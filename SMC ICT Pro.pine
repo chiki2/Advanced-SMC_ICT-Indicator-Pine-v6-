@@ -1,0 +1,737 @@
+//@version=6
+indicator("SMC / ICT Modular Engine [v6]", shorttitle="SMC ICT Modular", overlay=true, max_boxes_count=500, max_lines_count=500, max_labels_count=500)
+
+//==============================================================================
+// INPUTS
+//==============================================================================
+
+//------------------------------
+// 1) Structure
+//------------------------------
+groupStruct = "1) Structure"
+pivotLen           = input.int(3, "Pivot Length", minval=1, group=groupStruct)
+confirmByClose     = input.bool(true, "Confirm BOS / CHOCH by candle body close", group=groupStruct)
+showSwingLabels    = input.bool(true, "Show HH / HL / LH / LL labels", group=groupStruct)
+showSwingLevels    = input.bool(true, "Show swing high / low levels", group=groupStruct)
+showBOSCHOCH       = input.bool(true, "Show BOS / CHOCH labels", group=groupStruct)
+showConsolidation  = input.bool(true, "Shade consolidation", group=groupStruct)
+consolAtrMult      = input.float(1.5, "Consolidation max range (ATR multiple)", minval=0.1, step=0.1, group=groupStruct)
+consolLookbackBars = input.int(10, "Consolidation lookback bars", minval=1, group=groupStruct)
+
+//------------------------------
+// 2) Liquidity
+//------------------------------
+groupLiq = "2) Liquidity"
+showPrevDayLevels     = input.bool(true, "Show Previous Day High / Low", group=groupLiq)
+showPrevWeekLevels    = input.bool(true, "Show Previous Week High / Low", group=groupLiq)
+showPrevMonthLevels   = input.bool(true, "Show Previous Month High / Low", group=groupLiq)
+showPrevSessionLevels = input.bool(true, "Show Previous Session High / Low", group=groupLiq)
+
+showEqualHighLow     = input.bool(true, "Detect Equal Highs / Lows", group=groupLiq)
+eqToleranceAtr       = input.float(0.20, "EQH / EQL tolerance (ATR fraction)", minval=0.01, step=0.01, group=groupLiq)
+maxEQLevels          = input.int(20, "Max EQ levels", minval=1, group=groupLiq)
+
+showTrendlineLiq     = input.bool(true, "Show trendline liquidity", group=groupLiq)
+showSweeps           = input.bool(true, "Show liquidity sweeps", group=groupLiq)
+showInternalSweeps   = input.bool(true, "Show internal swing sweeps", group=groupLiq)
+showExternalSweeps   = input.bool(true, "Show external level sweeps", group=groupLiq)
+showIdm              = input.bool(true, "Show inducement / pullback sweep", group=groupLiq)
+
+//------------------------------
+// 3) Order Blocks / Breakers
+//------------------------------
+groupOB = "3) Order Blocks / Breaker Blocks"
+showOB             = input.bool(true, "Show Order Blocks", group=groupOB)
+showBreakerBlocks   = input.bool(true, "Show Breaker Blocks", group=groupOB)
+obLookbackBars     = input.int(20, "OB search depth", minval=2, group=groupOB)
+requireRecentSweep = input.bool(true, "Require recent liquidity sweep before OB", group=groupOB)
+sweepLookbackBars  = input.int(10, "Sweep lookback bars", minval=1, group=groupOB)
+obZoneMode         = input.string("Full Candle", "OB zone mode", options=["Full Candle", "Body Only"], group=groupOB)
+maxOBs             = input.int(25, "Max active OBs", minval=1, group=groupOB)
+showOBMid          = input.bool(true, "Show OB 50% line", group=groupOB)
+showRiskLevels     = input.bool(true, "Show latest OB stop cue", group=groupOB)
+
+//------------------------------
+// 4) Fair Value Gaps
+//------------------------------
+groupFVG = "4) Fair Value Gaps"
+showFVG             = input.bool(true, "Show FVGs", group=groupFVG)
+fvgMinAtrBody       = input.float(0.35, "Minimum displacement body (ATR)", minval=0.05, step=0.05, group=groupFVG)
+fvgMinBodyRatio     = input.float(0.55, "Minimum candle body ratio", minval=0.10, maxval=1.0, step=0.05, group=groupFVG)
+fvgFillMode         = input.string("Wick", "FVG mitigation mode", options=["Wick", "50%", "Close"], group=groupFVG)
+deleteMitigatedFVG  = input.bool(true, "Delete mitigated FVGs", group=groupFVG)
+maxFVGs             = input.int(30, "Max active FVGs", minval=1, group=groupFVG)
+
+//------------------------------
+// 5) Multi-Timeframe
+//------------------------------
+groupMTF = "5) Multi-Timeframe Context"
+htfTF           = input.timeframe("240", "Higher timeframe", group=groupMTF)
+showHTFLevels   = input.bool(true, "Show HTF swing levels", group=groupMTF)
+showHTFBiasBg   = input.bool(false, "Shade chart by HTF bias", group=groupMTF)
+showHTFBiasText = input.bool(true, "Show HTF bias in dashboard", group=groupMTF)
+
+//------------------------------
+// 6) Session / Killzone
+//------------------------------
+groupSession = "6) Session"
+useSessionLevels = input.bool(true, "Track previous session liquidity", group=groupSession)
+sessionWindow    = input.session("0700-1000", "Session window", group=groupSession)
+sessionTZ        = input.string("Asia/Jakarta", "Session timezone", group=groupSession)
+showSessionBg    = input.bool(false, "Shade active session", group=groupSession)
+
+//------------------------------
+// 7) Visuals
+//------------------------------
+groupStyle = "7) Visual Style"
+bullColor     = input.color(color.new(color.lime, 0), "Bullish color", group=groupStyle)
+bearColor     = input.color(color.new(color.red, 0), "Bearish color", group=groupStyle)
+liqColor      = input.color(color.new(color.aqua, 0), "Liquidity color", group=groupStyle)
+sessionColor  = input.color(color.new(color.blue, 0), "Session color", group=groupStyle)
+obBullBg      = input.color(color.new(color.teal, 85), "Bullish OB fill", group=groupStyle)
+obBearBg      = input.color(color.new(color.maroon, 85), "Bearish OB fill", group=groupStyle)
+fvgBullBg     = input.color(color.new(color.green, 86), "Bullish FVG fill", group=groupStyle)
+fvgBearBg     = input.color(color.new(color.red, 86), "Bearish FVG fill", group=groupStyle)
+showDashboard = input.bool(true, "Show dashboard", group=groupStyle)
+minConfluence = input.int(3, "Minimum confluence score", minval=1, maxval=6, group=groupStyle)
+
+//==============================================================================
+// STATE
+//==============================================================================
+
+//------------------------------
+// Structure state
+//------------------------------
+var float lastPH = na
+var float prevPH = na
+var int   lastPHBar = na
+var int   prevPHBar = na
+
+var float lastPL = na
+var float prevPL = na
+var int   lastPLBar = na
+var int   prevPLBar = na
+
+var int structTrend = 0   // 1 bullish, -1 bearish, 0 neutral
+
+//------------------------------
+// Latest risk cues
+//------------------------------
+var float lastBullOBStop = na
+var float lastBearOBStop = na
+
+//------------------------------
+// Trendline liquidity anchors
+//------------------------------
+var float hh1 = na
+var float hh2 = na
+var int   hh1Bar = na
+var int   hh2Bar = na
+
+var float ll1 = na
+var float ll2 = na
+var int   ll1Bar = na
+var int   ll2Bar = na
+
+var line highTrendLine = na
+var line lowTrendLine  = na
+
+//------------------------------
+// Equal highs / lows
+//------------------------------
+var line[]  eqLines  = array.new_line()
+var label[] eqLabels = array.new_label()
+var float[] eqLevels = array.new_float()
+var int[]   eqDirs   = array.new_int()   // 1 = EQH, -1 = EQL
+
+//------------------------------
+// OB state
+//------------------------------
+var box[]   obBoxes   = array.new_box()
+var line[]  obMids    = array.new_line()
+var float[] obTops    = array.new_float()
+var float[] obBots    = array.new_float()
+var int[]   obDirs    = array.new_int()   // 1 bull, -1 bear
+var bool[]  obBroken  = array.new_bool()
+var bool[]  obTouched = array.new_bool()
+
+//------------------------------
+// FVG state
+//------------------------------
+var box[]   fvgBoxes  = array.new_box()
+var float[] fvgTops   = array.new_float()
+var float[] fvgBots   = array.new_float()
+var int[]   fvgDirs   = array.new_int()   // 1 bull, -1 bear
+var bool[]  fvgFilled = array.new_bool()
+
+//------------------------------
+// Session state
+//------------------------------
+bool inSession = not na(time(timeframe.period, sessionWindow, sessionTZ))
+bool prevInSession = bar_index > 0 ? inSession[1] : false
+
+var float currSessHigh = na
+var float currSessLow  = na
+var float prevSessHigh = na
+var float prevSessLow  = na
+
+//==============================================================================
+// ENGINE HELPERS
+//==============================================================================
+
+f_mid(_a, _b) =>
+    (_a + _b) * 0.5
+
+f_delete_line(_l) =>
+    if not na(_l)
+        line.delete(_l)
+
+f_delete_box(_b) =>
+    if not na(_b)
+        box.delete(_b)
+
+f_delete_label(_l) =>
+    if not na(_l)
+        label.delete(_l)
+
+f_label(_x, _y, _txt, _style, _bg, _tc) =>
+    label.new(_x, _y, _txt, xloc=xloc.bar_index, style=_style, color=_bg, textcolor=_tc, size=size.tiny)
+
+f_overlaps(_top, _bot) =>
+    low <= _top and high >= _bot
+
+f_sweep_high(_lvl) =>
+    not na(_lvl) and high > _lvl and close < _lvl
+
+f_sweep_low(_lvl) =>
+    not na(_lvl) and low < _lvl and close > _lvl
+
+f_impulse_ok(_dir, _atr, _minBodyAtr, _minBodyRatio) =>
+    _rng = high - low
+    _body = math.abs(close - open)
+    _ratio = _rng > 0.0 ? _body / _rng : 0.0
+    bool ok = false
+    if _dir == 1
+        ok := close > open and _body >= _atr * _minBodyAtr and _ratio >= _minBodyRatio
+    else
+        ok := close < open and _body >= _atr * _minBodyAtr and _ratio >= _minBodyRatio
+    ok
+
+f_find_last_opposite(_dir, _lookback) =>
+    int off = na
+    for i = 1 to _lookback
+        bool opp = _dir == 1 ? close[i] < open[i] : close[i] > open[i]
+        if opp
+            off := i
+            break
+    off
+
+f_add_ob(_dir, _top, _bot, _leftBar) =>
+    _bg = _dir == 1 ? obBullBg : obBearBg
+    _bc = _dir == 1 ? color.new(color.teal, 0) : color.new(color.maroon, 0)
+    _box = box.new(left=_leftBar, top=_top, right=bar_index, bottom=_bot, xloc=xloc.bar_index, extend=extend.right, bgcolor=_bg, border_color=_bc, border_width=1)
+    array.push(obBoxes, _box)
+    array.push(obTops, _top)
+    array.push(obBots, _bot)
+    array.push(obDirs, _dir)
+    array.push(obBroken, false)
+    array.push(obTouched, false)
+
+    line _mid = na
+    if showOBMid
+        _mid := line.new(_leftBar, f_mid(_top, _bot), bar_index, f_mid(_top, _bot), xloc=xloc.bar_index, extend=extend.right, color=color.new(_bc, 0), style=line.style_dashed, width=1)
+    array.push(obMids, _mid)
+
+    if array.size(obBoxes) > maxOBs
+        oldBox = array.shift(obBoxes)
+        array.shift(obTops)
+        array.shift(obBots)
+        array.shift(obDirs)
+        array.shift(obBroken)
+        array.shift(obTouched)
+        oldMid = array.shift(obMids)
+        f_delete_box(oldBox)
+        f_delete_line(oldMid)
+
+f_add_fvg(_dir, _top, _bot, _leftBar) =>
+    _bg = _dir == 1 ? fvgBullBg : fvgBearBg
+    _bc = _dir == 1 ? color.new(color.green, 0) : color.new(color.red, 0)
+    _box = box.new(left=_leftBar, top=_top, right=bar_index, bottom=_bot, xloc=xloc.bar_index, extend=extend.right, bgcolor=_bg, border_color=_bc, border_width=1)
+    array.push(fvgBoxes, _box)
+    array.push(fvgTops, _top)
+    array.push(fvgBots, _bot)
+    array.push(fvgDirs, _dir)
+    array.push(fvgFilled, false)
+
+    if array.size(fvgBoxes) > maxFVGs
+        oldBox = array.shift(fvgBoxes)
+        array.shift(fvgTops)
+        array.shift(fvgBots)
+        array.shift(fvgDirs)
+        array.shift(fvgFilled)
+        f_delete_box(oldBox)
+
+//==============================================================================
+// ENGINE 1: SESSION TRACKING
+//==============================================================================
+
+if useSessionLevels
+    if inSession and not prevInSession
+        currSessHigh := high
+        currSessLow  := low
+    else if inSession
+        currSessHigh := na(currSessHigh) ? high : math.max(currSessHigh, high)
+        currSessLow  := na(currSessLow) ? low : math.min(currSessLow, low)
+    else if not inSession and prevInSession
+        prevSessHigh := currSessHigh
+        prevSessLow  := currSessLow
+
+//==============================================================================
+// ENGINE 2: HTF AND EXTERNAL LIQUIDITY
+//==============================================================================
+
+htfPH = request.security(syminfo.tickerid, htfTF, ta.pivothigh(high, pivotLen, pivotLen), gaps=barmerge.gaps_off, lookahead=barmerge.lookahead_off)
+htfPL = request.security(syminfo.tickerid, htfTF, ta.pivotlow(low, pivotLen, pivotLen), gaps=barmerge.gaps_off, lookahead=barmerge.lookahead_off)
+
+var int htfBias = 0
+if not na(htfPH) and close > htfPH
+    htfBias := 1
+else if not na(htfPL) and close < htfPL
+    htfBias := -1
+else
+    htfBias := nz(htfBias[1], 0)
+
+prevDayHigh   = request.security(syminfo.tickerid, "D", high[1], gaps=barmerge.gaps_off, lookahead=barmerge.lookahead_off)
+prevDayLow    = request.security(syminfo.tickerid, "D", low[1], gaps=barmerge.gaps_off, lookahead=barmerge.lookahead_off)
+prevWeekHigh  = request.security(syminfo.tickerid, "W", high[1], gaps=barmerge.gaps_off, lookahead=barmerge.lookahead_off)
+prevWeekLow   = request.security(syminfo.tickerid, "W", low[1], gaps=barmerge.gaps_off, lookahead=barmerge.lookahead_off)
+prevMonthHigh = request.security(syminfo.tickerid, "M", high[1], gaps=barmerge.gaps_off, lookahead=barmerge.lookahead_off)
+prevMonthLow  = request.security(syminfo.tickerid, "M", low[1], gaps=barmerge.gaps_off, lookahead=barmerge.lookahead_off)
+
+atr14 = ta.atr(14)
+eqTol = atr14 * eqToleranceAtr
+
+//==============================================================================
+// ENGINE 3: STRUCTURE / SWINGS
+//==============================================================================
+
+ph = ta.pivothigh(high, pivotLen, pivotLen)
+pl = ta.pivotlow(low, pivotLen, pivotLen)
+
+if not na(ph)
+    prevPH    := lastPH
+    prevPHBar := lastPHBar
+    lastPH    := ph
+    lastPHBar := bar_index - pivotLen
+
+    if showSwingLabels and not na(prevPH)
+        isHH = lastPH > prevPH
+        f_label(lastPHBar, lastPH, isHH ? "HH" : "LH", label.style_label_down, isHH ? color.new(bullColor, 0) : color.new(bearColor, 0), color.white)
+
+    if showEqualHighLow and not na(prevPH) and math.abs(lastPH - prevPH) <= eqTol
+        lvl = f_mid(lastPH, prevPH)
+        ln = line.new(prevPHBar, lvl, lastPHBar, lvl, xloc=xloc.bar_index, extend=extend.right, color=color.new(liqColor, 0), style=line.style_dashed, width=1)
+        lb = label.new(lastPHBar, lvl, "EQH", xloc=xloc.bar_index, style=label.style_label_down, color=color.new(liqColor, 0), textcolor=color.black, size=size.tiny)
+        array.push(eqLines, ln)
+        array.push(eqLabels, lb)
+        array.push(eqLevels, lvl)
+        array.push(eqDirs, 1)
+        if array.size(eqLines) > maxEQLevels
+            oldLn = array.shift(eqLines)
+            oldLb = array.shift(eqLabels)
+            array.shift(eqLevels)
+            array.shift(eqDirs)
+            f_delete_line(oldLn)
+            f_delete_label(oldLb)
+
+    hh2 := hh1
+    hh2Bar := hh1Bar
+    hh1 := lastPH
+    hh1Bar := lastPHBar
+
+    if showTrendlineLiq and not na(hh2) and not na(hh1) and not na(hh2Bar) and not na(hh1Bar)
+        f_delete_line(highTrendLine)
+        highTrendLine := line.new(hh2Bar, hh2, hh1Bar, hh1, xloc=xloc.bar_index, extend=extend.right, color=color.new(liqColor, 35), style=line.style_dotted, width=1)
+
+if not na(pl)
+    prevPL    := lastPL
+    prevPLBar := lastPLBar
+    lastPL    := pl
+    lastPLBar := bar_index - pivotLen
+
+    if showSwingLabels and not na(prevPL)
+        isHL = lastPL > prevPL
+        f_label(lastPLBar, lastPL, isHL ? "HL" : "LL", label.style_label_up, isHL ? color.new(bullColor, 0) : color.new(bearColor, 0), color.white)
+
+    if showEqualHighLow and not na(prevPL) and math.abs(lastPL - prevPL) <= eqTol
+        lvl = f_mid(lastPL, prevPL)
+        ln = line.new(prevPLBar, lvl, lastPLBar, lvl, xloc=xloc.bar_index, extend=extend.right, color=color.new(liqColor, 0), style=line.style_dashed, width=1)
+        lb = label.new(lastPLBar, lvl, "EQL", xloc=xloc.bar_index, style=label.style_label_up, color=color.new(liqColor, 0), textcolor=color.black, size=size.tiny)
+        array.push(eqLines, ln)
+        array.push(eqLabels, lb)
+        array.push(eqLevels, lvl)
+        array.push(eqDirs, -1)
+        if array.size(eqLines) > maxEQLevels
+            oldLn = array.shift(eqLines)
+            oldLb = array.shift(eqLabels)
+            array.shift(eqLevels)
+            array.shift(eqDirs)
+            f_delete_line(oldLn)
+            f_delete_label(oldLb)
+
+    ll2 := ll1
+    ll2Bar := ll1Bar
+    ll1 := lastPL
+    ll1Bar := lastPLBar
+
+    if showTrendlineLiq and not na(ll2) and not na(ll1) and not na(ll2Bar) and not na(ll1Bar)
+        f_delete_line(lowTrendLine)
+        lowTrendLine := line.new(ll2Bar, ll2, ll1Bar, ll1, xloc=xloc.bar_index, extend=extend.right, color=color.new(liqColor, 35), style=line.style_dotted, width=1)
+
+//==============================================================================
+// ENGINE 4: LIQUIDITY SWEEPS
+//==============================================================================
+
+bool structBuysideSweep  = showInternalSweeps and not na(lastPH) and f_sweep_high(lastPH)
+bool structSellsideSweep = showInternalSweeps and not na(lastPL) and f_sweep_low(lastPL)
+
+bool pdhSweep = showExternalSweeps and f_sweep_high(prevDayHigh)
+bool pdlSweep = showExternalSweeps and f_sweep_low(prevDayLow)
+bool pwhSweep = showExternalSweeps and f_sweep_high(prevWeekHigh)
+bool pwlSweep = showExternalSweeps and f_sweep_low(prevWeekLow)
+bool pmhSweep = showExternalSweeps and f_sweep_high(prevMonthHigh)
+bool pmlSweep = showExternalSweeps and f_sweep_low(prevMonthLow)
+bool pshSweep = showExternalSweeps and f_sweep_high(prevSessHigh)
+bool pslSweep = showExternalSweeps and f_sweep_low(prevSessLow)
+
+bool eqhSweep = false
+bool eqlSweep = false
+if showEqualHighLow and array.size(eqLevels) > 0
+    for i = 0 to array.size(eqLevels) - 1
+        lvl = array.get(eqLevels, i)
+        d   = array.get(eqDirs, i)
+        if d == 1 and high > lvl and close < lvl
+            eqhSweep := true
+        if d == -1 and low < lvl and close > lvl
+            eqlSweep := true
+
+trendHighPrice = showTrendlineLiq and not na(hh2) and not na(hh1) and not na(hh2Bar) and not na(hh1Bar) ? (hh1Bar == hh2Bar ? hh1 : hh2 + (hh1 - hh2) * (bar_index - hh2Bar) / (hh1Bar - hh2Bar)) : na
+trendLowPrice  = showTrendlineLiq and not na(ll2) and not na(ll1) and not na(ll2Bar) and not na(ll1Bar) ? (ll1Bar == ll2Bar ? ll1 : ll2 + (ll1 - ll2) * (bar_index - ll2Bar) / (ll1Bar - ll2Bar)) : na
+
+bool trendHighSweep = showTrendlineLiq and not na(trendHighPrice) and high > trendHighPrice and close < trendHighPrice
+bool trendLowSweep  = showTrendlineLiq and not na(trendLowPrice) and low < trendLowPrice and close > trendLowPrice
+
+bool sellsideRaid = structSellsideSweep or pdlSweep or pwlSweep or pmlSweep or pslSweep or eqlSweep or trendLowSweep
+bool buysideRaid  = structBuysideSweep or pdhSweep or pwhSweep or pmhSweep or pshSweep or eqhSweep or trendHighSweep
+
+idmUp   = showIdm and structTrend == 1 and not na(low[1]) and low < low[1] and close > low[1]
+idmDown = showIdm and structTrend == -1 and not na(high[1]) and high > high[1] and close < high[1]
+
+//==============================================================================
+// ENGINE 5: BOS / CHOCH
+//==============================================================================
+
+bool bullBreak = false
+bool bearBreak = false
+bool bosUp = false
+bool bosDown = false
+bool chochUp = false
+bool chochDown = false
+
+if barstate.isconfirmed
+    bullBreak := confirmByClose ? (not na(lastPH) and close > lastPH and close[1] <= lastPH) : (not na(lastPH) and high > lastPH and high[1] <= lastPH)
+    bearBreak := confirmByClose ? (not na(lastPL) and close < lastPL and close[1] >= lastPL) : (not na(lastPL) and low < lastPL and low[1] >= lastPL)
+
+    if bullBreak
+        chochUp := structTrend == -1
+        bosUp   := not chochUp
+        structTrend := 1
+        if showBOSCHOCH
+            f_label(bar_index, close, chochUp ? "CHOCH ↑" : "BOS ↑", label.style_label_up, color.new(bullColor, 0), color.white)
+
+    if bearBreak
+        chochDown := structTrend == 1
+        bosDown   := not chochDown
+        structTrend := -1
+        if showBOSCHOCH
+            f_label(bar_index, close, chochDown ? "CHOCH ↓" : "BOS ↓", label.style_label_down, color.new(bearColor, 0), color.white)
+
+//==============================================================================
+// ENGINE 6: OB / BREAKERS
+//==============================================================================
+
+barsSinceSellside = ta.barssince(sellsideRaid)
+barsSinceBuyside  = ta.barssince(buysideRaid)
+recentSellsideRaid = not na(barsSinceSellside) and barsSinceSellside <= sweepLookbackBars
+recentBuysideRaid  = not na(barsSinceBuyside) and barsSinceBuyside <= sweepLookbackBars
+
+bullImpulse = f_impulse_ok(1, atr14, fvgMinAtrBody, fvgMinBodyRatio)
+bearImpulse = f_impulse_ok(-1, atr14, fvgMinAtrBody, fvgMinBodyRatio)
+
+if barstate.isconfirmed and showOB
+    if bullBreak and bullImpulse and (not requireRecentSweep or recentSellsideRaid)
+        int off = f_find_last_opposite(-1, obLookbackBars)
+        if not na(off)
+            float top = obZoneMode == "Body Only" ? math.max(open[off], close[off]) : high[off]
+            float bot = obZoneMode == "Body Only" ? math.min(open[off], close[off]) : low[off]
+            f_add_ob(1, top, bot, bar_index - off)
+            lastBullOBStop := bot
+            f_label(bar_index, low, "Bull OB", label.style_label_up, color.new(color.teal, 0), color.white)
+
+    if bearBreak and bearImpulse and (not requireRecentSweep or recentBuysideRaid)
+        int off = f_find_last_opposite(1, obLookbackBars)
+        if not na(off)
+            float top = obZoneMode == "Body Only" ? math.max(open[off], close[off]) : high[off]
+            float bot = obZoneMode == "Body Only" ? math.min(open[off], close[off]) : low[off]
+            f_add_ob(-1, top, bot, bar_index - off)
+            lastBearOBStop := top
+            f_label(bar_index, high, "Bear OB", label.style_label_down, color.new(color.maroon, 0), color.white)
+
+if array.size(obBoxes) > 0
+    for i = array.size(obBoxes) - 1 to 0
+        _box = array.get(obBoxes, i)
+        _top = array.get(obTops, i)
+        _bot = array.get(obBots, i)
+        _dir = array.get(obDirs, i)
+        _brk = array.get(obBroken, i)
+        _tch = array.get(obTouched, i)
+
+        touchedNow = f_overlaps(_top, _bot)
+
+        if not _tch and touchedNow
+            array.set(obTouched, i, true)
+            box.set_bgcolor(_box, color.new(_dir == 1 ? color.teal : color.maroon, 92))
+
+        if showBreakerBlocks and not _brk
+            bullInvalid = _dir == 1 and close < _bot
+            bearInvalid = _dir == -1 and close > _top
+            if bullInvalid or bearInvalid
+                array.set(obBroken, i, true)
+                box.set_bgcolor(_box, color.new(color.gray, 82))
+                box.set_border_color(_box, color.new(color.gray, 0))
+                f_label(bar_index, close, "BB", bullInvalid ? label.style_label_down : label.style_label_up, color.new(color.gray, 0), color.white)
+
+//==============================================================================
+// ENGINE 7: FVG
+//==============================================================================
+
+if barstate.isconfirmed and showFVG and bar_index >= 2
+    bool bullFVG = bullImpulse and low > high[2]
+    bool bearFVG = bearImpulse and high < low[2]
+
+    if bullFVG
+        f_add_fvg(1, low, high[2], bar_index - 2)
+        f_label(bar_index, low, "FVG ↑", label.style_label_up, color.new(color.green, 0), color.white)
+
+    if bearFVG
+        f_add_fvg(-1, low[2], high, bar_index - 2)
+        f_label(bar_index, high, "FVG ↓", label.style_label_down, color.new(color.red, 0), color.white)
+
+if array.size(fvgBoxes) > 0
+    for i = array.size(fvgBoxes) - 1 to 0
+        _box  = array.get(fvgBoxes, i)
+        _top  = array.get(fvgTops, i)
+        _bot  = array.get(fvgBots, i)
+        _dir  = array.get(fvgDirs, i)
+        _fill = array.get(fvgFilled, i)
+
+        float mid = f_mid(_top, _bot)
+
+        bool filledNow =
+             fvgFillMode == "Wick"  ? (_dir == 1 ? low <= _bot : high >= _top) :
+             fvgFillMode == "50%"   ? (_dir == 1 ? low <= mid  : high >= mid)  :
+                                      (_dir == 1 ? close <= _bot : close >= _top)
+
+        if not _fill and filledNow
+            array.set(fvgFilled, i, true)
+            if deleteMitigatedFVG
+                f_delete_box(_box)
+                array.remove(fvgBoxes, i)
+                array.remove(fvgTops, i)
+                array.remove(fvgBots, i)
+                array.remove(fvgDirs, i)
+                array.remove(fvgFilled, i)
+            else
+                box.set_bgcolor(_box, color.new(color.gray, 90))
+                box.set_border_color(_box, color.new(color.gray, 40))
+
+//==============================================================================
+// ENGINE 8: CONSOLIDATION
+//==============================================================================
+
+barsSinceBreak = ta.barssince(bosUp or bosDown or chochUp or chochDown)
+rangeWidth = (not na(lastPH) and not na(lastPL)) ? math.abs(lastPH - lastPL) : na
+bool isConsolidation = showConsolidation and not na(rangeWidth) and rangeWidth <= atr14 * consolAtrMult and (na(barsSinceBreak) ? true : barsSinceBreak > consolLookbackBars)
+
+//==============================================================================
+// RENDER 1: BACKGROUND
+//==============================================================================
+
+color bgCol = na
+if showSessionBg and inSession
+    bgCol := color.new(sessionColor, 92)
+else if showHTFBiasBg and htfBias != 0
+    bgCol := htfBias == 1 ? color.new(color.green, 92) : color.new(color.red, 92)
+else if isConsolidation
+    bgCol := color.new(color.gray, 90)
+
+bgcolor(bgCol)
+
+//==============================================================================
+// RENDER 2: LIQUIDITY LABELS
+//==============================================================================
+
+if barstate.isconfirmed and showSweeps
+    if structBuysideSweep
+        f_label(bar_index, high, "BSL Sweep", label.style_label_down, color.new(liqColor, 0), color.black)
+    if structSellsideSweep
+        f_label(bar_index, low, "SSL Sweep", label.style_label_up, color.new(liqColor, 0), color.black)
+
+    if pdhSweep
+        f_label(bar_index, high, "PDH Sweep", label.style_label_down, color.new(liqColor, 0), color.black)
+    if pdlSweep
+        f_label(bar_index, low, "PDL Sweep", label.style_label_up, color.new(liqColor, 0), color.black)
+    if pwhSweep
+        f_label(bar_index, high, "PWH Sweep", label.style_label_down, color.new(liqColor, 0), color.black)
+    if pwlSweep
+        f_label(bar_index, low, "PWL Sweep", label.style_label_up, color.new(liqColor, 0), color.black)
+    if pmhSweep
+        f_label(bar_index, high, "PMH Sweep", label.style_label_down, color.new(liqColor, 0), color.black)
+    if pmlSweep
+        f_label(bar_index, low, "PML Sweep", label.style_label_up, color.new(liqColor, 0), color.black)
+    if pshSweep
+        f_label(bar_index, high, "PSH Sweep", label.style_label_down, color.new(liqColor, 0), color.black)
+    if pslSweep
+        f_label(bar_index, low, "PSL Sweep", label.style_label_up, color.new(liqColor, 0), color.black)
+    if eqhSweep
+        f_label(bar_index, high, "EQH Sweep", label.style_label_down, color.new(liqColor, 0), color.black)
+    if eqlSweep
+        f_label(bar_index, low, "EQL Sweep", label.style_label_up, color.new(liqColor, 0), color.black)
+    if trendHighSweep
+        f_label(bar_index, high, "TL Sweep ↑", label.style_label_down, color.new(liqColor, 0), color.black)
+    if trendLowSweep
+        f_label(bar_index, low, "TL Sweep ↓", label.style_label_up, color.new(liqColor, 0), color.black)
+
+if barstate.isconfirmed and showIdm
+    if idmUp
+        f_label(bar_index, low, "IDM ↑", label.style_label_up, color.new(color.yellow, 0), color.black)
+    if idmDown
+        f_label(bar_index, high, "IDM ↓", label.style_label_down, color.new(color.yellow, 0), color.black)
+
+//==============================================================================
+// RENDER 3: DASHBOARD
+//==============================================================================
+
+bool priceInBullOB = false
+bool priceInBearOB = false
+bool priceInBullFVG = false
+bool priceInBearFVG = false
+
+if array.size(obBoxes) > 0
+    for i = 0 to array.size(obBoxes) - 1
+        _top = array.get(obTops, i)
+        _bot = array.get(obBots, i)
+        _dir = array.get(obDirs, i)
+        _brk = array.get(obBroken, i)
+        if not _brk and f_overlaps(_top, _bot)
+            if _dir == 1
+                priceInBullOB := true
+            else
+                priceInBearOB := true
+
+if array.size(fvgBoxes) > 0
+    for i = 0 to array.size(fvgBoxes) - 1
+        _top = array.get(fvgTops, i)
+        _bot = array.get(fvgBots, i)
+        _dir = array.get(fvgDirs, i)
+        _filled = array.get(fvgFilled, i)
+        if not _filled and f_overlaps(_top, _bot)
+            if _dir == 1
+                priceInBullFVG := true
+            else
+                priceInBearFVG := true
+
+bullScore = 0
+bullScore += htfBias >= 0 ? 1 : 0
+bullScore += recentSellsideRaid ? 1 : 0
+bullScore += priceInBullOB ? 1 : 0
+bullScore += priceInBullFVG ? 1 : 0
+bullScore += inSession ? 1 : 0
+
+bearScore = 0
+bearScore += htfBias <= 0 ? 1 : 0
+bearScore += recentBuysideRaid ? 1 : 0
+bearScore += priceInBearOB ? 1 : 0
+bearScore += priceInBearFVG ? 1 : 0
+bearScore += inSession ? 1 : 0
+
+bullSetup = bullScore >= minConfluence and structTrend != -1
+bearSetup = bearScore >= minConfluence and structTrend != 1
+
+var table dash = table.new(position.top_right, 2, 6, border_width=1)
+
+if showDashboard and barstate.islast
+    structureText = structTrend == 1 ? "Bullish" : structTrend == -1 ? "Bearish" : "Neutral"
+    htfText = showHTFBiasText ? (htfBias == 1 ? "Bullish" : htfBias == -1 ? "Bearish" : "Neutral") : "Hidden"
+    sessionText = inSession ? "Active" : "Inactive"
+    poiText = (priceInBullOB or priceInBullFVG or priceInBearOB or priceInBearFVG) ? "Active" : "None"
+
+    table.cell(dash, 0, 0, "Structure", text_color=color.white, bgcolor=color.new(color.black, 0))
+    table.cell(dash, 1, 0, structureText, text_color=color.white, bgcolor=structTrend == 1 ? color.new(bullColor, 65) : structTrend == -1 ? color.new(bearColor, 65) : color.new(color.gray, 65))
+
+    table.cell(dash, 0, 1, "HTF Bias", text_color=color.white, bgcolor=color.new(color.black, 0))
+    table.cell(dash, 1, 1, htfText, text_color=color.white, bgcolor=htfBias == 1 ? color.new(bullColor, 65) : htfBias == -1 ? color.new(bearColor, 65) : color.new(color.gray, 65))
+
+    table.cell(dash, 0, 2, "Session", text_color=color.white, bgcolor=color.new(color.black, 0))
+    table.cell(dash, 1, 2, sessionText, text_color=color.white, bgcolor=inSession ? color.new(sessionColor, 70) : color.new(color.gray, 80))
+
+    table.cell(dash, 0, 3, "Bull Score", text_color=color.white, bgcolor=color.new(color.black, 0))
+    table.cell(dash, 1, 3, str.tostring(bullScore), text_color=color.white, bgcolor=bullSetup ? color.new(bullColor, 65) : color.new(color.gray, 80))
+
+    table.cell(dash, 0, 4, "Bear Score", text_color=color.white, bgcolor=color.new(color.black, 0))
+    table.cell(dash, 1, 4, str.tostring(bearScore), text_color=color.white, bgcolor=bearSetup ? color.new(bearColor, 65) : color.new(color.gray, 80))
+
+    table.cell(dash, 0, 5, "POI", text_color=color.white, bgcolor=color.new(color.black, 0))
+    table.cell(dash, 1, 5, poiText, text_color=color.white, bgcolor=(priceInBullOB or priceInBullFVG or priceInBearOB or priceInBearFVG) ? color.new(liqColor, 75) : color.new(color.gray, 80))
+
+//==============================================================================
+// RENDER 4: PLOTS
+//==============================================================================
+
+// Swing structure
+plot(showSwingLevels ? lastPH : na, "Last Swing High", color=color.new(color.orange, 0), style=plot.style_linebr, linewidth=1)
+plot(showSwingLevels ? lastPL : na, "Last Swing Low", color=color.new(color.aqua, 0), style=plot.style_linebr, linewidth=1)
+
+// HTF levels
+plot(showHTFLevels ? htfPH : na, "HTF Swing High", color=color.new(color.orange, 35), style=plot.style_linebr, linewidth=2)
+plot(showHTFLevels ? htfPL : na, "HTF Swing Low", color=color.new(color.aqua, 35), style=plot.style_linebr, linewidth=2)
+
+// External liquidity
+plot(showPrevDayLevels ? prevDayHigh : na, "PDH", color=color.new(color.orange, 0), style=plot.style_linebr, linewidth=1)
+plot(showPrevDayLevels ? prevDayLow : na, "PDL", color=color.new(color.orange, 0), style=plot.style_linebr, linewidth=1)
+
+plot(showPrevWeekLevels ? prevWeekHigh : na, "PWH", color=color.new(color.fuchsia, 0), style=plot.style_linebr, linewidth=1)
+plot(showPrevWeekLevels ? prevWeekLow : na, "PWL", color=color.new(color.fuchsia, 0), style=plot.style_linebr, linewidth=1)
+
+plot(showPrevMonthLevels ? prevMonthHigh : na, "PMH", color=color.new(color.blue, 0), style=plot.style_linebr, linewidth=1)
+plot(showPrevMonthLevels ? prevMonthLow : na, "PML", color=color.new(color.blue, 0), style=plot.style_linebr, linewidth=1)
+
+plot(showPrevSessionLevels ? prevSessHigh : na, "PSH", color=color.new(color.purple, 0), style=plot.style_linebr, linewidth=1)
+plot(showPrevSessionLevels ? prevSessLow : na, "PSL", color=color.new(color.purple, 0), style=plot.style_linebr, linewidth=1)
+
+// Risk cues
+plot(showRiskLevels ? lastBullOBStop : na, "Bull OB Stop", color=color.new(color.red, 0), style=plot.style_linebr, linewidth=1)
+plot(showRiskLevels ? lastBearOBStop : na, "Bear OB Stop", color=color.new(color.green, 0), style=plot.style_linebr, linewidth=1)
+
+//==============================================================================
+// ALERTS
+//==============================================================================
+
+alertcondition(bosUp, "BOS Up", "Bullish BOS confirmed by body close.")
+alertcondition(bosDown, "BOS Down", "Bearish BOS confirmed by body close.")
+alertcondition(chochUp, "CHOCH Up", "Bullish CHOCH confirmed by body close.")
+alertcondition(chochDown, "CHOCH Down", "Bearish CHOCH confirmed by body close.")
+alertcondition(sellsideRaid, "Sellside Liquidity Raid", "Sellside liquidity raid detected.")
+alertcondition(buysideRaid, "Buyside Liquidity Raid", "Buyside liquidity raid detected.")
+alertcondition(bullSetup, "Bullish ICT Confluence", "Bullish ICT confluence reached.")
+alertcondition(bearSetup, "Bearish ICT Confluence", "Bearish ICT confluence reached.")

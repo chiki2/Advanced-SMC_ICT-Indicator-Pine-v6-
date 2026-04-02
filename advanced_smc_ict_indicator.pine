@@ -1,0 +1,1282 @@
+//@version=6
+indicator("Advanced SMC / ICT Indicator", shorttitle="Advanced SMC/ICT", overlay=true, max_lines_count=500, max_labels_count=500, max_boxes_count=500)
+
+//------------------------------------------------------------------------------
+// Inputs
+//------------------------------------------------------------------------------
+groupStructure = "1. Market Structure"
+showStructureLabels = input.bool(true, "Show HH / HL / LL / LH labels", group=groupStructure)
+showBosChoch = input.bool(true, "Show BOS / CHOCH markers", group=groupStructure)
+showIdm = input.bool(true, "Show inducement markers", group=groupStructure)
+showTrendBackground = input.bool(true, "Tint background by current bias", group=groupStructure)
+swingLen = input.int(3, "Swing confirmation length", minval=2, maxval=10, group=groupStructure)
+consolidationBars = input.int(18, "Bars without BOS before consolidation", minval=5, maxval=100, group=groupStructure)
+breakMode = input.string("Close Through", "Structure confirmation", options=["Close Through", "Full Body Through"], group=groupStructure)
+
+groupLiquidity = "2. Liquidity"
+showLiquidity = input.bool(true, "Show liquidity pools", group=groupLiquidity)
+showPrevSession = input.bool(true, "Show previous session high / low", group=groupLiquidity)
+showHigherPeriodLiquidity = input.bool(true, "Show previous day / week / month high / low", group=groupLiquidity)
+showInternalRange = input.bool(true, "Show internal range liquidity", group=groupLiquidity)
+showTrendlineLiquidity = input.bool(true, "Show trendline liquidity", group=groupLiquidity)
+showSweeps = input.bool(true, "Show liquidity sweep markers", group=groupLiquidity)
+liquiditySessionMode = input.string("ICT Asia", "Liquidity session source", options=["ICT Asia", "ICT London", "ICT New York", "Custom"], group=groupLiquidity)
+sessionInput = input.session("0000-2359", "Session for previous session liquidity", group=groupLiquidity)
+ictSessionTimezone = input.string("America/New_York", "ICT session timezone", group=groupLiquidity)
+equalToleranceAtr = input.float(0.10, "Equal highs / lows ATR tolerance", minval=0.01, maxval=1.00, step=0.01, group=groupLiquidity)
+
+groupOb = "3. Order Blocks / Breakers"
+showOb = input.bool(true, "Show order blocks", group=groupOb)
+obSearchBars = input.int(12, "Lookback for last opposing candle", minval=3, maxval=40, group=groupOb)
+obValidationLookback = input.int(8, "Sweep / FVG validation lookback", minval=2, maxval=20, group=groupOb)
+obImpulseAtr = input.float(1.00, "Minimum impulse range in ATR", minval=0.2, maxval=4.0, step=0.1, group=groupOb)
+obZoneMode = input.string("Open-to-Wick", "OB zone bounds", options=["Full Candle", "Open-to-Wick", "Body"], group=groupOb)
+obEntryMode = input.string("Midpoint", "Precision entry line", options=["Open", "Midpoint", "Wick"], group=groupOb)
+maxObZones = input.int(12, "Maximum OB / Breaker zones", minval=3, maxval=30, group=groupOb)
+
+groupFvg = "4. Fair Value Gaps"
+showFvg = input.bool(true, "Show fair value gaps", group=groupFvg)
+fvgMinAtr = input.float(0.15, "Minimum FVG size in ATR", minval=0.01, maxval=2.0, step=0.01, group=groupFvg)
+maxFvgZones = input.int(16, "Maximum live FVG zones", minval=4, maxval=40, group=groupFvg)
+
+groupHtf = "5. Higher Timeframe Context"
+showHtf = input.bool(true, "Show higher timeframe structure", group=groupHtf)
+htfTf = input.timeframe("240", "Manual higher timeframe override", group=groupHtf)
+allowManualHtfOverride = input.bool(false, "Allow manual HTF override inside ICT band", group=groupHtf)
+stopOnInvalidTf = input.bool(true, "Stop script on invalid ICT TF pairing", group=groupHtf)
+htfSwingLen = input.int(2, "HTF swing confirmation length", minval=1, maxval=10, group=groupHtf)
+showHtfBias = input.bool(true, "Show higher timeframe bias in table", group=groupHtf)
+
+groupRisk = "6. Risk Cues"
+showRisk = input.bool(false, "Show stop cues", group=groupRisk)
+stopAtrBuffer = input.float(0.10, "Stop buffer in ATR", minval=0.0, maxval=2.0, step=0.05, group=groupRisk)
+
+groupLifecycle = "7. Setup Lifecycle"
+setupFreshBars = input.int(6, "Fresh setup bars", minval=1, maxval=50, group=groupLifecycle)
+setupExpiryBars = input.int(25, "Expire setup after bars", minval=3, maxval=200, group=groupLifecycle)
+setupChaseAtr = input.float(1.50, "Cancel if price runs away (ATR)", minval=0.5, maxval=5.0, step=0.25, group=groupLifecycle)
+setupManagedR = input.float(1.00, "Managed after move (R)", minval=0.5, maxval=5.0, step=0.25, group=groupLifecycle)
+
+groupStrict = "8. Strict ICT Entry"
+strictIctMode = input.bool(false, "Enable Strict ICT Entry mode", group=groupStrict)
+strictRequireHtfBias = input.bool(true, "Require higher timeframe bias alignment", group=groupStrict)
+strictRequirePd = input.bool(true, "Require premium / discount filter", group=groupStrict)
+strictRequireOte = input.bool(true, "Require OTE overlap", group=groupStrict)
+strictRequireKillzone = input.bool(true, "Require killzone session", group=groupStrict)
+strictKillzoneSession = input.string("0200-0500,0700-1000", "Killzone session", group=groupStrict)
+strictMssLookback = input.int(10, "MSS / displacement lookback bars", minval=2, maxval=50, group=groupStrict)
+strictShowOte = input.bool(true, "Show OTE zone", group=groupStrict)
+
+groupStyle = "9. Style"
+showDashboard = input.bool(true, "Show context dashboard", group=groupStyle)
+showProtectedLevels = input.bool(true, "Show protected high / low", group=groupStyle)
+showActiveDealingRange = input.bool(true, "Show active dealing range", group=groupStyle)
+showPremiumDiscount = input.bool(true, "Show premium / discount zones", group=groupStyle)
+showKillzoneVisual = input.bool(true, "Shade killzone on chart", group=groupStyle)
+
+groupMobile = "10. Mobile / Android"
+androidCompactMode = input.bool(false, "Android compact mode", group=groupMobile)
+mobileCompactDashboard = input.bool(true, "Use compact dashboard", group=groupMobile)
+mobileCompactLabels = input.bool(true, "Use short labels", group=groupMobile)
+mobileHideStructureLabels = input.bool(true, "Hide structure labels", group=groupMobile)
+mobileHideSecondaryLiquidity = input.bool(true, "Hide weekly / monthly liquidity", group=groupMobile)
+mobileHideTrendlineLiquidity = input.bool(true, "Hide trendline liquidity", group=groupMobile)
+mobileHideInternalRange = input.bool(true, "Hide internal range fill", group=groupMobile)
+mobileHideTrendBackground = input.bool(true, "Hide trend background tint", group=groupMobile)
+mobileMaxObVisible = input.int(5, "Max OB zones in compact mode", minval=2, maxval=12, group=groupMobile)
+mobileMaxFvgVisible = input.int(6, "Max FVG zones in compact mode", minval=2, maxval=16, group=groupMobile)
+
+//------------------------------------------------------------------------------
+// Styling and helpers
+//------------------------------------------------------------------------------
+bullColor = color.rgb(15, 156, 119)
+bearColor = color.rgb(201, 76, 76)
+neutralColor = color.rgb(128, 128, 128)
+liqHighColor = color.rgb(44, 120, 200)
+liqLowColor = color.rgb(230, 145, 56)
+fvgBullColor = color.new(color.rgb(33, 150, 120), 82)
+fvgBearColor = color.new(color.rgb(206, 81, 81), 82)
+obBullColor = color.new(color.rgb(33, 150, 120), 82)
+obBearColor = color.new(color.rgb(206, 81, 81), 82)
+bbBullColor = color.new(color.rgb(33, 100, 180), 80)
+bbBearColor = color.new(color.rgb(180, 110, 33), 80)
+
+atr = ta.atr(14)
+bodyHigh = math.max(open, close)
+bodyLow = math.min(open, close)
+equalTolerance = atr * equalToleranceAtr
+compactMode = androidCompactMode
+compactDashboardMode = androidCompactMode and mobileCompactDashboard
+displayStructureLabels = showStructureLabels and not (compactMode and mobileHideStructureLabels)
+displayTrendlineLiquidity = showTrendlineLiquidity and not (compactMode and mobileHideTrendlineLiquidity)
+displayInternalRange = showInternalRange and not (compactMode and mobileHideInternalRange)
+displayTrendBackground = showTrendBackground and not (compactMode and mobileHideTrendBackground)
+displayWeekMonthLiquidity = showHigherPeriodLiquidity and not (compactMode and mobileHideSecondaryLiquidity)
+displayProtectedLevels = showProtectedLevels and not compactMode
+displayDealingRange = showActiveDealingRange and displayInternalRange
+displayPremiumDiscount = showPremiumDiscount and displayDealingRange
+displayKillzoneVisual = showKillzoneVisual and not (compactMode and mobileHideTrendBackground)
+effectiveMaxObZones = compactMode ? math.min(maxObZones, mobileMaxObVisible) : maxObZones
+effectiveMaxFvgZones = compactMode ? math.min(maxFvgZones, mobileMaxFvgVisible) : maxFvgZones
+
+//------------------------------------------------------------------------------
+// Stateful arrays for FVG / OB tracking
+//------------------------------------------------------------------------------
+var box[] fvgBoxes = array.new_box()
+var float[] fvgTops = array.new_float()
+var float[] fvgBottoms = array.new_float()
+var bool[] fvgBull = array.new_bool()
+var label[] fvgLabels = array.new_label()
+var int[] fvgCreatedBars = array.new_int()
+var bool[] fvgTouched = array.new_bool()
+
+var box[] obBoxes = array.new_box()
+var line[] obEntryLines = array.new_line()
+var float[] obTops = array.new_float()
+var float[] obBottoms = array.new_float()
+var bool[] obBull = array.new_bool()
+var bool[] obBreaker = array.new_bool()
+var label[] obLabels = array.new_label()
+var int[] obCreatedBars = array.new_int()
+var bool[] obTouched = array.new_bool()
+
+f_breakUp(float level) =>
+    breakMode == "Full Body Through" ? bodyLow > level : close > level
+
+f_breakDown(float level) =>
+    breakMode == "Full Body Through" ? bodyHigh < level : close < level
+
+f_biasText(int bias) =>
+    bias == 1 ? "Bullish" : bias == -1 ? "Bearish" : "Consolidation"
+
+f_biasShort(int bias) =>
+    bias == 1 ? "Bull" : bias == -1 ? "Bear" : "Range"
+
+f_zoneMid(float zoneTop, float zoneBottom) =>
+    (zoneTop + zoneBottom) * 0.5
+
+f_fvgLabelText(bool isBull) =>
+    compactMode and mobileCompactLabels ? (isBull ? "FVG+" : "FVG-") : (isBull ? "Bullish FVG" : "Bearish FVG")
+
+f_obLabelText(bool isBull, bool isBreaker) =>
+    compactMode and mobileCompactLabels ? (isBreaker ? (isBull ? "BRK+" : "BRK-") : (isBull ? "OB+" : "OB-")) : (isBreaker ? (isBull ? "Bullish Breaker" : "Bearish Breaker") : (isBull ? "Bullish OB" : "Bearish OB"))
+
+f_formatLevel(float price) =>
+    na(price) ? "-" : str.tostring(price, format.mintick)
+
+f_selectAbove(float base, float best, float candidate) =>
+    float result = best
+    if not na(base) and not na(candidate) and candidate > base
+        if na(result) or candidate < result
+            result := candidate
+    result
+
+f_selectBelow(float base, float best, float candidate) =>
+    float result = best
+    if not na(base) and not na(candidate) and candidate < base
+        if na(result) or candidate > result
+            result := candidate
+    result
+
+f_clamp(float value, float minValue, float maxValue) =>
+    math.max(minValue, math.min(maxValue, value))
+
+f_formatRange(float zoneTop, float zoneBottom) =>
+    na(zoneTop) or na(zoneBottom) ? "-" : str.tostring(zoneBottom, format.mintick) + " - " + str.tostring(zoneTop, format.mintick)
+
+f_formatPercent(float value) =>
+    na(value) ? "-" : str.tostring(math.round(value)) + "%"
+
+f_formatRr(float rr) =>
+    na(rr) ? "-" : str.tostring(math.round(rr * 100.0) / 100.0) + "R"
+
+f_alignmentText(bool isBull, int ltfBias, int higherBias) =>
+    if isBull
+        ltfBias == 1 and higherBias == 1 ? "Strong" : ltfBias == 1 or higherBias == 1 ? "Mixed" : "Counter"
+    else
+        ltfBias == -1 and higherBias == -1 ? "Strong" : ltfBias == -1 or higherBias == -1 ? "Mixed" : "Counter"
+
+f_statusCompact(string statusText) =>
+    statusText == "Valid now" ? "Valid" : statusText == "Strict Ready" ? "Ready" : statusText == "Invalidated" ? "Invalid" : statusText == "Standby" ? "Standby" : statusText == "Managed" ? "Mngd" : statusText == "Replaced" ? "Newer" : statusText == "Expired" ? "Exp" : statusText == "Chased" ? "Chased" : statusText == "Filtered" ? "Filter" : statusText == "Wait KZ" ? "WaitKZ" : statusText
+
+f_zoneTouched(float zoneTop, float zoneBottom) =>
+    not na(zoneTop) and not na(zoneBottom) and high >= zoneBottom and low <= zoneTop
+
+f_zoneIntersects(float zoneTop, float zoneBottom, float refTop, float refBottom) =>
+    not na(zoneTop) and not na(zoneBottom) and not na(refTop) and not na(refBottom) and math.max(zoneBottom, refBottom) <= math.min(zoneTop, refTop)
+
+f_boolFlag(bool cond) =>
+    cond ? "Y" : "N"
+
+f_bodyShare(int shift) =>
+    float candleRange = high[shift] - low[shift]
+    candleRange > 0 ? math.abs(close[shift] - open[shift]) / candleRange : 0.0
+
+f_legLowSince(int sourceBar, int maxBars) =>
+    float result = na
+    int barsCount = na(sourceBar) ? math.min(maxBars, bar_index + 1) : math.min(maxBars, bar_index - sourceBar + 1)
+    if barsCount > 0
+        result := low
+        for i = 0 to barsCount - 1
+            result := na(result) ? low[i] : math.min(result, low[i])
+    result
+
+f_legHighSince(int sourceBar, int maxBars) =>
+    float result = na
+    int barsCount = na(sourceBar) ? math.min(maxBars, bar_index + 1) : math.min(maxBars, bar_index - sourceBar + 1)
+    if barsCount > 0
+        result := high
+        for i = 0 to barsCount - 1
+            result := na(result) ? high[i] : math.max(result, high[i])
+    result
+
+f_sessionPreset(string sessionMode, string customSession) =>
+    sessionMode == "ICT Asia" ? "2000-0000" :
+         sessionMode == "ICT London" ? "0200-0500" :
+         sessionMode == "ICT New York" ? "0700-1000" : customSession
+
+f_sessionLabel(string sessionMode, string effectiveSession) =>
+    sessionMode == "Custom" ? "Custom " + effectiveSession : sessionMode
+
+f_ictMinHtf(float chartSeconds) =>
+    na(chartSeconds) ? "" :
+         chartSeconds <= timeframe.in_seconds("3") ? "15" :
+         chartSeconds <= timeframe.in_seconds("15") ? "60" :
+         chartSeconds <= timeframe.in_seconds("60") ? "240" :
+         chartSeconds <= timeframe.in_seconds("240") ? "1D" :
+         chartSeconds <= timeframe.in_seconds("1D") ? "1W" : ""
+
+f_ictMaxHtf(float chartSeconds) =>
+    na(chartSeconds) ? "" :
+         chartSeconds <= timeframe.in_seconds("3") ? "60" :
+         chartSeconds <= timeframe.in_seconds("15") ? "240" :
+         chartSeconds <= timeframe.in_seconds("60") ? "1D" :
+         chartSeconds <= timeframe.in_seconds("240") ? "1W" :
+         chartSeconds <= timeframe.in_seconds("1D") ? "1M" : ""
+
+f_htfStateText(string chartTf, string minTf, string maxTf, string selectedTf, bool manualAllowed, bool manualValid, bool ready) =>
+    string stateText = chartTf + " | ICT " + minTf
+    if ready and maxTf != ""
+        stateText := chartTf + " | ICT " + minTf + "-" + maxTf + " | " + selectedTf
+    if manualAllowed and not manualValid
+        stateText := chartTf + " | Manual " + selectedTf + " outside ICT band"
+    else if not ready
+        stateText := chartTf + " | ICT TF invalid"
+    stateText
+
+f_rrBand(float rr) =>
+    na(rr) ? 0.0 : rr >= 2.0 ? 1.0 : rr >= 1.2 ? 0.5 : 0.0
+
+f_strictChecklist(bool biasPass, bool sweepPass, bool mssPass, bool pdPass, bool otePass, bool kzPass, bool compactText) =>
+    compactText ? "B" + f_boolFlag(biasPass) + " S" + f_boolFlag(sweepPass) + " M" + f_boolFlag(mssPass) + " P" + f_boolFlag(pdPass) + " O" + f_boolFlag(otePass) + " K" + f_boolFlag(kzPass) : "B:" + f_boolFlag(biasPass) + " S:" + f_boolFlag(sweepPass) + " M:" + f_boolFlag(mssPass) + " PD:" + f_boolFlag(pdPass) + " OTE:" + f_boolFlag(otePass) + " KZ:" + f_boolFlag(kzPass)
+
+f_setupStatus(bool hasSetup, bool stopHit, bool structureInvalidated, bool replaced, bool expired, bool chased, bool managed, bool strictModeEnabled, bool strictContextPass, bool strictKillzonePass, bool priceInZone, bool priceNearZone, bool fresh) =>
+    string status = "No setup"
+    if hasSetup
+        if stopHit or structureInvalidated
+            status := "Invalidated"
+        else if replaced
+            status := "Replaced"
+        else if expired
+            status := "Expired"
+        else if chased
+            status := "Chased"
+        else if managed
+            status := "Managed"
+        else if strictModeEnabled and not strictContextPass
+            status := "Filtered"
+        else if strictModeEnabled and not strictKillzonePass
+            status := "Wait KZ"
+        else if strictModeEnabled and (priceInZone or priceNearZone)
+            status := "Strict Ready"
+        else if priceInZone or priceNearZone
+            status := "Valid now"
+        else if fresh
+            status := "Fresh"
+        else
+            status := "Standby"
+    status
+
+f_isActionable(string statusText) =>
+    statusText != "No setup" and statusText != "Invalidated" and statusText != "Expired" and statusText != "Chased" and statusText != "Filtered"
+
+f_setupScore(bool hasSetup, bool biasAligned, bool htfAligned, bool sweepSeen, bool displacementSeen, bool hasOb, bool hasBreaker, bool hasFvg, bool idmSeen, bool priceInZone, bool priceNearZone, float rr, bool fresh, bool managed, bool strictModeEnabled, bool strictContextPass, bool strictKillzonePass, bool replaced, bool chased, bool expired, bool invalidated) =>
+    float score = na
+    if hasSetup
+        score := 20.0
+        score += biasAligned ? 16.0 : -10.0
+        score += htfAligned ? 10.0 : 0.0
+        score += sweepSeen ? 12.0 : 0.0
+        score += displacementSeen ? 12.0 : 0.0
+        score += hasOb ? (hasBreaker ? 8.0 : 12.0) : hasFvg ? 10.0 : 0.0
+        score += idmSeen ? 4.0 : 0.0
+        score += priceInZone ? 14.0 : priceNearZone ? 8.0 : 0.0
+        score += f_rrBand(rr) * 16.0
+        score += fresh ? 4.0 : 0.0
+        score += managed ? 6.0 : 0.0
+        score += strictModeEnabled and strictContextPass and strictKillzonePass ? 8.0 : 0.0
+        score -= strictModeEnabled and (not strictContextPass or not strictKillzonePass) ? 12.0 : 0.0
+        score -= replaced ? 6.0 : 0.0
+        score -= chased ? 16.0 : 0.0
+        score -= expired ? 18.0 : 0.0
+        score -= invalidated ? 30.0 : 0.0
+        score := f_clamp(score, 0.0, 100.0)
+    score
+
+f_tpProbability(float confidence, float rr, bool priceInZone, bool priceNearZone, bool managed, bool strictModeEnabled, bool strictContextPass, bool strictKillzonePass, bool chased, bool expired, bool invalidated) =>
+    float probability = na
+    if not na(confidence)
+        probability := confidence * 0.75
+        probability += rr >= 2.0 ? 8.0 : rr >= 1.2 ? 3.0 : -10.0
+        probability += managed ? 6.0 : priceInZone ? 4.0 : priceNearZone ? 2.0 : 0.0
+        probability -= strictModeEnabled and (not strictContextPass or not strictKillzonePass) ? 8.0 : 0.0
+        probability -= chased ? 14.0 : 0.0
+        probability -= expired ? 16.0 : 0.0
+        probability -= invalidated ? 30.0 : 0.0
+        probability := f_clamp(probability, 5.0, 95.0)
+    probability
+
+chartTfLabel = timeframe.main_period
+chartTfSeconds = timeframe.in_seconds()
+ictMinHtfTf = f_ictMinHtf(chartTfSeconds)
+ictMaxHtfTf = f_ictMaxHtf(chartTfSeconds)
+ictChartTfValid = ictMinHtfTf != "" and ictMaxHtfTf != ""
+ictMinHtfSeconds = ictChartTfValid ? timeframe.in_seconds(ictMinHtfTf) : na
+ictMaxHtfSeconds = ictChartTfValid ? timeframe.in_seconds(ictMaxHtfTf) : na
+manualHtfSeconds = timeframe.in_seconds(htfTf)
+manualHtfValid = allowManualHtfOverride and ictChartTfValid and not na(manualHtfSeconds) and manualHtfSeconds > chartTfSeconds and manualHtfSeconds >= ictMinHtfSeconds and manualHtfSeconds <= ictMaxHtfSeconds
+effectiveHtfTf = manualHtfValid ? htfTf : ictChartTfValid ? ictMinHtfTf : timeframe.main_period
+effectiveHtfSeconds = ictChartTfValid ? timeframe.in_seconds(effectiveHtfTf) : na
+htfContextReady = ictChartTfValid and not na(effectiveHtfSeconds) and effectiveHtfSeconds > chartTfSeconds
+tfPairInvalid = not ictChartTfValid or (allowManualHtfOverride and not manualHtfValid)
+htfStateText = f_htfStateText(chartTfLabel, ictMinHtfTf, ictMaxHtfTf, effectiveHtfTf, allowManualHtfOverride, manualHtfValid, htfContextReady)
+
+if stopOnInvalidTf and tfPairInvalid
+    runtime.error(not ictChartTfValid ? "Invalid ICT chart timeframe: " + chartTfLabel + ". Use an execution timeframe from 1m up to 1D." : "Invalid ICT TF pairing: chart " + chartTfLabel + " requires HTF inside " + ictMinHtfTf + "-" + ictMaxHtfTf + ", but manual override uses " + htfTf + ".")
+
+f_trimFvg() =>
+    if array.size(fvgBoxes) > effectiveMaxFvgZones
+        oldBox = array.shift(fvgBoxes)
+        box.delete(oldBox)
+        oldLabel = array.shift(fvgLabels)
+        label.delete(oldLabel)
+        array.shift(fvgTops)
+        array.shift(fvgBottoms)
+        array.shift(fvgBull)
+        array.shift(fvgCreatedBars)
+        array.shift(fvgTouched)
+
+f_trimOb() =>
+    if array.size(obBoxes) > effectiveMaxObZones
+        oldBox = array.shift(obBoxes)
+        box.delete(oldBox)
+        oldLine = array.shift(obEntryLines)
+        line.delete(oldLine)
+        oldLabel = array.shift(obLabels)
+        label.delete(oldLabel)
+        array.shift(obTops)
+        array.shift(obBottoms)
+        array.shift(obBull)
+        array.shift(obBreaker)
+        array.shift(obCreatedBars)
+        array.shift(obTouched)
+
+f_drawStructureEvent(int fromBar, float level, string eventText, bool isBull) =>
+    if showBosChoch and not na(fromBar)
+        eventColor = isBull ? bullColor : bearColor
+        line.new(x1=fromBar, y1=level, x2=bar_index, y2=level, xloc=xloc.bar_index, color=eventColor, width=2)
+        label.new(x=bar_index, y=level, text=eventText, xloc=xloc.bar_index, style=isBull ? label.style_label_down : label.style_label_up, color=eventColor, textcolor=color.white, size=size.small)
+
+// Strict OB anchor: last opposing candle after the sweep but before the FVG/displacement leg.
+f_findLastOpposingCandle(bool isBull, int sourceBar, int anchorBar, int lookback) =>
+    int locatedShift = na
+    int startShift = not na(anchorBar) ? math.max(1, bar_index - anchorBar + 1) : 1
+    int endShift = na(sourceBar) ? math.min(lookback, bar_index) : math.min(lookback, bar_index - sourceBar)
+    if endShift >= startShift
+        for i = startShift to endShift
+            if na(locatedShift)
+                opposing = isBull ? close[i] < open[i] : close[i] > open[i]
+                if opposing
+                    locatedShift := i
+    locatedShift
+
+f_obBounds(bool isBull, int shift) =>
+    float zoneTop = na
+    float zoneBottom = na
+    if obZoneMode == "Full Candle"
+        zoneTop := high[shift]
+        zoneBottom := low[shift]
+    else if obZoneMode == "Open-to-Wick"
+        zoneTop := isBull ? open[shift] : high[shift]
+        zoneBottom := isBull ? low[shift] : open[shift]
+    else
+        zoneTop := math.max(open[shift], close[shift])
+        zoneBottom := math.min(open[shift], close[shift])
+    [math.max(zoneTop, zoneBottom), math.min(zoneTop, zoneBottom)]
+
+f_obEntry(bool isBull, int shift, float zoneTop, float zoneBottom) =>
+    float entry = na
+    if obEntryMode == "Open"
+        entry := open[shift]
+    else if obEntryMode == "Wick"
+        entry := isBull ? low[shift] : high[shift]
+    else
+        entry := (zoneTop + zoneBottom) * 0.5
+    entry
+
+f_addFvg(bool isBull, float zoneTop, float zoneBottom) =>
+    if showFvg
+        borderClr = isBull ? color.new(bullColor, 30) : color.new(bearColor, 30)
+        fillClr = isBull ? fvgBullColor : fvgBearColor
+        newBox = box.new(left=bar_index - 2, top=zoneTop, right=bar_index, bottom=zoneBottom, xloc=xloc.bar_index, extend=extend.right, bgcolor=fillClr, border_color=borderClr)
+        newLabel = label.new(x=bar_index - 2, y=f_zoneMid(zoneTop, zoneBottom), xloc=xloc.bar_index, text=f_fvgLabelText(isBull), style=label.style_label_left, color=color.new(borderClr, 0), textcolor=color.white, size=size.tiny)
+        array.push(fvgBoxes, newBox)
+        array.push(fvgLabels, newLabel)
+        array.push(fvgTops, zoneTop)
+        array.push(fvgBottoms, zoneBottom)
+        array.push(fvgBull, isBull)
+        array.push(fvgCreatedBars, bar_index)
+        array.push(fvgTouched, false)
+        f_trimFvg()
+
+f_addOb(bool isBull, int shift) =>
+    if showOb
+        [zoneTop, zoneBottom] = f_obBounds(isBull, shift)
+        entry = f_obEntry(isBull, shift, zoneTop, zoneBottom)
+        zoneColor = isBull ? obBullColor : obBearColor
+        borderClr = isBull ? bullColor : bearColor
+        newBox = box.new(left=bar_index - shift, top=zoneTop, right=bar_index, bottom=zoneBottom, xloc=xloc.bar_index, extend=extend.right, bgcolor=zoneColor, border_color=borderClr)
+        newLine = line.new(x1=bar_index - shift, y1=entry, x2=bar_index, y2=entry, xloc=xloc.bar_index, extend=extend.right, color=borderClr, style=line.style_dashed)
+        newLabel = label.new(x=bar_index - shift, y=f_zoneMid(zoneTop, zoneBottom), xloc=xloc.bar_index, text=f_obLabelText(isBull, false), style=label.style_label_left, color=color.new(borderClr, 0), textcolor=color.white, size=size.tiny)
+        array.push(obBoxes, newBox)
+        array.push(obEntryLines, newLine)
+        array.push(obLabels, newLabel)
+        array.push(obTops, zoneTop)
+        array.push(obBottoms, zoneBottom)
+        array.push(obBull, isBull)
+        array.push(obBreaker, false)
+        array.push(obCreatedBars, bar_index)
+        array.push(obTouched, false)
+        f_trimOb()
+
+//------------------------------------------------------------------------------
+// Session liquidity tracking
+//------------------------------------------------------------------------------
+effectiveLiquiditySession = f_sessionPreset(liquiditySessionMode, sessionInput)
+liquiditySessionLabel = f_sessionLabel(liquiditySessionMode, effectiveLiquiditySession)
+inSession = not na(time(timeframe.period, effectiveLiquiditySession, ictSessionTimezone))
+newSession = inSession and not inSession[1]
+sessionEnded = not inSession and inSession[1]
+
+var float sessionHigh = na
+var float sessionLow = na
+var float prevSessionHigh = na
+var float prevSessionLow = na
+
+if newSession
+    prevSessionHigh := sessionHigh
+    prevSessionLow := sessionLow
+    sessionHigh := high
+    sessionLow := low
+else if inSession
+    sessionHigh := na(sessionHigh) ? high : math.max(sessionHigh, high)
+    sessionLow := na(sessionLow) ? low : math.min(sessionLow, low)
+
+if sessionEnded
+    prevSessionHigh := sessionHigh
+    prevSessionLow := sessionLow
+
+prevDayHigh = request.security(syminfo.tickerid, "D", high[1], lookahead=barmerge.lookahead_off)
+prevDayLow = request.security(syminfo.tickerid, "D", low[1], lookahead=barmerge.lookahead_off)
+prevWeekHigh = request.security(syminfo.tickerid, "W", high[1], lookahead=barmerge.lookahead_off)
+prevWeekLow = request.security(syminfo.tickerid, "W", low[1], lookahead=barmerge.lookahead_off)
+prevMonthHigh = request.security(syminfo.tickerid, "M", high[1], lookahead=barmerge.lookahead_off)
+prevMonthLow = request.security(syminfo.tickerid, "M", low[1], lookahead=barmerge.lookahead_off)
+
+//------------------------------------------------------------------------------
+// Pivot-based market structure
+//------------------------------------------------------------------------------
+pivotHigh = ta.pivothigh(high, swingLen, swingLen)
+pivotLow = ta.pivotlow(low, swingLen, swingLen)
+
+var float lastSwingHigh = na
+var int lastSwingHighBar = na
+var float prevSwingHigh = na
+var int prevSwingHighBar = na
+var float lastSwingLow = na
+var int lastSwingLowBar = na
+var float prevSwingLow = na
+var int prevSwingLowBar = na
+var float latestEqh = na
+var float latestEql = na
+var bool lastHighBroken = false
+var bool lastLowBroken = false
+
+var line bullTrendline = na
+var line bearTrendline = na
+
+if not na(pivotHigh)
+    pBar = bar_index - swingLen
+    pPrice = pivotHigh
+    structureText = na(lastSwingHigh) ? "SH" : math.abs(pPrice - lastSwingHigh) <= equalTolerance ? "EQH" : pPrice > lastSwingHigh ? "HH" : "LH"
+    if displayStructureLabels
+        label.new(x=pBar, y=pPrice, xloc=xloc.bar_index, text=structureText, style=label.style_label_down, color=color.new(liqHighColor, 0), textcolor=color.white, size=size.tiny)
+    if structureText == "EQH" and not na(lastSwingHighBar)
+        latestEqh := math.max(pPrice, lastSwingHigh)
+        line.new(x1=lastSwingHighBar, y1=lastSwingHigh, x2=pBar, y2=pPrice, xloc=xloc.bar_index, color=color.new(liqHighColor, 15), style=line.style_dotted)
+    prevSwingHigh := lastSwingHigh
+    prevSwingHighBar := lastSwingHighBar
+    lastSwingHigh := pPrice
+    lastSwingHighBar := pBar
+    lastHighBroken := false
+    if displayTrendlineLiquidity and not na(prevSwingHigh) and not na(prevSwingHighBar)
+        if not na(bearTrendline)
+            line.delete(bearTrendline)
+        bearTrendline := line.new(x1=prevSwingHighBar, y1=prevSwingHigh, x2=lastSwingHighBar, y2=lastSwingHigh, xloc=xloc.bar_index, extend=extend.right, color=color.new(liqHighColor, 30), style=line.style_dashed)
+
+if not na(pivotLow)
+    pBar = bar_index - swingLen
+    pPrice = pivotLow
+    structureText = na(lastSwingLow) ? "SL" : math.abs(pPrice - lastSwingLow) <= equalTolerance ? "EQL" : pPrice > lastSwingLow ? "HL" : "LL"
+    if displayStructureLabels
+        label.new(x=pBar, y=pPrice, xloc=xloc.bar_index, text=structureText, style=label.style_label_up, color=color.new(liqLowColor, 0), textcolor=color.white, size=size.tiny)
+    if structureText == "EQL" and not na(lastSwingLowBar)
+        latestEql := math.min(pPrice, lastSwingLow)
+        line.new(x1=lastSwingLowBar, y1=lastSwingLow, x2=pBar, y2=pPrice, xloc=xloc.bar_index, color=color.new(liqLowColor, 15), style=line.style_dotted)
+    prevSwingLow := lastSwingLow
+    prevSwingLowBar := lastSwingLowBar
+    lastSwingLow := pPrice
+    lastSwingLowBar := pBar
+    lastLowBroken := false
+    if displayTrendlineLiquidity and not na(prevSwingLow) and not na(prevSwingLowBar)
+        if not na(bullTrendline)
+            line.delete(bullTrendline)
+        bullTrendline := line.new(x1=prevSwingLowBar, y1=prevSwingLow, x2=lastSwingLowBar, y2=lastSwingLow, xloc=xloc.bar_index, extend=extend.right, color=color.new(liqLowColor, 30), style=line.style_dashed)
+
+//------------------------------------------------------------------------------
+// Liquidity sweeps, inducement, BOS / CHOCH
+//------------------------------------------------------------------------------
+bullTrendlinePrice = not na(bullTrendline) ? line.get_price(bullTrendline, bar_index) : na
+bearTrendlinePrice = not na(bearTrendline) ? line.get_price(bearTrendline, bar_index) : na
+
+sellSideSweep = (not na(lastSwingLow) and low < lastSwingLow and not f_breakDown(lastSwingLow)) or
+     (showPrevSession and not na(prevSessionLow) and low < prevSessionLow and close > prevSessionLow) or
+     (showHigherPeriodLiquidity and low < prevDayLow and close > prevDayLow) or
+     (showHigherPeriodLiquidity and low < prevWeekLow and close > prevWeekLow) or
+     (showHigherPeriodLiquidity and low < prevMonthLow and close > prevMonthLow) or
+     (not na(latestEql) and low < latestEql and close > latestEql) or
+     (displayTrendlineLiquidity and not na(bullTrendlinePrice) and low < bullTrendlinePrice and close > bullTrendlinePrice)
+
+buySideSweep = (not na(lastSwingHigh) and high > lastSwingHigh and not f_breakUp(lastSwingHigh)) or
+     (showPrevSession and not na(prevSessionHigh) and high > prevSessionHigh and close < prevSessionHigh) or
+     (showHigherPeriodLiquidity and high > prevDayHigh and close < prevDayHigh) or
+     (showHigherPeriodLiquidity and high > prevWeekHigh and close < prevWeekHigh) or
+     (showHigherPeriodLiquidity and high > prevMonthHigh and close < prevMonthHigh) or
+     (not na(latestEqh) and high > latestEqh and close < latestEqh) or
+     (displayTrendlineLiquidity and not na(bearTrendlinePrice) and high > bearTrendlinePrice and close < bearTrendlinePrice)
+
+plotshape(showSweeps and sellSideSweep, title="Sell-side liquidity sweep", style=shape.triangleup, location=location.belowbar, color=bullColor, size=size.tiny, text="Sweep")
+plotshape(showSweeps and buySideSweep, title="Buy-side liquidity sweep", style=shape.triangledown, location=location.abovebar, color=bearColor, size=size.tiny, text="Sweep")
+
+var int lastSellSideSweepBar = na
+var int lastBuySideSweepBar = na
+
+if sellSideSweep
+    lastSellSideSweepBar := bar_index
+if buySideSweep
+    lastBuySideSweepBar := bar_index
+
+var int trendBias = 0
+var int lastStructureBreakBar = na
+var float protectedLow = na
+var int protectedLowBar = na
+var float protectedHigh = na
+var int protectedHighBar = na
+var int lastBullMssBar = na
+var int lastBearMssBar = na
+
+bullishIdm = trendBias == 1 and not na(prevSwingLow) and low < prevSwingLow and close > prevSwingLow and close > open and (na(protectedLow) or low > protectedLow)
+bearishIdm = trendBias == -1 and not na(prevSwingHigh) and high > prevSwingHigh and close < prevSwingHigh and close < open and (na(protectedHigh) or high < protectedHigh)
+impulsiveBull = (high - low) >= atr * obImpulseAtr and close > open
+impulsiveBear = (high - low) >= atr * obImpulseAtr and close < open
+
+plotshape(showIdm and bullishIdm, title="Bullish IDM", style=shape.circle, location=location.belowbar, size=size.tiny, color=color.new(bullColor, 0), text="IDM")
+plotshape(showIdm and bearishIdm, title="Bearish IDM", style=shape.circle, location=location.abovebar, size=size.tiny, color=color.new(bearColor, 0), text="IDM")
+
+bullBreak = not na(lastSwingHigh) and not lastHighBroken and f_breakUp(lastSwingHigh)
+bearBreak = not na(lastSwingLow) and not lastLowBroken and f_breakDown(lastSwingLow)
+
+var int lastBullFvgBar = na
+var int lastBearFvgBar = na
+var int lastBullDisplacementBar = na
+var int lastBearDisplacementBar = na
+var float bullLegLow = na
+var float bullLegHigh = na
+var int bullLegStartBar = na
+var int bullLegEndBar = na
+var bool bullLegHasSweep = false
+var bool bullLegHasDisplacement = false
+var bool bullLegHasMss = false
+var float bearLegLow = na
+var float bearLegHigh = na
+var int bearLegStartBar = na
+var int bearLegEndBar = na
+var bool bearLegHasSweep = false
+var bool bearLegHasDisplacement = false
+var bool bearLegHasMss = false
+
+legSearchBars = obSearchBars + obValidationLookback + 2
+
+//------------------------------------------------------------------------------
+// FVG detection and mitigation tracking
+//------------------------------------------------------------------------------
+bullDisplacementFvg = close[1] > open[1] and close[1] > high[2] and (high[1] - low[1]) >= atr * math.max(fvgMinAtr * 2.0, obImpulseAtr * 0.75) and f_bodyShare(1) >= 0.60
+bearDisplacementFvg = close[1] < open[1] and close[1] < low[2] and (high[1] - low[1]) >= atr * math.max(fvgMinAtr * 2.0, obImpulseAtr * 0.75) and f_bodyShare(1) >= 0.60
+bullFvg = low > high[2] and bullDisplacementFvg and (low - high[2]) >= atr * fvgMinAtr
+bearFvg = high < low[2] and bearDisplacementFvg and (low[2] - high) >= atr * fvgMinAtr
+
+if bullFvg
+    lastBullFvgBar := bar_index
+    lastBullDisplacementBar := bar_index - 1
+    f_addFvg(true, low, high[2])
+
+if bearFvg
+    lastBearFvgBar := bar_index
+    lastBearDisplacementBar := bar_index - 1
+    f_addFvg(false, low[2], high)
+
+if array.size(fvgBoxes) > 0
+    for idx = 0 to array.size(fvgBoxes) - 1
+        i = array.size(fvgBoxes) - 1 - idx
+        zoneBox = array.get(fvgBoxes, i)
+        zoneLabel = array.get(fvgLabels, i)
+        zoneTop = array.get(fvgTops, i)
+        zoneBottom = array.get(fvgBottoms, i)
+        zoneBull = array.get(fvgBull, i)
+        removeZone = false
+        if f_zoneTouched(zoneTop, zoneBottom)
+            array.set(fvgTouched, i, true)
+        if zoneBull
+            if low < zoneTop
+                zoneTop := math.max(low, zoneBottom)
+                array.set(fvgTops, i, zoneTop)
+                box.set_top(zoneBox, zoneTop)
+            if low <= zoneBottom
+                removeZone := true
+        else
+            if high > zoneBottom
+                zoneBottom := math.min(high, zoneTop)
+                array.set(fvgBottoms, i, zoneBottom)
+                box.set_bottom(zoneBox, zoneBottom)
+            if high >= zoneTop
+                removeZone := true
+        label.set_y(zoneLabel, f_zoneMid(zoneTop, zoneBottom))
+        if removeZone
+            box.delete(zoneBox)
+            label.delete(zoneLabel)
+            array.remove(fvgBoxes, i)
+            array.remove(fvgLabels, i)
+            array.remove(fvgTops, i)
+            array.remove(fvgBottoms, i)
+            array.remove(fvgBull, i)
+            array.remove(fvgCreatedBars, i)
+            array.remove(fvgTouched, i)
+
+bullSequenceValid = not na(lastSellSideSweepBar) and not na(lastBullFvgBar) and (bar_index - lastSellSideSweepBar) <= obValidationLookback and (bar_index - lastBullFvgBar) <= obValidationLookback and lastBullFvgBar >= lastSellSideSweepBar
+bearSequenceValid = not na(lastBuySideSweepBar) and not na(lastBearFvgBar) and (bar_index - lastBuySideSweepBar) <= obValidationLookback and (bar_index - lastBearFvgBar) <= obValidationLookback and lastBearFvgBar >= lastBuySideSweepBar
+recentBullDisplacement = not na(lastBullDisplacementBar) and (bar_index - lastBullDisplacementBar) <= strictMssLookback
+recentBearDisplacement = not na(lastBearDisplacementBar) and (bar_index - lastBearDisplacementBar) <= strictMssLookback
+bullMssLevel = not na(protectedHigh) ? protectedHigh : lastSwingHigh
+bearMssLevel = not na(protectedLow) ? protectedLow : lastSwingLow
+bullMss = not na(bullMssLevel) and trendBias != 1 and f_breakUp(bullMssLevel) and bullSequenceValid and recentBullDisplacement
+bearMss = not na(bearMssLevel) and trendBias != -1 and f_breakDown(bearMssLevel) and bearSequenceValid and recentBearDisplacement
+bullBos = trendBias == 1 and bullBreak
+bearBos = trendBias == -1 and bearBreak
+
+if bullMss or bullBos
+    bool resetBullLeg = bullMss or trendBias != 1
+    float bullEventLevel = bullMss ? bullMssLevel : lastSwingHigh
+    int bullEventBar = bullMss and not na(protectedHighBar) ? protectedHighBar : lastSwingHighBar
+    f_drawStructureEvent(bullEventBar, bullEventLevel, bullMss ? "MSS" : "BOS", true)
+    trendBias := 1
+    lastStructureBreakBar := bar_index
+    lastHighBroken := true
+    if bullMss
+        lastBullMssBar := bar_index
+    bullLegLow := bullSequenceValid ? f_legLowSince(lastSellSideSweepBar, legSearchBars) : na(protectedLow) ? lastSwingLow : protectedLow
+    bullLegHigh := high
+    bullLegStartBar := bullSequenceValid ? lastSellSideSweepBar : na(protectedLowBar) ? lastSwingLowBar : protectedLowBar
+    bullLegEndBar := bar_index
+    bullLegHasSweep := resetBullLeg ? bullSequenceValid : (bullLegHasSweep or bullSequenceValid)
+    bullLegHasDisplacement := resetBullLeg ? recentBullDisplacement : (bullLegHasDisplacement or recentBullDisplacement)
+    bullLegHasMss := resetBullLeg ? bullMss : (bullLegHasMss or bullMss)
+    protectedLow := bullLegLow
+    protectedLowBar := bullLegStartBar
+    if bullMss
+        bearLegHasSweep := false
+        bearLegHasDisplacement := false
+        bearLegHasMss := false
+
+if bearMss or bearBos
+    bool resetBearLeg = bearMss or trendBias != -1
+    float bearEventLevel = bearMss ? bearMssLevel : lastSwingLow
+    int bearEventBar = bearMss and not na(protectedLowBar) ? protectedLowBar : lastSwingLowBar
+    f_drawStructureEvent(bearEventBar, bearEventLevel, bearMss ? "MSS" : "BOS", false)
+    trendBias := -1
+    lastStructureBreakBar := bar_index
+    lastLowBroken := true
+    if bearMss
+        lastBearMssBar := bar_index
+    bearLegHigh := bearSequenceValid ? f_legHighSince(lastBuySideSweepBar, legSearchBars) : na(protectedHigh) ? lastSwingHigh : protectedHigh
+    bearLegLow := low
+    bearLegStartBar := bearSequenceValid ? lastBuySideSweepBar : na(protectedHighBar) ? lastSwingHighBar : protectedHighBar
+    bearLegEndBar := bar_index
+    bearLegHasSweep := resetBearLeg ? bearSequenceValid : (bearLegHasSweep or bearSequenceValid)
+    bearLegHasDisplacement := resetBearLeg ? recentBearDisplacement : (bearLegHasDisplacement or recentBearDisplacement)
+    bearLegHasMss := resetBearLeg ? bearMss : (bearLegHasMss or bearMss)
+    protectedHigh := bearLegHigh
+    protectedHighBar := bearLegStartBar
+    if bearMss
+        bullLegHasSweep := false
+        bullLegHasDisplacement := false
+        bullLegHasMss := false
+
+//------------------------------------------------------------------------------
+// Order block qualification from a single strict leg: sweep -> displacement/FVG -> BOS
+//------------------------------------------------------------------------------
+recentSellSideSweep = not na(lastSellSideSweepBar) and (bar_index - lastSellSideSweepBar) <= obValidationLookback
+recentBuySideSweep = not na(lastBuySideSweepBar) and (bar_index - lastBuySideSweepBar) <= obValidationLookback
+recentBullFvg = not na(lastBullFvgBar) and (bar_index - lastBullFvgBar) <= obValidationLookback
+recentBearFvg = not na(lastBearFvgBar) and (bar_index - lastBearFvgBar) <= obValidationLookback
+obBullDisplacement = not na(lastBullDisplacementBar) and (bar_index - lastBullDisplacementBar) <= 1
+obBearDisplacement = not na(lastBearDisplacementBar) and (bar_index - lastBearDisplacementBar) <= 1
+
+if (bullMss or bullBos) and bullSequenceValid and obBullDisplacement
+    obShift = f_findLastOpposingCandle(true, lastSellSideSweepBar, lastBullFvgBar, legSearchBars)
+    if not na(obShift)
+        f_addOb(true, obShift)
+
+if (bearMss or bearBos) and bearSequenceValid and obBearDisplacement
+    obShift = f_findLastOpposingCandle(false, lastBuySideSweepBar, lastBearFvgBar, legSearchBars)
+    if not na(obShift)
+        f_addOb(false, obShift)
+
+if array.size(obBoxes) > 0
+    for idx = 0 to array.size(obBoxes) - 1
+        i = array.size(obBoxes) - 1 - idx
+        zoneBox = array.get(obBoxes, i)
+        zoneLine = array.get(obEntryLines, i)
+        zoneLabel = array.get(obLabels, i)
+        zoneTop = array.get(obTops, i)
+        zoneBottom = array.get(obBottoms, i)
+        zoneBull = array.get(obBull, i)
+        zoneBreaker = array.get(obBreaker, i)
+        zoneTouched = array.get(obTouched, i)
+        deleteZone = false
+
+        label.set_y(zoneLabel, f_zoneMid(zoneTop, zoneBottom))
+        if f_zoneTouched(zoneTop, zoneBottom)
+            array.set(obTouched, i, true)
+
+        if zoneBull and close < zoneBottom and zoneTouched and (bearMss or bearBos)
+            if not zoneBreaker
+                array.set(obBull, i, false)
+                array.set(obBreaker, i, true)
+                array.set(obCreatedBars, i, bar_index)
+                array.set(obTouched, i, false)
+                box.set_bgcolor(zoneBox, bbBearColor)
+                box.set_border_color(zoneBox, color.new(bearColor, 0))
+                line.set_color(zoneLine, bearColor)
+                line.set_style(zoneLine, line.style_dotted)
+                label.set_text(zoneLabel, f_obLabelText(false, true))
+                label.set_color(zoneLabel, bearColor)
+            else
+                deleteZone := true
+        else if not zoneBull and close > zoneTop and zoneTouched and (bullMss or bullBos)
+            if not zoneBreaker
+                array.set(obBull, i, true)
+                array.set(obBreaker, i, true)
+                array.set(obCreatedBars, i, bar_index)
+                array.set(obTouched, i, false)
+                box.set_bgcolor(zoneBox, bbBullColor)
+                box.set_border_color(zoneBox, color.new(bullColor, 0))
+                line.set_color(zoneLine, bullColor)
+                line.set_style(zoneLine, line.style_dotted)
+                label.set_text(zoneLabel, f_obLabelText(true, true))
+                label.set_color(zoneLabel, bullColor)
+            else
+                deleteZone := true
+
+        if deleteZone
+            box.delete(zoneBox)
+            line.delete(zoneLine)
+            label.delete(zoneLabel)
+            array.remove(obBoxes, i)
+            array.remove(obEntryLines, i)
+            array.remove(obLabels, i)
+            array.remove(obTops, i)
+            array.remove(obBottoms, i)
+            array.remove(obBull, i)
+            array.remove(obBreaker, i)
+            array.remove(obCreatedBars, i)
+            array.remove(obTouched, i)
+
+//------------------------------------------------------------------------------
+// Higher timeframe structure context
+//------------------------------------------------------------------------------
+htfPivotHigh = request.security(syminfo.tickerid, effectiveHtfTf, ta.pivothigh(high, htfSwingLen, htfSwingLen), lookahead=barmerge.lookahead_off)
+htfPivotLow = request.security(syminfo.tickerid, effectiveHtfTf, ta.pivotlow(low, htfSwingLen, htfSwingLen), lookahead=barmerge.lookahead_off)
+htfClose = request.security(syminfo.tickerid, effectiveHtfTf, close, lookahead=barmerge.lookahead_off)
+
+var float htfStructureHigh = na
+var float htfStructureLow = na
+var int htfBias = 0
+
+if htfContextReady
+    if not na(htfPivotHigh)
+        htfStructureHigh := htfPivotHigh
+    if not na(htfPivotLow)
+        htfStructureLow := htfPivotLow
+    if not na(htfStructureHigh) and htfClose > htfStructureHigh
+        htfBias := 1
+    else if not na(htfStructureLow) and htfClose < htfStructureLow
+        htfBias := -1
+else
+    htfStructureHigh := na
+    htfStructureLow := na
+    htfBias := 0
+
+activeBias = not na(lastStructureBreakBar) and (bar_index - lastStructureBreakBar) > consolidationBars ? 0 : trendBias
+strictKillzoneActive = timeframe.isintraday and not na(time(timeframe.period, strictKillzoneSession, ictSessionTimezone))
+bullDealingRangeHigh = bullLegHigh
+bullDealingRangeLow = bullLegLow
+bearDealingRangeHigh = bearLegHigh
+bearDealingRangeLow = bearLegLow
+bullDealingRangeSize = not na(bullDealingRangeHigh) and not na(bullDealingRangeLow) ? bullDealingRangeHigh - bullDealingRangeLow : na
+bearDealingRangeSize = not na(bearDealingRangeHigh) and not na(bearDealingRangeLow) ? bearDealingRangeHigh - bearDealingRangeLow : na
+bullEquilibrium = not na(bullDealingRangeHigh) and not na(bullDealingRangeLow) ? (bullDealingRangeHigh + bullDealingRangeLow) * 0.5 : na
+bearEquilibrium = not na(bearDealingRangeHigh) and not na(bearDealingRangeLow) ? (bearDealingRangeHigh + bearDealingRangeLow) * 0.5 : na
+oteLongTop = not na(bullDealingRangeSize) and bullDealingRangeSize > 0 ? bullDealingRangeHigh - bullDealingRangeSize * 0.62 : na
+oteLongBottom = not na(bullDealingRangeSize) and bullDealingRangeSize > 0 ? bullDealingRangeHigh - bullDealingRangeSize * 0.79 : na
+oteShortTop = not na(bearDealingRangeSize) and bearDealingRangeSize > 0 ? bearDealingRangeLow + bearDealingRangeSize * 0.79 : na
+oteShortBottom = not na(bearDealingRangeSize) and bearDealingRangeSize > 0 ? bearDealingRangeLow + bearDealingRangeSize * 0.62 : na
+activeRangeHigh = activeBias == 1 ? bullDealingRangeHigh : activeBias == -1 ? bearDealingRangeHigh : na
+activeRangeLow = activeBias == 1 ? bullDealingRangeLow : activeBias == -1 ? bearDealingRangeLow : na
+activeRangeEquilibrium = activeBias == 1 ? bullEquilibrium : activeBias == -1 ? bearEquilibrium : na
+activeProtectedHigh = protectedHigh
+activeProtectedLow = protectedLow
+activeRangeLabel = activeBias == 1 ? "Bull Leg" : activeBias == -1 ? "Bear Leg" : "Range"
+
+//------------------------------------------------------------------------------
+// Risk cues from latest live zone or structure
+//------------------------------------------------------------------------------
+float latestBullFvgTop = na
+float latestBullFvgBottom = na
+float latestBearFvgTop = na
+float latestBearFvgBottom = na
+int latestBullFvgCreatedBar = na
+int latestBearFvgCreatedBar = na
+bool latestBullFvgTouched = false
+bool latestBearFvgTouched = false
+
+if array.size(fvgBoxes) > 0
+    for idx = 0 to array.size(fvgBoxes) - 1
+        i = array.size(fvgBoxes) - 1 - idx
+        zoneTop = array.get(fvgTops, i)
+        zoneBottom = array.get(fvgBottoms, i)
+        zoneBull = array.get(fvgBull, i)
+        zoneCreatedBar = array.get(fvgCreatedBars, i)
+        bullLegMatch = na(bullLegStartBar) or zoneCreatedBar >= bullLegStartBar
+        bearLegMatch = na(bearLegStartBar) or zoneCreatedBar >= bearLegStartBar
+        if zoneBull and bullLegMatch and na(latestBullFvgTop)
+            latestBullFvgTop := zoneTop
+            latestBullFvgBottom := zoneBottom
+            latestBullFvgCreatedBar := zoneCreatedBar
+            latestBullFvgTouched := array.get(fvgTouched, i)
+        if not zoneBull and bearLegMatch and na(latestBearFvgTop)
+            latestBearFvgTop := zoneTop
+            latestBearFvgBottom := zoneBottom
+            latestBearFvgCreatedBar := zoneCreatedBar
+            latestBearFvgTouched := array.get(fvgTouched, i)
+
+float latestBullZoneTop = na
+float latestBullZoneBottom = na
+float latestBullEntry = na
+bool latestBullZoneIsBreaker = false
+int latestBullZoneCreatedBar = na
+bool latestBullZoneTouched = false
+float latestBearZoneBottom = na
+float latestBearZoneTop = na
+float latestBearEntry = na
+bool latestBearZoneIsBreaker = false
+int latestBearZoneCreatedBar = na
+bool latestBearZoneTouched = false
+
+if array.size(obBoxes) > 0
+    for idx = 0 to array.size(obBoxes) - 1
+        i = array.size(obBoxes) - 1 - idx
+        zoneTop = array.get(obTops, i)
+        zoneBottom = array.get(obBottoms, i)
+        zoneBull = array.get(obBull, i)
+        zoneBreaker = array.get(obBreaker, i)
+        zoneCreatedBar = array.get(obCreatedBars, i)
+        bullLegMatch = na(bullLegStartBar) or zoneCreatedBar >= bullLegStartBar
+        bearLegMatch = na(bearLegStartBar) or zoneCreatedBar >= bearLegStartBar
+        if zoneBull and bullLegMatch and na(latestBullZoneBottom)
+            latestBullZoneTop := zoneTop
+            latestBullZoneBottom := zoneBottom
+            latestBullEntry := line.get_y1(array.get(obEntryLines, i))
+            latestBullZoneIsBreaker := zoneBreaker
+            latestBullZoneCreatedBar := zoneCreatedBar
+            latestBullZoneTouched := array.get(obTouched, i)
+        if not zoneBull and bearLegMatch and na(latestBearZoneTop)
+            latestBearZoneBottom := zoneBottom
+            latestBearZoneTop := zoneTop
+            latestBearEntry := line.get_y1(array.get(obEntryLines, i))
+            latestBearZoneIsBreaker := zoneBreaker
+            latestBearZoneCreatedBar := zoneCreatedBar
+            latestBearZoneTouched := array.get(obTouched, i)
+
+bool bullObPdPass = not strictRequirePd or (not na(latestBullZoneTop) and not na(bullEquilibrium) and f_zoneMid(latestBullZoneTop, latestBullZoneBottom) < bullEquilibrium)
+bool bullFvgPdPass = not strictRequirePd or (not na(latestBullFvgTop) and not na(bullEquilibrium) and f_zoneMid(latestBullFvgTop, latestBullFvgBottom) < bullEquilibrium)
+bool bearObPdPass = not strictRequirePd or (not na(latestBearZoneTop) and not na(bearEquilibrium) and f_zoneMid(latestBearZoneTop, latestBearZoneBottom) > bearEquilibrium)
+bool bearFvgPdPass = not strictRequirePd or (not na(latestBearFvgTop) and not na(bearEquilibrium) and f_zoneMid(latestBearFvgTop, latestBearFvgBottom) > bearEquilibrium)
+bool bullObOtePass = not strictRequireOte or f_zoneIntersects(latestBullZoneTop, latestBullZoneBottom, oteLongTop, oteLongBottom)
+bool bullFvgOtePass = not strictRequireOte or f_zoneIntersects(latestBullFvgTop, latestBullFvgBottom, oteLongTop, oteLongBottom)
+bool bearObOtePass = not strictRequireOte or f_zoneIntersects(latestBearZoneTop, latestBearZoneBottom, oteShortTop, oteShortBottom)
+bool bearFvgOtePass = not strictRequireOte or f_zoneIntersects(latestBearFvgTop, latestBearFvgBottom, oteShortTop, oteShortBottom)
+bool preferBullOb = not na(latestBullEntry) and (not strictIctMode or (bullObPdPass and bullObOtePass))
+bool preferBullFvg = not na(latestBullFvgTop) and not na(latestBullFvgBottom) and (not strictIctMode or (bullFvgPdPass and bullFvgOtePass))
+bool preferBearOb = not na(latestBearEntry) and (not strictIctMode or (bearObPdPass and bearObOtePass))
+bool preferBearFvg = not na(latestBearFvgTop) and not na(latestBearFvgBottom) and (not strictIctMode or (bearFvgPdPass and bearFvgOtePass))
+
+float tradeLongEntry = na
+float tradeLongStop = na
+float tradeLongTarget = na
+string tradeLongSetup = "Waiting"
+float tradeLongValidTop = na
+float tradeLongValidBottom = na
+bool tradeLongIsOb = false
+bool tradeLongIsFvg = false
+int tradeLongCreatedBar = na
+bool tradeLongTouched = false
+
+if preferBullOb
+    tradeLongEntry := latestBullEntry
+    tradeLongStop := latestBullZoneBottom - atr * stopAtrBuffer
+    tradeLongSetup := latestBullZoneIsBreaker ? "Bullish Breaker" : "Bullish OB"
+    tradeLongValidTop := latestBullZoneTop
+    tradeLongValidBottom := latestBullZoneBottom
+    tradeLongIsOb := true
+    tradeLongCreatedBar := latestBullZoneCreatedBar
+    tradeLongTouched := latestBullZoneTouched
+else if preferBullFvg
+    tradeLongEntry := f_zoneMid(latestBullFvgTop, latestBullFvgBottom)
+    tradeLongStop := latestBullFvgBottom - atr * stopAtrBuffer
+    tradeLongSetup := "Bullish FVG"
+    tradeLongValidTop := latestBullFvgTop
+    tradeLongValidBottom := latestBullFvgBottom
+    tradeLongIsFvg := true
+    tradeLongCreatedBar := latestBullFvgCreatedBar
+    tradeLongTouched := latestBullFvgTouched
+
+if not na(tradeLongEntry)
+    tradeLongTarget := f_selectAbove(tradeLongEntry, tradeLongTarget, lastSwingHigh)
+    tradeLongTarget := f_selectAbove(tradeLongEntry, tradeLongTarget, latestEqh)
+    tradeLongTarget := f_selectAbove(tradeLongEntry, tradeLongTarget, prevSessionHigh)
+    tradeLongTarget := f_selectAbove(tradeLongEntry, tradeLongTarget, prevDayHigh)
+    tradeLongTarget := f_selectAbove(tradeLongEntry, tradeLongTarget, prevWeekHigh)
+    tradeLongTarget := f_selectAbove(tradeLongEntry, tradeLongTarget, prevMonthHigh)
+    tradeLongTarget := f_selectAbove(tradeLongEntry, tradeLongTarget, htfStructureHigh)
+    float tempLongRisk = not na(tradeLongStop) ? tradeLongEntry - tradeLongStop : na
+    if na(tradeLongTarget) and not na(tempLongRisk) and tempLongRisk > 0
+        tradeLongTarget := tradeLongEntry + tempLongRisk * 2.0
+
+float tradeShortEntry = na
+float tradeShortStop = na
+float tradeShortTarget = na
+string tradeShortSetup = "Waiting"
+float tradeShortValidTop = na
+float tradeShortValidBottom = na
+bool tradeShortIsOb = false
+bool tradeShortIsFvg = false
+int tradeShortCreatedBar = na
+bool tradeShortTouched = false
+
+if preferBearOb
+    tradeShortEntry := latestBearEntry
+    tradeShortStop := latestBearZoneTop + atr * stopAtrBuffer
+    tradeShortSetup := latestBearZoneIsBreaker ? "Bearish Breaker" : "Bearish OB"
+    tradeShortValidTop := latestBearZoneTop
+    tradeShortValidBottom := latestBearZoneBottom
+    tradeShortIsOb := true
+    tradeShortCreatedBar := latestBearZoneCreatedBar
+    tradeShortTouched := latestBearZoneTouched
+else if preferBearFvg
+    tradeShortEntry := f_zoneMid(latestBearFvgTop, latestBearFvgBottom)
+    tradeShortStop := latestBearFvgTop + atr * stopAtrBuffer
+    tradeShortSetup := "Bearish FVG"
+    tradeShortValidTop := latestBearFvgTop
+    tradeShortValidBottom := latestBearFvgBottom
+    tradeShortIsFvg := true
+    tradeShortCreatedBar := latestBearFvgCreatedBar
+    tradeShortTouched := latestBearFvgTouched
+
+if not na(tradeShortEntry)
+    tradeShortTarget := f_selectBelow(tradeShortEntry, tradeShortTarget, lastSwingLow)
+    tradeShortTarget := f_selectBelow(tradeShortEntry, tradeShortTarget, latestEql)
+    tradeShortTarget := f_selectBelow(tradeShortEntry, tradeShortTarget, prevSessionLow)
+    tradeShortTarget := f_selectBelow(tradeShortEntry, tradeShortTarget, prevDayLow)
+    tradeShortTarget := f_selectBelow(tradeShortEntry, tradeShortTarget, prevWeekLow)
+    tradeShortTarget := f_selectBelow(tradeShortEntry, tradeShortTarget, prevMonthLow)
+    tradeShortTarget := f_selectBelow(tradeShortEntry, tradeShortTarget, htfStructureLow)
+    float tempShortRisk = not na(tradeShortStop) ? tradeShortStop - tradeShortEntry : na
+    if na(tradeShortTarget) and not na(tempShortRisk) and tempShortRisk > 0
+        tradeShortTarget := tradeShortEntry - tempShortRisk * 2.0
+
+float longRisk = not na(tradeLongEntry) and not na(tradeLongStop) ? tradeLongEntry - tradeLongStop : na
+float longReward = not na(tradeLongEntry) and not na(tradeLongTarget) ? tradeLongTarget - tradeLongEntry : na
+float longRr = not na(longRisk) and longRisk > 0 and not na(longReward) ? longReward / longRisk : na
+bool longPriceInZone = not na(tradeLongValidBottom) and close >= tradeLongValidBottom and close <= tradeLongValidTop
+bool longPriceNearZone = not na(tradeLongEntry) and math.abs(close - tradeLongEntry) <= atr * 0.25
+int longSetupAge = not na(tradeLongCreatedBar) ? bar_index - tradeLongCreatedBar : na
+bool longExpired = not tradeLongTouched and not na(longSetupAge) and longSetupAge > setupExpiryBars
+bool longChased = not tradeLongTouched and not na(tradeLongValidTop) and close > tradeLongValidTop + atr * setupChaseAtr
+bool longStructureInvalidated = not na(tradeLongCreatedBar) and not na(lastBearMssBar) and lastBearMssBar > tradeLongCreatedBar
+bool longManaged = tradeLongTouched and not na(longRisk) and high >= tradeLongEntry + longRisk * setupManagedR
+bool longFresh = not tradeLongTouched and not na(longSetupAge) and longSetupAge <= setupFreshBars
+bool strictLongBiasPass = not strictIctMode or (activeBias == 1 and (not strictRequireHtfBias or (htfContextReady and htfBias == 1)))
+bool strictLongSweepPass = not strictIctMode or bullLegHasSweep
+bool strictLongMssPass = not strictIctMode or (bullLegHasMss and not na(lastBullMssBar) and activeBias == 1)
+bool strictLongPdPass = not strictIctMode or (not strictRequirePd or (not na(tradeLongValidTop) and not na(bullEquilibrium) and f_zoneMid(tradeLongValidTop, tradeLongValidBottom) < bullEquilibrium))
+bool strictLongOtePass = not strictIctMode or (not strictRequireOte or f_zoneIntersects(tradeLongValidTop, tradeLongValidBottom, oteLongTop, oteLongBottom))
+bool strictLongKillzonePass = not strictIctMode or (not strictRequireKillzone or not timeframe.isintraday or strictKillzoneActive)
+bool strictLongContextPass = strictLongBiasPass and strictLongSweepPass and strictLongMssPass and strictLongPdPass and strictLongOtePass
+string strictLongMap = strictIctMode ? f_strictChecklist(strictLongBiasPass, strictLongSweepPass, strictLongMssPass, strictLongPdPass, strictLongOtePass, strictLongKillzonePass, false) : "Off"
+string strictLongMapCompact = strictIctMode ? f_strictChecklist(strictLongBiasPass, strictLongSweepPass, strictLongMssPass, strictLongPdPass, strictLongOtePass, strictLongKillzonePass, true) : "Off"
+var string lastLongSetupTag = ""
+string currentLongSetupTag = not na(tradeLongCreatedBar) ? tradeLongSetup + "|" + str.tostring(tradeLongCreatedBar) : ""
+bool longReplaced = currentLongSetupTag != "" and lastLongSetupTag != "" and currentLongSetupTag != lastLongSetupTag
+lastLongSetupTag := currentLongSetupTag
+bool longInvalidated = (not na(tradeLongStop) and close <= tradeLongStop) or longStructureInvalidated
+string longStatus = f_setupStatus(not na(tradeLongEntry), not na(tradeLongStop) and close <= tradeLongStop, longStructureInvalidated, longReplaced, longExpired, longChased, longManaged, strictIctMode, strictLongContextPass, strictLongKillzonePass, longPriceInZone, longPriceNearZone, longFresh)
+
+float shortRisk = not na(tradeShortEntry) and not na(tradeShortStop) ? tradeShortStop - tradeShortEntry : na
+float shortReward = not na(tradeShortEntry) and not na(tradeShortTarget) ? tradeShortEntry - tradeShortTarget : na
+float shortRr = not na(shortRisk) and shortRisk > 0 and not na(shortReward) ? shortReward / shortRisk : na
+bool shortPriceInZone = not na(tradeShortValidBottom) and close >= tradeShortValidBottom and close <= tradeShortValidTop
+bool shortPriceNearZone = not na(tradeShortEntry) and math.abs(close - tradeShortEntry) <= atr * 0.25
+int shortSetupAge = not na(tradeShortCreatedBar) ? bar_index - tradeShortCreatedBar : na
+bool shortExpired = not tradeShortTouched and not na(shortSetupAge) and shortSetupAge > setupExpiryBars
+bool shortChased = not tradeShortTouched and not na(tradeShortValidBottom) and close < tradeShortValidBottom - atr * setupChaseAtr
+bool shortStructureInvalidated = not na(tradeShortCreatedBar) and not na(lastBullMssBar) and lastBullMssBar > tradeShortCreatedBar
+bool shortManaged = tradeShortTouched and not na(shortRisk) and low <= tradeShortEntry - shortRisk * setupManagedR
+bool shortFresh = not tradeShortTouched and not na(shortSetupAge) and shortSetupAge <= setupFreshBars
+bool strictShortBiasPass = not strictIctMode or (activeBias == -1 and (not strictRequireHtfBias or (htfContextReady and htfBias == -1)))
+bool strictShortSweepPass = not strictIctMode or bearLegHasSweep
+bool strictShortMssPass = not strictIctMode or (bearLegHasMss and not na(lastBearMssBar) and activeBias == -1)
+bool strictShortPdPass = not strictIctMode or (not strictRequirePd or (not na(tradeShortValidTop) and not na(bearEquilibrium) and f_zoneMid(tradeShortValidTop, tradeShortValidBottom) > bearEquilibrium))
+bool strictShortOtePass = not strictIctMode or (not strictRequireOte or f_zoneIntersects(tradeShortValidTop, tradeShortValidBottom, oteShortTop, oteShortBottom))
+bool strictShortKillzonePass = not strictIctMode or (not strictRequireKillzone or not timeframe.isintraday or strictKillzoneActive)
+bool strictShortContextPass = strictShortBiasPass and strictShortSweepPass and strictShortMssPass and strictShortPdPass and strictShortOtePass
+string strictShortMap = strictIctMode ? f_strictChecklist(strictShortBiasPass, strictShortSweepPass, strictShortMssPass, strictShortPdPass, strictShortOtePass, strictShortKillzonePass, false) : "Off"
+string strictShortMapCompact = strictIctMode ? f_strictChecklist(strictShortBiasPass, strictShortSweepPass, strictShortMssPass, strictShortPdPass, strictShortOtePass, strictShortKillzonePass, true) : "Off"
+var string lastShortSetupTag = ""
+string currentShortSetupTag = not na(tradeShortCreatedBar) ? tradeShortSetup + "|" + str.tostring(tradeShortCreatedBar) : ""
+bool shortReplaced = currentShortSetupTag != "" and lastShortSetupTag != "" and currentShortSetupTag != lastShortSetupTag
+lastShortSetupTag := currentShortSetupTag
+bool shortInvalidated = (not na(tradeShortStop) and close >= tradeShortStop) or shortStructureInvalidated
+string shortStatus = f_setupStatus(not na(tradeShortEntry), not na(tradeShortStop) and close >= tradeShortStop, shortStructureInvalidated, shortReplaced, shortExpired, shortChased, shortManaged, strictIctMode, strictShortContextPass, strictShortKillzonePass, shortPriceInZone, shortPriceNearZone, shortFresh)
+
+// Keep setup scoring intentionally simple to reduce overtuning.
+bool longBiasAligned = activeBias == 1
+bool shortBiasAligned = activeBias == -1
+bool longHtfAligned = htfBias == 1
+bool shortHtfAligned = htfBias == -1
+bool longDisplacementSeen = bullLegHasDisplacement or recentBullFvg or (not na(lastBullDisplacementBar) and bar_index - lastBullDisplacementBar <= obValidationLookback)
+bool shortDisplacementSeen = bearLegHasDisplacement or recentBearFvg or (not na(lastBearDisplacementBar) and bar_index - lastBearDisplacementBar <= obValidationLookback)
+
+float longConfidence = f_setupScore(not na(tradeLongEntry), longBiasAligned, longHtfAligned, recentSellSideSweep, longDisplacementSeen, tradeLongIsOb, latestBullZoneIsBreaker, tradeLongIsFvg, bullishIdm, longPriceInZone, longPriceNearZone, longRr, longFresh, longManaged, strictIctMode, strictLongContextPass, strictLongKillzonePass, longReplaced, longChased, longExpired, longInvalidated)
+float longTpProbability = f_tpProbability(longConfidence, longRr, longPriceInZone, longPriceNearZone, longManaged, strictIctMode, strictLongContextPass, strictLongKillzonePass, longChased, longExpired, longInvalidated)
+
+float shortConfidence = f_setupScore(not na(tradeShortEntry), shortBiasAligned, shortHtfAligned, recentBuySideSweep, shortDisplacementSeen, tradeShortIsOb, latestBearZoneIsBreaker, tradeShortIsFvg, bearishIdm, shortPriceInZone, shortPriceNearZone, shortRr, shortFresh, shortManaged, strictIctMode, strictShortContextPass, strictShortKillzonePass, shortReplaced, shortChased, shortExpired, shortInvalidated)
+float shortTpProbability = f_tpProbability(shortConfidence, shortRr, shortPriceInZone, shortPriceNearZone, shortManaged, strictIctMode, strictShortContextPass, strictShortKillzonePass, shortChased, shortExpired, shortInvalidated)
+
+string preferredDirection = "Wait"
+bool longActionable = f_isActionable(longStatus)
+bool shortActionable = f_isActionable(shortStatus)
+if strictIctMode
+    longActionable := longActionable and strictLongContextPass and strictLongKillzonePass
+    shortActionable := shortActionable and strictShortContextPass and strictShortKillzonePass
+if not na(longConfidence) or not na(shortConfidence)
+    if na(shortConfidence) or (not na(longConfidence) and longConfidence > shortConfidence + 3.0)
+        preferredDirection := longActionable ? "Long" : "Wait"
+    else if na(longConfidence) or shortConfidence > longConfidence + 3.0
+        preferredDirection := shortActionable ? "Short" : "Wait"
+    else
+        preferredDirection := "Balanced"
+
+bool compactUseLong = preferredDirection == "Long" or (preferredDirection == "Balanced" and not na(longConfidence) and (na(shortConfidence) or longConfidence >= shortConfidence))
+if preferredDirection == "Wait" and na(longConfidence) and not na(shortConfidence)
+    compactUseLong := false
+
+string compactSetup = compactUseLong ? tradeLongSetup : tradeShortSetup
+string compactStatus = compactUseLong ? longStatus : shortStatus
+float compactZoneTop = compactUseLong ? tradeLongValidTop : tradeShortValidTop
+float compactZoneBottom = compactUseLong ? tradeLongValidBottom : tradeShortValidBottom
+float compactEntry = compactUseLong ? tradeLongEntry : tradeShortEntry
+float compactStop = compactUseLong ? tradeLongStop : tradeShortStop
+float compactTarget = compactUseLong ? tradeLongTarget : tradeShortTarget
+float compactRr = compactUseLong ? longRr : shortRr
+float compactConfidence = compactUseLong ? longConfidence : shortConfidence
+float compactTpProbability = compactUseLong ? longTpProbability : shortTpProbability
+color compactAccent = compactUseLong ? color.new(bullColor, 12) : color.new(bearColor, 12)
+string compactDirectionText = preferredDirection == "Balanced" ? "Balanced" : preferredDirection == "Wait" ? "Wait" : compactUseLong ? "Long" : "Short"
+
+bullStop = not na(tradeLongStop) ? tradeLongStop : not na(lastSwingLow) ? lastSwingLow - atr * stopAtrBuffer : na
+bearStop = not na(tradeShortStop) ? tradeShortStop : not na(lastSwingHigh) ? lastSwingHigh + atr * stopAtrBuffer : na
+
+//------------------------------------------------------------------------------
+// Plots
+//------------------------------------------------------------------------------
+plotPrevSessionHigh = plot(showLiquidity and showPrevSession ? prevSessionHigh : na, "Prev Session High", color=color.new(liqHighColor, 20), linewidth=1, style=plot.style_linebr)
+plotPrevSessionLow = plot(showLiquidity and showPrevSession ? prevSessionLow : na, "Prev Session Low", color=color.new(liqLowColor, 20), linewidth=1, style=plot.style_linebr)
+plotPrevDayHigh = plot(showLiquidity and showHigherPeriodLiquidity ? prevDayHigh : na, "PDH", color=color.new(liqHighColor, 0), linewidth=1, style=plot.style_linebr)
+plotPrevDayLow = plot(showLiquidity and showHigherPeriodLiquidity ? prevDayLow : na, "PDL", color=color.new(liqLowColor, 0), linewidth=1, style=plot.style_linebr)
+plotPrevWeekHigh = plot(showLiquidity and displayWeekMonthLiquidity ? prevWeekHigh : na, "PWH", color=color.new(liqHighColor, 30), linewidth=1, style=plot.style_linebr)
+plotPrevWeekLow = plot(showLiquidity and displayWeekMonthLiquidity ? prevWeekLow : na, "PWL", color=color.new(liqLowColor, 30), linewidth=1, style=plot.style_linebr)
+plotPrevMonthHigh = plot(showLiquidity and displayWeekMonthLiquidity ? prevMonthHigh : na, "PMH", color=color.new(liqHighColor, 55), linewidth=1, style=plot.style_linebr)
+plotPrevMonthLow = plot(showLiquidity and displayWeekMonthLiquidity ? prevMonthLow : na, "PML", color=color.new(liqLowColor, 55), linewidth=1, style=plot.style_linebr)
+
+protectedHighPlot = plot(showLiquidity and displayProtectedLevels ? activeProtectedHigh : na, "Protected High", color=color.new(liqHighColor, 8), linewidth=2, style=plot.style_linebr)
+protectedLowPlot = plot(showLiquidity and displayProtectedLevels ? activeProtectedLow : na, "Protected Low", color=color.new(liqLowColor, 8), linewidth=2, style=plot.style_linebr)
+
+internalHighPlot = plot(showLiquidity and displayDealingRange ? activeRangeHigh : na, "ICT Dealing Range High", color=color.new(color.silver, 20), linewidth=1, style=plot.style_linebr)
+internalLowPlot = plot(showLiquidity and displayDealingRange ? activeRangeLow : na, "ICT Dealing Range Low", color=color.new(color.silver, 20), linewidth=1, style=plot.style_linebr)
+internalEqPlot = plot(showLiquidity and displayDealingRange ? activeRangeEquilibrium : na, "ICT Equilibrium", color=color.new(neutralColor, 20), linewidth=1, style=plot.style_linebr)
+fill(internalHighPlot, internalLowPlot, color=showLiquidity and displayDealingRange ? color.new(color.silver, 95) : na)
+fill(internalHighPlot, internalEqPlot, color=showLiquidity and displayPremiumDiscount ? color.new(bearColor, 90) : na)
+fill(internalEqPlot, internalLowPlot, color=showLiquidity and displayPremiumDiscount ? color.new(bullColor, 90) : na)
+
+oteLongTopPlot = plot(strictIctMode and strictShowOte ? oteLongTop : na, "OTE Long Top", color=color.new(bullColor, 40), linewidth=1, style=plot.style_linebr)
+oteLongBottomPlot = plot(strictIctMode and strictShowOte ? oteLongBottom : na, "OTE Long Bottom", color=color.new(bullColor, 40), linewidth=1, style=plot.style_linebr)
+oteShortTopPlot = plot(strictIctMode and strictShowOte ? oteShortTop : na, "OTE Short Top", color=color.new(bearColor, 40), linewidth=1, style=plot.style_linebr)
+oteShortBottomPlot = plot(strictIctMode and strictShowOte ? oteShortBottom : na, "OTE Short Bottom", color=color.new(bearColor, 40), linewidth=1, style=plot.style_linebr)
+fill(oteLongTopPlot, oteLongBottomPlot, color=strictIctMode and strictShowOte ? color.new(bullColor, 92) : na)
+fill(oteShortTopPlot, oteShortBottomPlot, color=strictIctMode and strictShowOte ? color.new(bearColor, 92) : na)
+
+plot(showHtf and htfContextReady ? htfStructureHigh : na, "HTF Structure High", color=color.new(color.fuchsia, 15), linewidth=2, style=plot.style_linebr)
+plot(showHtf and htfContextReady ? htfStructureLow : na, "HTF Structure Low", color=color.new(color.fuchsia, 15), linewidth=2, style=plot.style_linebr)
+
+plot(showRisk ? tradeLongEntry : na, "Bullish Entry Cue", color=color.new(bullColor, 0), linewidth=2, style=plot.style_linebr)
+plot(showRisk ? tradeShortEntry : na, "Bearish Entry Cue", color=color.new(bearColor, 0), linewidth=2, style=plot.style_linebr)
+plot(showRisk ? bullStop : na, "Bullish Stop Cue", color=color.new(bearColor, 0), linewidth=1, style=plot.style_linebr)
+plot(showRisk ? bearStop : na, "Bearish Stop Cue", color=color.new(bullColor, 0), linewidth=1, style=plot.style_linebr)
+plot(showRisk ? tradeLongTarget : na, "Bullish TP Cue", color=color.new(liqHighColor, 0), linewidth=1, style=plot.style_linebr)
+plot(showRisk ? tradeShortTarget : na, "Bearish TP Cue", color=color.new(liqLowColor, 0), linewidth=1, style=plot.style_linebr)
+
+chartBackdrop = displayKillzoneVisual and strictKillzoneActive ? color.new(color.rgb(217, 172, 61), 88) : displayTrendBackground ? color.new(activeBias == 1 ? bullColor : activeBias == -1 ? bearColor : neutralColor, 93) : na
+bgcolor(chartBackdrop)
+
+//------------------------------------------------------------------------------
+// Dashboard
+//------------------------------------------------------------------------------
+var table dashboard = table.new(position.top_right, 4, 14, border_width=1)
+var table dashboardCompact = table.new(position.bottom_right, 2, 10, border_width=1)
+
+if barstate.islast and showDashboard and not compactDashboardMode
+    table.clear(dashboardCompact, 0, 0, 1, 9)
+    table.cell(dashboard, 0, 0, "Field", text_color=color.white, bgcolor=color.new(color.black, 0))
+    table.cell(dashboard, 1, 0, "Market", text_color=color.white, bgcolor=color.new(color.black, 0))
+    table.cell(dashboard, 2, 0, "Long", text_color=color.white, bgcolor=color.new(bullColor, 5))
+    table.cell(dashboard, 3, 0, "Short", text_color=color.white, bgcolor=color.new(bearColor, 5))
+
+    table.cell(dashboard, 0, 1, "Current Px", text_color=color.white, bgcolor=color.new(color.black, 10))
+    table.cell(dashboard, 1, 1, f_formatLevel(close), text_color=color.white, bgcolor=color.new(color.black, 10))
+    table.cell(dashboard, 2, 1, longStatus, text_color=color.white, bgcolor=color.new(bullColor, 20))
+    table.cell(dashboard, 3, 1, shortStatus, text_color=color.white, bgcolor=color.new(bearColor, 20))
+
+    table.cell(dashboard, 0, 2, "Bias", text_color=color.white, bgcolor=color.new(color.black, 10))
+    table.cell(dashboard, 1, 2, f_biasText(activeBias) + " / " + (showHtfBias ? (htfContextReady ? f_biasText(htfBias) : "HTF Guard") : "HTF Hidden"), text_color=color.white, bgcolor=color.new(color.black, 10))
+    table.cell(dashboard, 2, 2, htfContextReady ? f_alignmentText(true, activeBias, htfBias) : "HTF Guard", text_color=color.white, bgcolor=color.new(bullColor, 20))
+    table.cell(dashboard, 3, 2, htfContextReady ? f_alignmentText(false, activeBias, htfBias) : "HTF Guard", text_color=color.white, bgcolor=color.new(bearColor, 20))
+
+    table.cell(dashboard, 0, 3, "Preferred", text_color=color.white, bgcolor=color.new(color.black, 10))
+    table.cell(dashboard, 1, 3, preferredDirection, text_color=color.white, bgcolor=color.new(preferredDirection == "Long" ? bullColor : preferredDirection == "Short" ? bearColor : neutralColor, 15))
+    table.cell(dashboard, 2, 3, tradeLongSetup, text_color=color.white, bgcolor=color.new(bullColor, 20))
+    table.cell(dashboard, 3, 3, tradeShortSetup, text_color=color.white, bgcolor=color.new(bearColor, 20))
+
+    table.cell(dashboard, 0, 4, "Valid Zone", text_color=color.white, bgcolor=color.new(color.black, 10))
+    table.cell(dashboard, 1, 4, "Entry Range", text_color=color.white, bgcolor=color.new(color.black, 10))
+    table.cell(dashboard, 2, 4, f_formatRange(tradeLongValidTop, tradeLongValidBottom), text_color=color.white, bgcolor=color.new(bullColor, 20))
+    table.cell(dashboard, 3, 4, f_formatRange(tradeShortValidTop, tradeShortValidBottom), text_color=color.white, bgcolor=color.new(bearColor, 20))
+
+    table.cell(dashboard, 0, 5, "Entry", text_color=color.white, bgcolor=color.new(color.black, 10))
+    table.cell(dashboard, 1, 5, "Trigger", text_color=color.white, bgcolor=color.new(color.black, 10))
+    table.cell(dashboard, 2, 5, f_formatLevel(tradeLongEntry), text_color=color.white, bgcolor=color.new(bullColor, 20))
+    table.cell(dashboard, 3, 5, f_formatLevel(tradeShortEntry), text_color=color.white, bgcolor=color.new(bearColor, 20))
+
+    table.cell(dashboard, 0, 6, "Stop Loss", text_color=color.white, bgcolor=color.new(color.black, 10))
+    table.cell(dashboard, 1, 6, "Zone / swing buffer", text_color=color.white, bgcolor=color.new(color.black, 10))
+    table.cell(dashboard, 2, 6, f_formatLevel(tradeLongStop), text_color=color.white, bgcolor=color.new(bearColor, 20))
+    table.cell(dashboard, 3, 6, f_formatLevel(tradeShortStop), text_color=color.white, bgcolor=color.new(bullColor, 20))
+
+    table.cell(dashboard, 0, 7, "Take Profit", text_color=color.white, bgcolor=color.new(color.black, 10))
+    table.cell(dashboard, 1, 7, "Nearest liquidity", text_color=color.white, bgcolor=color.new(color.black, 10))
+    table.cell(dashboard, 2, 7, f_formatLevel(tradeLongTarget), text_color=color.white, bgcolor=color.new(liqHighColor, 20))
+    table.cell(dashboard, 3, 7, f_formatLevel(tradeShortTarget), text_color=color.white, bgcolor=color.new(liqLowColor, 20))
+
+    table.cell(dashboard, 0, 8, "R:R", text_color=color.white, bgcolor=color.new(color.black, 10))
+    table.cell(dashboard, 1, 8, "Reward / risk", text_color=color.white, bgcolor=color.new(color.black, 10))
+    table.cell(dashboard, 2, 8, f_formatRr(longRr), text_color=color.white, bgcolor=color.new(bullColor, 20))
+    table.cell(dashboard, 3, 8, f_formatRr(shortRr), text_color=color.white, bgcolor=color.new(bearColor, 20))
+
+    table.cell(dashboard, 0, 9, "Confidence*", text_color=color.white, bgcolor=color.new(color.black, 10))
+    table.cell(dashboard, 1, 9, "Simple confluence", text_color=color.white, bgcolor=color.new(color.black, 10))
+    table.cell(dashboard, 2, 9, f_formatPercent(longConfidence), text_color=color.white, bgcolor=color.new(bullColor, 20))
+    table.cell(dashboard, 3, 9, f_formatPercent(shortConfidence), text_color=color.white, bgcolor=color.new(bearColor, 20))
+
+    table.cell(dashboard, 0, 10, "TP Prob*", text_color=color.white, bgcolor=color.new(color.black, 10))
+    table.cell(dashboard, 1, 10, "Rule-based model", text_color=color.white, bgcolor=color.new(color.black, 10))
+    table.cell(dashboard, 2, 10, f_formatPercent(longTpProbability), text_color=color.white, bgcolor=color.new(bullColor, 20))
+    table.cell(dashboard, 3, 10, f_formatPercent(shortTpProbability), text_color=color.white, bgcolor=color.new(bearColor, 20))
+
+    table.cell(dashboard, 0, 11, "Lifecycle", text_color=color.white, bgcolor=color.new(color.black, 10))
+    table.cell(dashboard, 1, 11, "Age / touch", text_color=color.white, bgcolor=color.new(color.black, 10))
+    table.cell(dashboard, 2, 11, (na(longSetupAge) ? "-" : str.tostring(longSetupAge) + "b") + " / " + (tradeLongTouched ? "Touched" : "Untouched"), text_color=color.white, bgcolor=color.new(bullColor, 20))
+    table.cell(dashboard, 3, 11, (na(shortSetupAge) ? "-" : str.tostring(shortSetupAge) + "b") + " / " + (tradeShortTouched ? "Touched" : "Untouched"), text_color=color.white, bgcolor=color.new(bearColor, 20))
+
+    table.cell(dashboard, 0, 12, "Strict / Time", text_color=color.white, bgcolor=color.new(color.black, 10))
+    table.cell(dashboard, 1, 12, (strictIctMode ? "Mode ON | " : "Mode OFF | ") + htfStateText + " | " + liquiditySessionLabel + " | KZ " + (strictKillzoneActive ? "On" : "Off"), text_color=color.white, bgcolor=color.new(strictIctMode ? color.teal : neutralColor, 15))
+    table.cell(dashboard, 2, 12, strictLongMap, text_color=color.white, bgcolor=color.new(bullColor, 20))
+    table.cell(dashboard, 3, 12, strictShortMap, text_color=color.white, bgcolor=color.new(bearColor, 20))
+
+    table.cell(dashboard, 0, 13, "Caution", text_color=color.white, bgcolor=color.new(color.black, 10))
+    table.cell(dashboard, 1, 13, "Rule-based only, not statistical certainty", text_color=color.white, bgcolor=color.new(color.black, 10))
+    table.cell(dashboard, 2, 13, longStatus == "Strict Ready" or longStatus == "Valid now" ? "Entry active" : "Wait confirmation", text_color=color.white, bgcolor=color.new(bullColor, 20))
+    table.cell(dashboard, 3, 13, shortStatus == "Strict Ready" or shortStatus == "Valid now" ? "Entry active" : "Wait confirmation", text_color=color.white, bgcolor=color.new(bearColor, 20))
+else if barstate.islast and showDashboard and compactDashboardMode
+    table.clear(dashboard, 0, 0, 3, 13)
+    table.cell(dashboardCompact, 0, 0, "SMC Mobile", text_color=color.white, bgcolor=color.new(color.black, 0))
+    table.cell(dashboardCompact, 1, 0, compactDirectionText, text_color=color.white, bgcolor=compactAccent)
+    table.cell(dashboardCompact, 0, 1, "Bias", text_color=color.white, bgcolor=color.new(color.black, 10))
+    table.cell(dashboardCompact, 1, 1, f_biasShort(activeBias) + "/" + (htfContextReady ? f_biasShort(htfBias) : "Guard"), text_color=color.white, bgcolor=color.new(color.black, 10))
+    table.cell(dashboardCompact, 0, 2, "Setup", text_color=color.white, bgcolor=color.new(color.black, 10))
+    table.cell(dashboardCompact, 1, 2, compactSetup, text_color=color.white, bgcolor=compactAccent)
+    table.cell(dashboardCompact, 0, 3, "Zone", text_color=color.white, bgcolor=color.new(color.black, 10))
+    table.cell(dashboardCompact, 1, 3, f_formatRange(compactZoneTop, compactZoneBottom), text_color=color.white, bgcolor=compactAccent)
+    table.cell(dashboardCompact, 0, 4, "E / SL / TP", text_color=color.white, bgcolor=color.new(color.black, 10))
+    table.cell(dashboardCompact, 1, 4, f_formatLevel(compactEntry) + " | " + f_formatLevel(compactStop) + " | " + f_formatLevel(compactTarget), text_color=color.white, bgcolor=compactAccent)
+    table.cell(dashboardCompact, 0, 5, "Status", text_color=color.white, bgcolor=color.new(color.black, 10))
+    table.cell(dashboardCompact, 1, 5, f_statusCompact(compactStatus), text_color=color.white, bgcolor=compactAccent)
+    table.cell(dashboardCompact, 0, 6, "Conf / TP", text_color=color.white, bgcolor=color.new(color.black, 10))
+    table.cell(dashboardCompact, 1, 6, f_formatPercent(compactConfidence) + " / " + f_formatPercent(compactTpProbability), text_color=color.white, bgcolor=compactAccent)
+    table.cell(dashboardCompact, 0, 7, "R:R", text_color=color.white, bgcolor=color.new(color.black, 10))
+    table.cell(dashboardCompact, 1, 7, f_formatRr(compactRr), text_color=color.white, bgcolor=compactAccent)
+    table.cell(dashboardCompact, 0, 8, "Life", text_color=color.white, bgcolor=color.new(color.black, 10))
+    table.cell(dashboardCompact, 1, 8, (compactUseLong ? (na(longSetupAge) ? "-" : str.tostring(longSetupAge) + "b") + "/" + (tradeLongTouched ? "T" : "U") : (na(shortSetupAge) ? "-" : str.tostring(shortSetupAge) + "b") + "/" + (tradeShortTouched ? "T" : "U")), text_color=color.white, bgcolor=color.new(color.black, 10))
+    table.cell(dashboardCompact, 0, 9, "Strict", text_color=color.white, bgcolor=color.new(color.black, 10))
+    table.cell(dashboardCompact, 1, 9, (compactUseLong ? strictLongMapCompact : strictShortMapCompact) + " | " + effectiveHtfTf + " | KZ:" + (strictKillzoneActive ? "Y" : "N"), text_color=color.white, bgcolor=color.new(color.black, 10))
+else if barstate.islast and not showDashboard
+    table.clear(dashboardCompact, 0, 0, 1, 9)
+    table.clear(dashboard, 0, 0, 3, 13)

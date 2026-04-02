@@ -1,0 +1,2301 @@
+// ╔═══════════════════════════════════════════════════════════════════════════════════════════════════╗
+// ║                                                                                                   
+// ║                            ██╗ ██████╗████████╗    ███████╗██╗      ██████╗ ██╗    ██╗            
+// ║                            ██║██╔════╝╚══██╔══╝    ██╔════╝██║     ██╔═══██╗██║    ██║            
+// ║                            ██║██║        ██║       █████╗  ██║     ██║   ██║██║ █╗ ██║            
+// ║                            ██║██║        ██║       ██╔══╝  ██║     ██║   ██║██║███╗██║            
+// ║                            ██║╚██████╗   ██║       ██║     ███████╗╚██████╔╝╚███╔███╔╝            
+// ║                            ╚═╝ ╚═════╝   ╚═╝       ╚═╝     ╚══════╝ ╚═════╝  ╚══╝╚══╝             
+// ║                                                                                                   
+// ║                               M A T R I X   [  U L T I M A T E  ]                                 
+// ║                                                                                                   
+// ║                          ═══════════════════════════════════════════                              
+// ║                             Multi-Timeframe Smart Money Concepts                                  
+// ║                          ═══════════════════════════════════════════                              
+// ║                                                                                                   
+// ║                                        Version 6.0                                                
+// ║                                                                                                   
+// ║
+// ║
+// ║               ████████╗██████╗  █████╗ ██████╗ ███████╗██╗  ██╗ ██████╗  ██████╗ ██╗  ██╗
+// ║               ╚══██╔══╝██╔══██╗██╔══██╗██╔══██╗██╔════╝██║  ██║██╔═══██╗██╔═══██╗██║ ██╔╝
+// ║                  ██║   ██████╔╝███████║██║  ██║█████╗  ███████║██║   ██║██║   ██║█████╔╝ 
+// ║                  ██║   ██╔══██╗██╔══██║██║  ██║██╔══╝  ██╔══██║██║   ██║██║   ██║██╔═██╗ 
+// ║                  ██║   ██║  ██║██║  ██║██████╔╝███████╗██║  ██║╚██████╔╝╚██████╔╝██║  ██╗
+// ║                  ╚═╝   ╚═╝  ╚═╝╚═╝  ╚═╝╚═════╝ ╚══════╝╚═╝  ╚═╝ ╚═════╝  ╚═════╝ ╚═╝  ╚═╝
+// ║                                            .TECH
+// ║
+// ║             ─────────────────────────────────────────────────────────────────────────────
+// ║                                           MTMGBS
+// ║                      ⚡ Multi-Timeframe Model-Grid Based System ⚡
+// ║ ──────════════════════════════════════════════════════════════════════════════════════════════════╝
+
+//@version=6
+indicator("ICT Flow Matrix [Ultimate]", 
+     shorttitle    = "⚡TH_ICT Matrix v6", 
+     overlay       = true, 
+     max_boxes_count  = 500, 
+     max_lines_count  = 500, 
+     max_labels_count = 500, 
+     max_bars_back    = 5000,
+     explicit_plot_zorder = true)
+
+// ══════════════════════════════════════════════════════════════════════════════════════════════════════
+// ═══                                      CONSTANTS & TOOLTIPS                                      ═══
+// ══════════════════════════════════════════════════════════════════════════════════════════════════════
+
+const string TT_FVG    = "Fair Value Gaps represent price imbalances where institutional orders may rest."
+const string TT_OB     = "Order Blocks are the last opposing candle before a strong impulsive move."
+const string TT_BB     = "Breaker Blocks form when an Order Block fails and price breaks through."
+const string TT_RB     = "Rejection Blocks identify strong wick rejections indicating institutional defense."
+const string TT_VIMB   = "Volume Imbalances are gaps between candle bodies showing aggressive activity."
+const string TT_IFVG   = "Inverse FVGs form when a regular FVG is violated, creating a new zone."
+const string TT_EQ     = "Equal Highs/Lows represent liquidity pools where stop losses accumulate."
+const string TT_LIQ    = "Liquidity levels mark swing points where stop losses cluster."
+const string TT_MSS    = "Market Structure Shift occurs when price breaks a significant swing point."
+const string TT_OTE    = "Optimal Trade Entry zone (61.8%-79%) represents highest probability entry area."
+const string TT_CONF   = "Confluence detection scores areas where multiple ICT concepts align."
+const string TT_DR     = "Dealing Ranges define the high-low range with equilibrium as key decision point."
+const string TT_HTF    = "Higher Timeframe candles provide context for dominant orderflow direction."
+const string TT_KZ     = "Killzones are time windows where institutional activity is highest."
+const string TT_MACRO  = "ICT Macro Times are 30-minute windows where algorithms trigger significant moves."
+
+// ══════════════════════════════════════════════════════════════════════════════════════════════════════
+// ═══                                         INPUT GROUPS                                           ═══
+// ══════════════════════════════════════════════════════════════════════════════════════════════════════
+
+const string G_DISPLAY   = "══════════ 🎨 DISPLAY SETTINGS ══════════════"
+const string G_THEME     = "══════════ 🎭 COLOR THEME ══════════════"
+const string G_FVG       = "══════════ 📊 FAIR VALUE GAPS ════════════"
+const string G_OB        = "══════════ 🏛️ ORDER BLOCKS ═══════════════"
+const string G_STRUCT    = "═══════════ 📐 STRUCTURE & LIQUIDITY ═════════"
+const string G_SESSIONS  = "═══════════ ⏰ SESSIONS & KILLZONES ══════════"
+const string G_DR        = "══════════ 📏 DEALING RANGES ═══════════════"
+const string G_HTF       = "══════════ 🕯️ HTF ORDERFLOW ═══════════════"
+const string G_MACROS    = "═════════ ⏱️ ICT MACRO TIMES ═══════════════"
+const string G_DASHBOARD = "═════════ 📋 DASHBOARD ═══════════════"
+
+// ══════════════════════════════════════════════════════════════════════════════════════════════════════
+// ═══                                       DISPLAY SETTINGS                                         ═══
+// ══════════════════════════════════════════════════════════════════════════════════════════════════════
+
+string i_labelSize     = input.string("Small", "Label Size", options=["Tiny", "Small", "Normal", "Large"], group=G_DISPLAY, inline="d1")
+int    i_zoneTrans     = input.int(85, "Zone Opacity", minval=50, maxval=95, step=1, group=G_DISPLAY, inline="d1")
+bool   i_showLabels    = input.bool(true, "Show Labels", group=G_DISPLAY, inline="d2")
+bool   i_showZoneLabels = input.bool(false, "Zone Labels", group=G_DISPLAY, inline="d2", tooltip="Show FVG/OB/RB labels - disable to reduce clutter")
+bool   i_showPrices    = input.bool(false, "Price on Labels", group=G_DISPLAY, inline="d2")
+bool   i_mitEffect     = input.bool(true, "Mitigation Fade", group=G_DISPLAY, inline="d3")
+int    i_historyBars   = input.int(300, "History (Bars)", minval=100, maxval=5000, step=100, group=G_DISPLAY, inline="d3")
+
+// ══════════════════════════════════════════════════════════════════════════════════════════════════════
+// ═══                                         COLOR THEME                                            ═══
+// ══════════════════════════════════════════════════════════════════════════════════════════════════════
+
+string i_themeMode = input.string("Dark Pro", "Theme Preset", options=["Dark Pro", "Light Clean", "Neon", "Classic", "Custom"], group=G_THEME)
+
+color i_custBull    = input.color(#00E676, "↗ Bullish", group=G_THEME, inline="c1")
+color i_custBear    = input.color(#FF5252, "↘ Bearish", group=G_THEME, inline="c1")
+color i_custNeutral = input.color(#78909C, "◐ Neutral", group=G_THEME, inline="c2")
+color i_custEq      = input.color(#FFEB3B, "≡ Equilibrium", group=G_THEME, inline="c2")
+color i_custOB      = input.color(#2196F3, "■ Order Block", group=G_THEME, inline="c3")
+color i_custBB      = input.color(#9C27B0, "◈ Breaker", group=G_THEME, inline="c3")
+color i_custVIMB    = input.color(#FF9800, "▤ VIMB", group=G_THEME, inline="c4")
+color i_custIFVG    = input.color(#00BCD4, "◫ iFVG", group=G_THEME, inline="c4")
+color i_custOTE     = input.color(#4CAF50, "▧ OTE Zone", group=G_THEME, inline="c5")
+color i_custConf    = input.color(#FFD700, "★ Confluence", group=G_THEME, inline="c5")
+
+// Theme Color Function
+f_getThemeColors() =>
+    color _bull = switch i_themeMode
+        "Dark Pro"    => #00E676
+        "Light Clean" => #26A69A
+        "Neon"        => #00FF88
+        "Classic"     => #089981
+        "Custom"      => i_custBull
+        => #00E676
+    
+    color _bear = switch i_themeMode
+        "Dark Pro"    => #FF5252
+        "Light Clean" => #EF5350
+        "Neon"        => #FF0055
+        "Classic"     => #F23645
+        "Custom"      => i_custBear
+        => #FF5252
+    
+    color _neutral = switch i_themeMode
+        "Dark Pro"    => #78909C
+        "Light Clean" => #90A4AE
+        "Neon"        => #607D8B
+        "Classic"     => #787B86
+        "Custom"      => i_custNeutral
+        => #78909C
+    
+    color _eq = switch i_themeMode
+        "Dark Pro"    => #FFD54F
+        "Light Clean" => #FFC107
+        "Neon"        => #FFFF00
+        "Classic"     => #FFEB3B
+        "Custom"      => i_custEq
+        => #FFD54F
+    
+    color _ob = switch i_themeMode
+        "Dark Pro"    => #42A5F5
+        "Light Clean" => #1E88E5
+        "Neon"        => #00BFFF
+        "Classic"     => #2196F3
+        "Custom"      => i_custOB
+        => #42A5F5
+    
+    color _bb = switch i_themeMode
+        "Dark Pro"    => #AB47BC
+        "Light Clean" => #8E24AA
+        "Neon"        => #FF00FF
+        "Classic"     => #9C27B0
+        "Custom"      => i_custBB
+        => #AB47BC
+    
+    color _vimb = switch i_themeMode
+        "Dark Pro"    => #FFA726
+        "Light Clean" => #FB8C00
+        "Neon"        => #FF8800
+        "Classic"     => #FF9800
+        "Custom"      => i_custVIMB
+        => #FFA726
+    
+    color _ifvg = switch i_themeMode
+        "Dark Pro"    => #26C6DA
+        "Light Clean" => #00ACC1
+        "Neon"        => #00FFFF
+        "Classic"     => #00BCD4
+        "Custom"      => i_custIFVG
+        => #26C6DA
+    
+    color _ote = switch i_themeMode
+        "Dark Pro"    => #66BB6A
+        "Light Clean" => #43A047
+        "Neon"        => #00FF00
+        "Classic"     => #4CAF50
+        "Custom"      => i_custOTE
+        => #66BB6A
+    
+    color _conf = switch i_themeMode
+        "Dark Pro"    => #FFD700
+        "Light Clean" => #FFC400
+        "Neon"        => #FFFF00
+        "Classic"     => #FFD700
+        "Custom"      => i_custConf
+        => #FFD700
+    
+    color _asia   = #FF9800
+    color _london = #42A5F5
+    color _ny     = #EC407A
+    color _weekly = #AB47BC
+    color _monthly = #EC407A
+    color _daily  = #42A5F5
+    
+    [_bull, _bear, _neutral, _eq, _ob, _bb, _vimb, _ifvg, _ote, _conf, _asia, _london, _ny, _weekly, _monthly, _daily]
+
+[C_BULL, C_BEAR, C_NEUTRAL, C_EQ, C_OB, C_BB, C_VIMB, C_IFVG, C_OTE, C_CONF, C_ASIA, C_LONDON, C_NY, C_WEEKLY, C_MONTHLY, C_DAILY] = f_getThemeColors()
+
+// ══════════════════════════════════════════════════════════════════════════════════════════════════════
+// ═══                                      FVG SETTINGS                                              ═══
+// ══════════════════════════════════════════════════════════════════════════════════════════════════════
+
+bool   i_showFVG     = input.bool(true, "Enable FVG Detection", group=G_FVG, tooltip=TT_FVG)
+int    i_fvgMax      = input.int(5, "Maximum Zones", minval=1, maxval=20, group=G_FVG, inline="fvg1")
+string i_fvgStyle    = input.string("Filled", "Style", options=["Filled", "Border Only"], group=G_FVG, inline="fvg1")
+bool   i_fvgMitTrack = input.bool(true, "Track Mitigation", group=G_FVG, inline="fvg2")
+bool   i_fvgExtend   = input.bool(true, "Extend Until Mitigated", group=G_FVG, inline="fvg2")
+bool   i_fvgMidLine  = input.bool(true, "Show CE Line", group=G_FVG, inline="fvg3")
+string i_fvgMitType  = input.string("Wick Touch", "Mitigation Type", options=["Wick Touch", "50% (CE)", "Full Close"], group=G_FVG, inline="fvg3")
+bool   i_showIFVG    = input.bool(true, "Enable Inverse FVG", group=G_FVG, inline="ifvg1", tooltip=TT_IFVG)
+int    i_ifvgMax     = input.int(3, "Max iFVG", minval=1, maxval=10, group=G_FVG, inline="ifvg1")
+
+// ══════════════════════════════════════════════════════════════════════════════════════════════════════
+// ═══                                    ORDER BLOCK SETTINGS                                        ═══
+// ══════════════════════════════════════════════════════════════════════════════════════════════════════
+
+bool   i_showOB      = input.bool(true, "Enable Order Blocks", group=G_OB, tooltip=TT_OB)
+int    i_obMax       = input.int(3, "Maximum Zones", minval=1, maxval=10, group=G_OB, inline="ob1")
+int    i_obStrength  = input.int(3, "Impulse Strength", minval=2, maxval=10, group=G_OB, inline="ob1")
+bool   i_obExtend    = input.bool(true, "Extend Until Mitigated", group=G_OB, inline="ob2")
+bool   i_obMidLine   = input.bool(true, "Show 50% Level", group=G_OB, inline="ob2")
+bool   i_obVolFilter = input.bool(false, "Volume Filter", group=G_OB, inline="ob3")
+string i_obStyle     = input.string("Filled", "Style", options=["Filled", "Border Only"], group=G_OB, inline="ob3")
+
+bool   i_showBB      = input.bool(true, "Enable Breaker Blocks", group=G_OB, inline="bb1", tooltip=TT_BB)
+int    i_bbMax       = input.int(3, "Max Breakers", minval=1, maxval=8, group=G_OB, inline="bb1")
+
+bool   i_showRB      = input.bool(true, "Enable Rejection Blocks", group=G_OB, inline="rb1", tooltip=TT_RB)
+int    i_rbMax       = input.int(2, "Max RBs", minval=1, maxval=8, group=G_OB, inline="rb1")
+float  i_rbWickRatio = input.float(2.0, "Wick Ratio", minval=1.5, maxval=5.0, step=0.5, group=G_OB, inline="rb2")
+
+bool   i_showVIMB    = input.bool(true, "Enable Volume Imbalance", group=G_OB, inline="vimb1", tooltip=TT_VIMB)
+int    i_vimbMax     = input.int(2, "Max VIMBs", minval=1, maxval=8, group=G_OB, inline="vimb1")
+
+// ══════════════════════════════════════════════════════════════════════════════════════════════════════
+// ═══                                   STRUCTURE & LIQUIDITY                                        ═══
+// ══════════════════════════════════════════════════════════════════════════════════════════════════════
+
+bool   i_showMSS     = input.bool(true, "Market Structure Shifts", group=G_STRUCT, tooltip=TT_MSS)
+int    i_mssLen      = input.int(5, "Swing Length", minval=2, maxval=20, group=G_STRUCT, inline="mss1")
+
+bool   i_showEQHL    = input.bool(true, "Equal Highs/Lows", group=G_STRUCT, inline="eq1", tooltip=TT_EQ)
+int    i_eqhlMax     = input.int(3, "Max EQ Levels", minval=1, maxval=8, group=G_STRUCT, inline="eq1")
+float  i_eqhlTol     = input.float(0.1, "EQ Tolerance %", minval=0.01, maxval=1.0, step=0.01, group=G_STRUCT, inline="eq2")
+
+bool   i_showLiq     = input.bool(true, "Liquidity Levels", group=G_STRUCT, inline="liq1", tooltip=TT_LIQ)
+int    i_liqMax      = input.int(4, "Max Levels", minval=1, maxval=10, group=G_STRUCT, inline="liq1")
+int    i_liqSwingLen = input.int(10, "Swing Length", minval=3, maxval=50, group=G_STRUCT, inline="liq2")
+
+bool   i_showFibs    = input.bool(true, "Structure Fibs", group=G_STRUCT, inline="fib1")
+bool   i_showPDZones = input.bool(true, "Premium/Discount BG", group=G_STRUCT, inline="fib1")
+int    i_fibMaxAge   = input.int(150, "Max Structure Age", minval=50, maxval=500, group=G_STRUCT, inline="fib2", tooltip="Hide P/D zones if structure is older than X bars")
+
+bool   i_showOTE     = input.bool(true, "OTE Zone (61.8%-79%)", group=G_STRUCT, inline="ote1", tooltip=TT_OTE)
+
+bool   i_showConf    = input.bool(true, "Confluence Detection", group=G_STRUCT, inline="conf1", tooltip=TT_CONF)
+int    i_confThresh  = input.int(3, "Min Score", minval=2, maxval=6, group=G_STRUCT, inline="conf1")
+bool   i_confShowLbl = input.bool(true, "Show Score", group=G_STRUCT, inline="conf2")
+
+// ══════════════════════════════════════════════════════════════════════════════════════════════════════
+// ═══                                    SESSION SETTINGS                                            ═══
+// ══════════════════════════════════════════════════════════════════════════════════════════════════════
+
+bool i_showSessOpens = input.bool(true, "Session Open Levels", group=G_SESSIONS)
+bool i_showWO        = input.bool(true, "Weekly Open", group=G_SESSIONS, inline="so1")
+bool i_showMO        = input.bool(true, "Monthly Open", group=G_SESSIONS, inline="so1")
+bool i_showDO        = input.bool(false, "Daily Open", group=G_SESSIONS, inline="so1")
+
+bool i_showPrevHL    = input.bool(true, "Previous Period H/L", group=G_SESSIONS)
+bool i_showPDHL      = input.bool(true, "Day", group=G_SESSIONS, inline="phl1")
+bool i_showPWHL      = input.bool(true, "Week", group=G_SESSIONS, inline="phl1")
+bool i_showPMHL      = input.bool(false, "Month", group=G_SESSIONS, inline="phl1")
+
+bool i_showKZ        = input.bool(true, "Killzone Sessions", group=G_SESSIONS, tooltip=TT_KZ)
+bool i_kzBoxes       = input.bool(true, "Session Boxes", group=G_SESSIONS, inline="kz1")
+bool i_kzHL          = input.bool(true, "Session H/L", group=G_SESSIONS, inline="kz1")
+bool i_kzExtend      = input.bool(true, "Extend H/L", group=G_SESSIONS, inline="kz1")
+
+bool   i_showAsia    = input.bool(true, "Asia", group=G_SESSIONS, inline="kz2")
+bool   i_showLondon  = input.bool(true, "London", group=G_SESSIONS, inline="kz2")
+bool   i_showNYAM    = input.bool(true, "NY AM", group=G_SESSIONS, inline="kz2")
+bool   i_showNYPM    = input.bool(false, "NY PM", group=G_SESSIONS, inline="kz2")
+
+string i_asiaStart   = input.string("2000", "Asia", group=G_SESSIONS, inline="kzt1")
+string i_asiaEnd     = input.string("0000", "→", group=G_SESSIONS, inline="kzt1")
+string i_londonStart = input.string("0200", "London", group=G_SESSIONS, inline="kzt2")
+string i_londonEnd   = input.string("0500", "→", group=G_SESSIONS, inline="kzt2")
+string i_nyamStart   = input.string("0830", "NY AM", group=G_SESSIONS, inline="kzt3")
+string i_nyamEnd     = input.string("1100", "→", group=G_SESSIONS, inline="kzt3")
+string i_nypmStart   = input.string("1330", "NY PM", group=G_SESSIONS, inline="kzt4")
+string i_nypmEnd     = input.string("1600", "→", group=G_SESSIONS, inline="kzt4")
+
+// ══════════════════════════════════════════════════════════════════════════════════════════════════════
+// ═══                                    DEALING RANGE SETTINGS                                      ═══
+// ══════════════════════════════════════════════════════════════════════════════════════════════════════
+
+bool i_showDR        = input.bool(true, "Enable Dealing Ranges", group=G_DR, tooltip=TT_DR)
+bool i_drFibs        = input.bool(true, "Fib Levels", group=G_DR, inline="dr1")
+bool i_drPDZones     = input.bool(true, "P/D Shading", group=G_DR, inline="dr1")
+bool i_drEQ          = input.bool(true, "EQ Line", group=G_DR, inline="dr1")
+bool i_drLabels      = input.bool(true, "Labels", group=G_DR, inline="dr2")
+bool i_drPrice       = input.bool(false, "Price", group=G_DR, inline="dr2")
+
+bool i_showDR_21D    = input.bool(false, "21-Day", group=G_DR, inline="drt1")
+bool i_showDR_3D     = input.bool(true, "3-Day", group=G_DR, inline="drt1")
+bool i_showDR_1D     = input.bool(true, "Daily", group=G_DR, inline="drt1")
+bool i_showDR_Asia   = input.bool(false, "Asia", group=G_DR, inline="drt2")
+bool i_showDR_LDN    = input.bool(false, "London", group=G_DR, inline="drt2")
+bool i_showDR_NY     = input.bool(false, "NY", group=G_DR, inline="drt2")
+
+// ══════════════════════════════════════════════════════════════════════════════════════════════════════
+// ═══                                      HTF ORDERFLOW                                             ═══
+// ══════════════════════════════════════════════════════════════════════════════════════════════════════
+
+bool   i_showHTF     = input.bool(true, "Show HTF Candles", group=G_HTF, tooltip=TT_HTF)
+string i_htfTF       = input.string("Auto", "Timeframe", options=["Auto", "5", "15", "30", "60", "240", "D", "W"], group=G_HTF, inline="htf1")
+int    i_htfCount    = input.int(5, "Count", minval=1, maxval=6, group=G_HTF, inline="htf1")
+int    i_htfOffset   = input.int(20, "Offset", minval=5, maxval=100, group=G_HTF, inline="htf2")
+bool   i_htfOHL      = input.bool(true, "O/H/L Lines", group=G_HTF, inline="htf3")
+bool   i_htfTimer    = input.bool(true, "Timer", group=G_HTF, inline="htf3")
+string i_htfStyle    = input.string("Modern", "Style", options=["Modern", "Classic", "Hollow"], group=G_HTF, inline="htf4")
+
+// ══════════════════════════════════════════════════════════════════════════════════════════════════════
+// ═══                                    ICT MACRO TIMES                                             ═══
+// ══════════════════════════════════════════════════════════════════════════════════════════════════════
+
+bool   i_showMacros    = input.bool(true, "Enable Macro Times", group=G_MACROS, tooltip=TT_MACRO)
+string i_macroStyle    = input.string("Brackets", "Style", options=["Brackets", "Background", "Both"], group=G_MACROS, inline="ms1")
+color  i_macroColor    = input.color(#FF6D00, "Color", group=G_MACROS, inline="ms1")
+bool   i_macroLabels   = input.bool(true, "Labels", group=G_MACROS, inline="ms2")
+bool   i_macroShowTime = input.bool(true, "Show Time", group=G_MACROS, inline="ms2")
+int    i_macroBgTrans  = input.int(90, "BG Trans", minval=70, maxval=98, group=G_MACROS, inline="ms3")
+
+bool i_m_0245 = input.bool(true, "02:45", group=G_MACROS, inline="m1")
+bool i_m_0345 = input.bool(true, "03:45", group=G_MACROS, inline="m1")
+bool i_m_0445 = input.bool(true, "04:45", group=G_MACROS, inline="m1")
+bool i_m_0945 = input.bool(true, "09:45", group=G_MACROS, inline="m2")
+bool i_m_1045 = input.bool(true, "10:45", group=G_MACROS, inline="m2")
+bool i_m_1345 = input.bool(true, "13:45", group=G_MACROS, inline="m2")
+bool i_m_1445 = input.bool(true, "14:45", group=G_MACROS, inline="m3")
+bool i_m_1515 = input.bool(true, "15:15", group=G_MACROS, inline="m3")
+bool i_m_1545 = input.bool(true, "15:45", group=G_MACROS, inline="m3")
+
+// ══════════════════════════════════════════════════════════════════════════════════════════════════════
+// ═══                                      DASHBOARD SETTINGS                                        ═══
+// ══════════════════════════════════════════════════════════════════════════════════════════════════════
+
+bool   i_showDash    = input.bool(true, "Show Dashboard", group=G_DASHBOARD)
+string i_dashPos     = input.string("Top Right", "Position", options=["Top Right", "Top Left", "Bottom Right", "Bottom Left"], group=G_DASHBOARD, inline="dash1")
+string i_dashSize    = input.string("Small", "Size", options=["Tiny", "Small", "Normal"], group=G_DASHBOARD, inline="dash1")
+string i_dashStyle   = input.string("Compact", "Style", options=["Compact", "Detailed", "Minimal"], group=G_DASHBOARD, inline="dash2")
+int    i_dashTrans   = input.int(5, "BG Trans", minval=0, maxval=50, group=G_DASHBOARD, inline="dash2")
+
+// ══════════════════════════════════════════════════════════════════════════════════════════════════════
+// ═══                                     UTILITY FUNCTIONS                                          ═══
+// ══════════════════════════════════════════════════════════════════════════════════════════════════════
+
+f_labelSize(string s) =>
+    switch s
+        "Tiny"   => size.tiny
+        "Small"  => size.small
+        "Normal" => size.normal
+        "Large"  => size.large
+        => size.small
+
+f_dashPosition(string pos) =>
+    switch pos
+        "Top Right"    => position.top_right
+        "Top Left"     => position.top_left
+        "Bottom Right" => position.bottom_right
+        "Bottom Left"  => position.bottom_left
+        => position.top_right
+
+f_inSession(string startT, string endT) =>
+    int startH = int(math.floor(str.tonumber(startT) / 100))
+    int startM = int(str.tonumber(startT)) % 100
+    int endH   = int(math.floor(str.tonumber(endT) / 100))
+    int endM   = int(str.tonumber(endT)) % 100
+    int currH  = hour(time, "America/New_York")
+    int currM  = minute(time, "America/New_York")
+    int currMins  = currH * 60 + currM
+    int startMins = startH * 60 + startM
+    int endMins   = endH * 60 + endM
+    endMins > startMins ? (currMins >= startMins and currMins < endMins) : (currMins >= startMins or currMins < endMins)
+
+f_inMacroTime(int sH, int sM, int eH, int eM) =>
+    int h = hour(time, "America/New_York")
+    int m = minute(time, "America/New_York")
+    if sH == eH
+        h == sH and m >= sM and m < eM
+    else
+        (h == sH and m >= sM) or (h == eH and m < eM)
+
+// Method extensions for arrays - FIXED with size checks
+method countActive(array<bool> arr) =>
+    int count = 0
+    if arr.size() > 0
+        for i = 0 to arr.size() - 1
+            if not arr.get(i)
+                count += 1
+    count
+
+method cleanupLines(array<line> arr, int maxSize) =>
+    while arr.size() > maxSize
+        line.delete(arr.shift())
+
+method cleanupBoxes(array<box> arr, int maxSize) =>
+    while arr.size() > maxSize
+        box.delete(arr.shift())
+
+method cleanupLabels(array<label> arr, int maxSize) =>
+    while arr.size() > maxSize
+        label.delete(arr.shift())
+
+f_formatCountdown(int secs) =>
+    int h = secs / 3600
+    int m = (secs % 3600) / 60
+    int s = secs % 60
+    string result = ""
+    if h > 0
+        result := str.tostring(h) + "h " + str.tostring(m) + "m"
+    else if m > 0
+        result := str.tostring(m) + "m " + str.tostring(s) + "s"
+    else
+        result := str.tostring(s) + "s"
+    result
+
+f_clampBar(int idx) => math.max(bar_index - i_historyBars, idx)
+
+// ══════════════════════════════════════════════════════════════════════════════════════════════════════
+// ═══                                    CORE CALCULATIONS                                           ═══
+// ══════════════════════════════════════════════════════════════════════════════════════════════════════
+
+float minSize = syminfo.mintick * 3
+
+bool isNewWeek  = ta.change(time("W")) != 0
+bool isNewMonth = ta.change(time("M")) != 0
+bool isNewDay   = ta.change(time("D")) != 0
+
+bool inAsia   = f_inSession(i_asiaStart, i_asiaEnd)
+bool inLondon = f_inSession(i_londonStart, i_londonEnd)
+bool inNYAM   = f_inSession(i_nyamStart, i_nyamEnd)
+bool inNYPM   = f_inSession(i_nypmStart, i_nypmEnd)
+bool inNY     = inNYAM or inNYPM
+
+float tolerance    = close * (i_eqhlTol / 100)
+float swingHighEQ  = ta.pivothigh(high, 5, 5)
+float swingLowEQ   = ta.pivotlow(low, 5, 5)
+float pivotHi      = ta.pivothigh(high, i_liqSwingLen, i_liqSwingLen)
+float pivotLo      = ta.pivotlow(low, i_liqSwingLen, i_liqSwingLen)
+float mssPivotHi   = ta.pivothigh(high, i_mssLen, i_mssLen)
+float mssPivotLo   = ta.pivotlow(low, i_mssLen, i_mssLen)
+
+float bodySize   = math.abs(close - open)
+float upperWick  = high - math.max(close, open)
+float lowerWick  = math.min(close, open) - low
+float avgVolume  = ta.sma(volume, 20)
+
+// Macro time checks
+bool macro_0245 = i_m_0245 and f_inMacroTime(2, 45, 3, 15)
+bool macro_0345 = i_m_0345 and f_inMacroTime(3, 45, 4, 15)
+bool macro_0445 = i_m_0445 and f_inMacroTime(4, 45, 5, 15)
+bool macro_0945 = i_m_0945 and f_inMacroTime(9, 45, 10, 15)
+bool macro_1045 = i_m_1045 and f_inMacroTime(10, 45, 11, 15)
+bool macro_1345 = i_m_1345 and f_inMacroTime(13, 45, 14, 15)
+bool macro_1445 = i_m_1445 and f_inMacroTime(14, 45, 15, 15)
+bool macro_1515 = i_m_1515 and f_inMacroTime(15, 15, 15, 45)
+bool macro_1545 = i_m_1545 and f_inMacroTime(15, 45, 16, 15)
+
+bool inAnyMacro = i_showMacros and (macro_0245 or macro_0345 or macro_0445 or macro_0945 or macro_1045 or macro_1345 or macro_1445 or macro_1515 or macro_1545)
+
+f_getCurrentMacroLabel() =>
+    if macro_0245
+        "02:45-03:15"
+    else if macro_0345
+        "03:45-04:15"
+    else if macro_0445
+        "04:45-05:15"
+    else if macro_0945
+        "09:45-10:15"
+    else if macro_1045
+        "10:45-11:15"
+    else if macro_1345
+        "13:45-14:15"
+    else if macro_1445
+        "14:45-15:15"
+    else if macro_1515
+        "15:15-15:45"
+    else if macro_1545
+        "15:45-16:15"
+    else
+        ""
+
+string currentMacroLbl = f_getCurrentMacroLabel()
+
+// ══════════════════════════════════════════════════════════════════════════════════════════════════════
+// ═══                                     ARRAY DECLARATIONS                                         ═══
+// ══════════════════════════════════════════════════════════════════════════════════════════════════════
+
+// FVG Arrays
+var bullFvgBox = array.new<box>()
+var bullFvgTop = array.new<float>()
+var bullFvgBot = array.new<float>()
+var bullFvgMit = array.new<bool>()
+var bullFvgMid = array.new<line>()
+var bullFvgBar = array.new<int>()
+
+var bearFvgBox = array.new<box>()
+var bearFvgTop = array.new<float>()
+var bearFvgBot = array.new<float>()
+var bearFvgMit = array.new<bool>()
+var bearFvgMid = array.new<line>()
+var bearFvgBar = array.new<int>()
+
+// iFVG Arrays
+var ifvgBox  = array.new<box>()
+var ifvgTop  = array.new<float>()
+var ifvgBot  = array.new<float>()
+var ifvgBull = array.new<bool>()
+var ifvgMit  = array.new<bool>()
+var ifvgBar  = array.new<int>()
+
+// Order Block Arrays
+var bullOBBox = array.new<box>()
+var bullOBTop = array.new<float>()
+var bullOBBot = array.new<float>()
+var bullOBMit = array.new<bool>()
+var bullOBBar = array.new<int>()
+var bullOBMid = array.new<line>()
+
+var bearOBBox = array.new<box>()
+var bearOBTop = array.new<float>()
+var bearOBBot = array.new<float>()
+var bearOBMit = array.new<bool>()
+var bearOBBar = array.new<int>()
+var bearOBMid = array.new<line>()
+
+// Breaker Block Arrays
+var bullBBBox = array.new<box>()
+var bullBBTop = array.new<float>()
+var bullBBBot = array.new<float>()
+var bullBBMit = array.new<bool>()
+
+var bearBBBox = array.new<box>()
+var bearBBTop = array.new<float>()
+var bearBBBot = array.new<float>()
+var bearBBMit = array.new<bool>()
+
+// Rejection Block Arrays
+var bullRBBox = array.new<box>()
+var bullRBTop = array.new<float>()
+var bullRBBot = array.new<float>()
+var bullRBMit = array.new<bool>()
+
+var bearRBBox = array.new<box>()
+var bearRBTop = array.new<float>()
+var bearRBBot = array.new<float>()
+var bearRBMit = array.new<bool>()
+
+// Volume Imbalance Arrays
+var vimbBox  = array.new<box>()
+var vimbTop  = array.new<float>()
+var vimbBot  = array.new<float>()
+var vimbMit  = array.new<bool>()
+var vimbBull = array.new<bool>()
+
+// EQH/EQL Arrays
+var eqhLine      = array.new<line>()
+var eqhPrice     = array.new<float>()
+var eqhSwept     = array.new<bool>()
+var eqhConfirmed = array.new<bool>()
+
+var eqlLine      = array.new<line>()
+var eqlPrice     = array.new<float>()
+var eqlSwept     = array.new<bool>()
+var eqlConfirmed = array.new<bool>()
+
+// Liquidity Arrays
+var bslLine  = array.new<line>()
+var bslPrice = array.new<float>()
+var bslSwept = array.new<bool>()
+
+var sslLine  = array.new<line>()
+var sslPrice = array.new<float>()
+var sslSwept = array.new<bool>()
+
+// HTF & Macro Drawing Arrays
+var htfBody = array.new<box>()
+var htfWick = array.new<line>()
+
+var macroLines  = array.new<line>()
+var macroBoxes  = array.new<box>()
+var macroLabels = array.new<label>()
+
+// ══════════════════════════════════════════════════════════════════════════════════════════════════════
+// ═══                                    STATE VARIABLES                                             ═══
+// ══════════════════════════════════════════════════════════════════════════════════════════════════════
+
+var float weeklyOpen  = na, var float monthlyOpen = na, var float dailyOpen = na
+var int weeklyBar = 0, var int monthlyBar = 0, var int dailyBar = 0
+
+var float pdh = na, var float pdl = na
+var float pwh = na, var float pwl = na
+var float pmh = na, var float pml = na
+var float currDayH = na, var float currDayL = na
+var float currWeekH = na, var float currWeekL = na
+var float currMonthH = na, var float currMonthL = na
+
+var float asiaH = na, var float asiaL = na, var int asiaStartBar = 0, var bool wasInAsia = false
+var float londonH = na, var float londonL = na, var int londonStartBar = 0, var bool wasInLondon = false
+var float nyamH = na, var float nyamL = na, var int nyamStartBar = 0, var bool wasInNYAM = false
+var float nypmH = na, var float nypmL = na, var int nypmStartBar = 0, var bool wasInNYPM = false
+var box asiaBox = na, var box londonBox = na, var box nyamBox = na, var box nypmBox = na
+
+var float dr1H = na, var float dr1L = na, var int dr1StartBar = 0
+var float drAsiaH = na, var float drAsiaL = na, var int drAsiaStartBar = 0, var bool drAsiaComplete = false
+var float drLdnH = na, var float drLdnL = na, var int drLdnStartBar = 0, var bool drLdnComplete = false
+var float drNyH = na, var float drNyL = na, var int drNyStartBar = 0, var bool drNyComplete = false
+
+var float mssSwingH = na, var float mssSwingL = na
+var int mssSwingHBar = 0, var int mssSwingLBar = 0
+var int mssDirection = 0
+
+var float structHi = na, var float structLo = na
+var int structHiBar = 0, var int structLoBar = 0
+var float oteTop = na, var float oteMid = na, var float oteBot = na
+
+var float macroSessionHigh = na, var float macroSessionLow = na
+var int macroStartBar = 0, var bool wasInMacro = false
+
+// Alert tracking
+var bool eqhSweptAlert = false, var bool eqlSweptAlert = false
+var bool bslSweptAlert = false, var bool sslSweptAlert = false
+var bool bullBreakerFormed = false, var bool bearBreakerFormed = false
+var bool bullMSS = false, var bool bearMSS = false
+var bool highConfAlert = false, var bool ifvgFormed = false
+
+// Reset alerts
+eqhSweptAlert := false
+eqlSweptAlert := false
+bslSweptAlert := false
+sslSweptAlert := false
+bullBreakerFormed := false
+bearBreakerFormed := false
+bullMSS := false
+bearMSS := false
+highConfAlert := false
+ifvgFormed := false
+
+// Drawing objects
+var line wkLine = na, var line moLine = na, var line doLine = na
+var label wkLbl = na, var label moLbl = na, var label doLbl = na
+var line pdhLine = na, var line pdlLine = na
+var line pwhLine = na, var line pwlLine = na
+var line pmhLine = na, var line pmlLine = na
+var label pdhLbl = na, var label pdlLbl = na
+var label pwhLbl = na, var label pwlLbl = na
+var label pmhLbl = na, var label pmlLbl = na
+var line asiaHLine = na, var line asiaLLine = na
+var line londonHLine = na, var line londonLLine = na
+var line nyamHLine = na, var line nyamLLine = na
+var line nypmHLine = na, var line nypmLLine = na
+var line htfOpenLn = na, var line htfHighLn = na, var line htfLowLn = na
+var label htfTimerLbl = na
+var line ln0 = na, var line ln50 = na, var line ln100 = na
+var line lnOteTop = na, var line lnOteBot = na
+var box premBox = na, var box discBox = na, var box oteBox = na
+var table dashboard = na
+
+// ══════════════════════════════════════════════════════════════════════════════════════════════════════
+// ═══                                      HTF DATA REQUEST                                          ═══
+// ══════════════════════════════════════════════════════════════════════════════════════════════════════
+
+f_getHTFTimeframe() =>
+    switch i_htfTF
+        "Auto" =>
+            int tfMins = timeframe.in_seconds() / 60
+            tfMins <= 1 ? "5" : tfMins <= 5 ? "15" : tfMins <= 15 ? "60" : tfMins <= 60 ? "240" : tfMins <= 240 ? "D" : "W"
+        => i_htfTF
+
+string htfTF = f_getHTFTimeframe()
+
+[htfO, htfH, htfL, htfC, htfTime, htfO1, htfH1, htfL1, htfC1, htfO2, htfH2, htfL2, htfC2] = 
+     request.security(syminfo.tickerid, htfTF, 
+     [open, high, low, close, time, open[1], high[1], low[1], close[1], open[2], high[2], low[2], close[2]], 
+     lookahead=barmerge.lookahead_on)
+
+[htfO3, htfH3, htfL3, htfC3, htfO4, htfH4, htfL4, htfC4, htfO5, htfH5, htfL5, htfC5] = 
+     request.security(syminfo.tickerid, htfTF, 
+     [open[3], high[3], low[3], close[3], open[4], high[4], low[4], close[4], open[5], high[5], low[5], close[5]], 
+     lookahead=barmerge.lookahead_on)
+
+int htfSeconds    = timeframe.in_seconds(htfTF)
+int elapsedSecs   = int((timenow - htfTime) / 1000)
+int remainingSecs = math.max(0, htfSeconds - elapsedSecs)
+string countdownStr = f_formatCountdown(remainingSecs)
+
+// ══════════════════════════════════════════════════════════════════════════════════════════════════════
+// ═══                                     FVG DETECTION                                              ═══
+// ══════════════════════════════════════════════════════════════════════════════════════════════════════
+
+bool bullFVG = low > high[2] and close[1] > open[1] and (low - high[2]) > minSize
+bool bearFVG = high < low[2] and close[1] < open[1] and (low[2] - high) > minSize
+
+if i_showFVG and bullFVG
+    float _top = low
+    float _bot = high[2]
+    float _mid = math.avg(_top, _bot)
+    int _left  = bar_index - 2
+    int _right = bar_index + 3
+    
+    color bgCol = i_fvgStyle == "Filled" ? color.new(C_BULL, i_zoneTrans) : color.new(C_BULL, 98)
+    int borderW = i_fvgStyle == "Border Only" ? 2 : 1
+    
+    box newBox = box.new(_left, _top, _right, _bot, bgcolor=bgCol, border_color=color.new(C_BULL, 30), border_width=borderW)
+    bullFvgBox.push(newBox)
+    bullFvgTop.push(_top)
+    bullFvgBot.push(_bot)
+    bullFvgMit.push(false)
+    bullFvgBar.push(_left)
+    
+    if i_fvgMidLine
+        bullFvgMid.push(line.new(_left, _mid, _right, _mid, color=color.new(C_BULL, 50), style=line.style_dotted, width=1))
+    else
+        bullFvgMid.push(na)
+    
+    if i_showLabels and i_showZoneLabels
+        label.new(_left, _bot, "FVG▲", style=label.style_none, textcolor=color.new(C_BULL, 20), size=f_labelSize(i_labelSize))
+    
+    bullFvgBox.cleanupBoxes(i_fvgMax)
+    if bullFvgTop.size() > i_fvgMax
+        bullFvgTop.shift()
+        bullFvgBot.shift()
+        bullFvgMit.shift()
+        bullFvgBar.shift()
+        line.delete(bullFvgMid.shift())
+
+if i_showFVG and bearFVG
+    float _top = low[2]
+    float _bot = high
+    float _mid = math.avg(_top, _bot)
+    int _left  = bar_index - 2
+    int _right = bar_index + 3
+    
+    color bgCol = i_fvgStyle == "Filled" ? color.new(C_BEAR, i_zoneTrans) : color.new(C_BEAR, 98)
+    int borderW = i_fvgStyle == "Border Only" ? 2 : 1
+    
+    box newBox = box.new(_left, _top, _right, _bot, bgcolor=bgCol, border_color=color.new(C_BEAR, 30), border_width=borderW)
+    bearFvgBox.push(newBox)
+    bearFvgTop.push(_top)
+    bearFvgBot.push(_bot)
+    bearFvgMit.push(false)
+    bearFvgBar.push(_left)
+    
+    if i_fvgMidLine
+        bearFvgMid.push(line.new(_left, _mid, _right, _mid, color=color.new(C_BEAR, 50), style=line.style_dotted, width=1))
+    else
+        bearFvgMid.push(na)
+    
+    if i_showLabels and i_showZoneLabels
+        label.new(_left, _top, "FVG▼", style=label.style_none, textcolor=color.new(C_BEAR, 20), size=f_labelSize(i_labelSize))
+    
+    bearFvgBox.cleanupBoxes(i_fvgMax)
+    if bearFvgTop.size() > i_fvgMax
+        bearFvgTop.shift()
+        bearFvgBot.shift()
+        bearFvgMit.shift()
+        bearFvgBar.shift()
+        line.delete(bearFvgMid.shift())
+
+// ══════════════════════════════════════════════════════════════════════════════════════════════════════
+// ═══                               FVG MITIGATION & iFVG                                            ═══
+// ══════════════════════════════════════════════════════════════════════════════════════════════════════
+
+f_checkMitigation(float priceH, float priceL, float priceC, float zoneTop, float zoneBot, bool isBull) =>
+    switch i_fvgMitType
+        "Wick Touch"   => isBull ? priceL <= zoneBot : priceH >= zoneTop
+        "50% (CE)"     => isBull ? priceL <= math.avg(zoneTop, zoneBot) : priceH >= math.avg(zoneTop, zoneBot)
+        "Full Close"   => isBull ? priceC < zoneBot : priceC > zoneTop
+        => false
+
+if i_showFVG and i_fvgMitTrack and bullFvgBox.size() > 0
+    for i = 0 to bullFvgBox.size() - 1
+        if i < bullFvgMit.size() and not bullFvgMit.get(i)
+            float topLvl = bullFvgTop.get(i)
+            float botLvl = bullFvgBot.get(i)
+            int origBar  = bullFvgBar.get(i)
+            box bx       = bullFvgBox.get(i)
+            line midLn   = bullFvgMid.get(i)
+            
+            if f_checkMitigation(high, low, close, topLvl, botLvl, true)
+                bullFvgMit.set(i, true)
+                if i_mitEffect
+                    bx.set_bgcolor(color.new(C_NEUTRAL, 94))
+                    bx.set_border_color(color.new(C_NEUTRAL, 80))
+                    if not na(midLn)
+                        midLn.set_color(color.new(C_NEUTRAL, 80))
+                
+                if i_showIFVG and close < botLvl and ifvgBox.size() < i_ifvgMax
+                    box ifvg = box.new(origBar, topLvl, bar_index + 5, botLvl, 
+                         bgcolor=color.new(C_IFVG, i_zoneTrans), 
+                         border_color=C_IFVG, border_width=1, border_style=line.style_dashed)
+                    ifvgBox.push(ifvg)
+                    ifvgTop.push(topLvl)
+                    ifvgBot.push(botLvl)
+                    ifvgBull.push(false)
+                    ifvgMit.push(false)
+                    ifvgBar.push(origBar)
+                    ifvgFormed := true
+                    if i_showLabels
+                        label.new(bar_index, math.avg(topLvl, botLvl), "iFVG▼", style=label.style_none, textcolor=C_IFVG, size=f_labelSize(i_labelSize))
+            else if i_fvgExtend
+                bx.set_right(bar_index + 3)
+                if not na(midLn)
+                    midLn.set_x2(bar_index + 3)
+
+if i_showFVG and i_fvgMitTrack and bearFvgBox.size() > 0
+    for i = 0 to bearFvgBox.size() - 1
+        if i < bearFvgMit.size() and not bearFvgMit.get(i)
+            float topLvl = bearFvgTop.get(i)
+            float botLvl = bearFvgBot.get(i)
+            int origBar  = bearFvgBar.get(i)
+            box bx       = bearFvgBox.get(i)
+            line midLn   = bearFvgMid.get(i)
+            
+            if f_checkMitigation(high, low, close, topLvl, botLvl, false)
+                bearFvgMit.set(i, true)
+                if i_mitEffect
+                    bx.set_bgcolor(color.new(C_NEUTRAL, 94))
+                    bx.set_border_color(color.new(C_NEUTRAL, 80))
+                    if not na(midLn)
+                        midLn.set_color(color.new(C_NEUTRAL, 80))
+                
+                if i_showIFVG and close > topLvl and ifvgBox.size() < i_ifvgMax
+                    box ifvg = box.new(origBar, topLvl, bar_index + 5, botLvl, 
+                         bgcolor=color.new(C_IFVG, i_zoneTrans), 
+                         border_color=C_IFVG, border_width=1, border_style=line.style_dashed)
+                    ifvgBox.push(ifvg)
+                    ifvgTop.push(topLvl)
+                    ifvgBot.push(botLvl)
+                    ifvgBull.push(true)
+                    ifvgMit.push(false)
+                    ifvgBar.push(origBar)
+                    ifvgFormed := true
+                    if i_showLabels
+                        label.new(bar_index, math.avg(topLvl, botLvl), "iFVG▲", style=label.style_none, textcolor=C_IFVG, size=f_labelSize(i_labelSize))
+            else if i_fvgExtend
+                bx.set_right(bar_index + 3)
+                if not na(midLn)
+                    midLn.set_x2(bar_index + 3)
+
+// iFVG Management
+if i_showIFVG and ifvgBox.size() > 0
+    for i = 0 to ifvgBox.size() - 1
+        if i < ifvgMit.size() and not ifvgMit.get(i)
+            bool isBull  = ifvgBull.get(i)
+            float topLvl = ifvgTop.get(i)
+            float botLvl = ifvgBot.get(i)
+            box bx       = ifvgBox.get(i)
+            if not na(bx)
+                bool shouldMit = isBull ? low <= botLvl : high >= topLvl
+                if shouldMit
+                    ifvgMit.set(i, true)
+                    if i_mitEffect
+                        bx.set_bgcolor(color.new(C_NEUTRAL, 95))
+                        bx.set_border_color(color.new(C_NEUTRAL, 80))
+                else
+                    bx.set_right(bar_index + 5)
+
+// ══════════════════════════════════════════════════════════════════════════════════════════════════════
+// ═══                                    ORDER BLOCK DETECTION                                       ═══
+// ══════════════════════════════════════════════════════════════════════════════════════════════════════
+
+bool bullishImpulse = true
+bool bearishImpulse = true
+
+for j = 1 to i_obStrength
+    if close[j] <= open[j]
+        bullishImpulse := false
+    if close[j] >= open[j]
+        bearishImpulse := false
+
+bool lastBearish   = close[i_obStrength + 1] < open[i_obStrength + 1]
+bool lastBullish   = close[i_obStrength + 1] > open[i_obStrength + 1]
+bool volumeConfirm = not i_obVolFilter or volume[i_obStrength + 1] > avgVolume[i_obStrength + 1]
+
+bool bullOB = bullishImpulse and lastBearish and close > high[i_obStrength + 1] and volumeConfirm
+bool bearOB = bearishImpulse and lastBullish and close < low[i_obStrength + 1] and volumeConfirm
+
+// Create Bullish OB
+if i_showOB and bullOB
+    int obBar    = bar_index - i_obStrength - 1
+    float _top   = high[i_obStrength + 1]
+    float _bot   = low[i_obStrength + 1]
+    float _mid   = math.avg(_top, _bot)
+    int _right   = bar_index + 4
+    
+    color bgCol = i_obStyle == "Filled" ? color.new(C_OB, i_zoneTrans) : color.new(C_OB, 98)
+    int borderW = i_obStyle == "Border Only" ? 2 : 1
+    
+    box newBox = box.new(obBar, _top, _right, _bot, bgcolor=bgCol, border_color=color.new(C_OB, 25), border_width=borderW)
+    bullOBBox.push(newBox)
+    bullOBTop.push(_top)
+    bullOBBot.push(_bot)
+    bullOBMit.push(false)
+    bullOBBar.push(obBar)
+    
+    if i_obMidLine
+        bullOBMid.push(line.new(obBar, _mid, _right, _mid, color=color.new(C_OB, 50), style=line.style_dashed, width=1))
+    else
+        bullOBMid.push(na)
+    
+    if i_showLabels and i_showZoneLabels
+        label.new(obBar, _bot, "OB▲", style=label.style_none, textcolor=color.new(C_OB, 15), size=f_labelSize(i_labelSize))
+    
+    bullOBBox.cleanupBoxes(i_obMax)
+    if bullOBTop.size() > i_obMax
+        bullOBTop.shift()
+        bullOBBot.shift()
+        bullOBMit.shift()
+        bullOBBar.shift()
+        line.delete(bullOBMid.shift())
+
+// Create Bearish OB - FIXED
+if i_showOB and bearOB
+    int obBar    = bar_index - i_obStrength - 1
+    float _top   = high[i_obStrength + 1]
+    float _bot   = low[i_obStrength + 1]
+    float _mid   = math.avg(_top, _bot)
+    int _right   = bar_index + 4
+    
+    color obBearCol = C_BEAR  // Changed from color.orange to theme color
+    color bgCol = i_obStyle == "Filled" ? color.new(obBearCol, i_zoneTrans) : color.new(obBearCol, 98)
+    int borderW = i_obStyle == "Border Only" ? 2 : 1
+    
+    box newBox = box.new(obBar, _top, _right, _bot, bgcolor=bgCol, border_color=color.new(obBearCol, 25), border_width=borderW)
+    bearOBBox.push(newBox)
+    bearOBTop.push(_top)
+    bearOBBot.push(_bot)
+    bearOBMit.push(false)
+    bearOBBar.push(obBar)
+    
+    if i_obMidLine
+        bearOBMid.push(line.new(obBar, _mid, _right, _mid, color=color.new(obBearCol, 50), style=line.style_dashed, width=1))
+    else
+        bearOBMid.push(na)
+    
+    if i_showLabels and i_showZoneLabels
+        label.new(obBar, _top, "OB▼", style=label.style_none, textcolor=color.new(obBearCol, 15), size=f_labelSize(i_labelSize))
+    
+    bearOBBox.cleanupBoxes(i_obMax)
+    if bearOBTop.size() > i_obMax
+        bearOBTop.shift()
+        bearOBBot.shift()
+        bearOBMit.shift()
+        bearOBBar.shift()
+        line.delete(bearOBMid.shift())
+
+// ══════════════════════════════════════════════════════════════════════════════════════════════════════
+// ═══                              OB MITIGATION & BREAKER CREATION                                  ═══
+// ══════════════════════════════════════════════════════════════════════════════════════════════════════
+
+// Bullish OB Mitigation
+if i_showOB and bullOBBox.size() > 0
+    for i = 0 to bullOBBox.size() - 1
+        if i < bullOBMit.size() and not bullOBMit.get(i)
+            float botLvl = bullOBBot.get(i)
+            float topLvl = bullOBTop.get(i)
+            int obBar    = bullOBBar.get(i)
+            box bx       = bullOBBox.get(i)
+            line midLn   = bullOBMid.get(i)
+            
+            if low <= botLvl
+                bullOBMit.set(i, true)
+                if i_mitEffect
+                    bx.set_bgcolor(color.new(C_NEUTRAL, 95))
+                    bx.set_border_color(color.new(C_NEUTRAL, 80))
+                    if not na(midLn)
+                        midLn.set_color(color.new(C_NEUTRAL, 80))
+                
+                // Create Bearish Breaker
+                if i_showBB and bearBBBox.size() < i_bbMax
+                    box bbBox = box.new(obBar, topLvl, bar_index + 6, botLvl, 
+                         bgcolor=color.new(C_BB, i_zoneTrans), 
+                         border_color=C_BB, border_width=1, border_style=line.style_dashed)
+                    bearBBBox.push(bbBox)
+                    bearBBTop.push(topLvl)
+                    bearBBBot.push(botLvl)
+                    bearBBMit.push(false)
+                    bearBreakerFormed := true
+                    if i_showLabels
+                        label.new(bar_index, math.avg(topLvl, botLvl), "BB▼", style=label.style_none, textcolor=C_BB, size=f_labelSize(i_labelSize))
+            else if i_obExtend
+                bx.set_right(bar_index + 4)
+                if not na(midLn)
+                    midLn.set_x2(bar_index + 4)
+
+// Bearish OB Mitigation
+if i_showOB and bearOBBox.size() > 0
+    for i = 0 to bearOBBox.size() - 1
+        if i < bearOBMit.size() and not bearOBMit.get(i)
+            float topLvl = bearOBTop.get(i)
+            float botLvl = bearOBBot.get(i)
+            int obBar    = bearOBBar.get(i)
+            box bx       = bearOBBox.get(i)
+            line midLn   = bearOBMid.get(i)
+            
+            if high >= topLvl
+                bearOBMit.set(i, true)
+                if i_mitEffect
+                    bx.set_bgcolor(color.new(C_NEUTRAL, 95))
+                    bx.set_border_color(color.new(C_NEUTRAL, 80))
+                    if not na(midLn)
+                        midLn.set_color(color.new(C_NEUTRAL, 80))
+                
+                // Create Bullish Breaker
+                if i_showBB and bullBBBox.size() < i_bbMax
+                    box bbBox = box.new(obBar, topLvl, bar_index + 6, botLvl, 
+                         bgcolor=color.new(C_BB, i_zoneTrans), 
+                         border_color=C_BB, border_width=1, border_style=line.style_dashed)
+                    bullBBBox.push(bbBox)
+                    bullBBTop.push(topLvl)
+                    bullBBBot.push(botLvl)
+                    bullBBMit.push(false)
+                    bullBreakerFormed := true
+                    if i_showLabels
+                        label.new(bar_index, math.avg(topLvl, botLvl), "BB▲", style=label.style_none, textcolor=C_BB, size=f_labelSize(i_labelSize))
+            else if i_obExtend
+                bx.set_right(bar_index + 4)
+                if not na(midLn)
+                    midLn.set_x2(bar_index + 4)
+
+// Breaker Block Management
+if i_showBB and bullBBBox.size() > 0
+    for i = 0 to bullBBBox.size() - 1
+        if i < bullBBMit.size() and not bullBBMit.get(i)
+            box bx = bullBBBox.get(i)
+            if not na(bx)
+                if low < bullBBBot.get(i)
+                    bullBBMit.set(i, true)
+                    if i_mitEffect
+                        bx.set_bgcolor(color.new(C_NEUTRAL, 95))
+                        bx.set_border_color(color.new(C_NEUTRAL, 80))
+                else
+                    bx.set_right(bar_index + 6)
+
+if i_showBB and bearBBBox.size() > 0
+    for i = 0 to bearBBBox.size() - 1
+        if i < bearBBMit.size() and not bearBBMit.get(i)
+            box bx = bearBBBox.get(i)
+            if not na(bx)
+                if high > bearBBTop.get(i)
+                    bearBBMit.set(i, true)
+                    if i_mitEffect
+                        bx.set_bgcolor(color.new(C_NEUTRAL, 95))
+                        bx.set_border_color(color.new(C_NEUTRAL, 80))
+                else
+                    bx.set_right(bar_index + 6)
+
+// ══════════════════════════════════════════════════════════════════════════════════════════════════════
+// ═══                                    REJECTION BLOCKS                                            ═══
+// ══════════════════════════════════════════════════════════════════════════════════════════════════════
+
+bool bullRejection = lowerWick >= bodySize * i_rbWickRatio and lowerWick > upperWick * 2 and bodySize > 0
+bool bearRejection = upperWick >= bodySize * i_rbWickRatio and upperWick > lowerWick * 2 and bodySize > 0
+
+if i_showRB and bullRejection
+    float _top = math.min(close, open)
+    float _bot = low
+    box rbBox = box.new(bar_index, _top, bar_index + 4, _bot, 
+         bgcolor=color.new(C_BULL, i_zoneTrans + 3), 
+         border_color=color.new(C_BULL, 40), border_width=1)
+    bullRBBox.push(rbBox)
+    bullRBTop.push(_top)
+    bullRBBot.push(_bot)
+    bullRBMit.push(false)
+    if i_showLabels and i_showZoneLabels
+        label.new(bar_index, _bot, "RB▲", style=label.style_none, textcolor=C_BULL, size=f_labelSize(i_labelSize))
+    bullRBBox.cleanupBoxes(i_rbMax)
+    if bullRBTop.size() > i_rbMax
+        bullRBTop.shift()
+        bullRBBot.shift()
+        bullRBMit.shift()
+
+if i_showRB and bearRejection
+    float _top = high
+    float _bot = math.max(close, open)
+    box rbBox = box.new(bar_index, _top, bar_index + 4, _bot, 
+         bgcolor=color.new(C_BEAR, i_zoneTrans + 3), 
+         border_color=color.new(C_BEAR, 40), border_width=1)
+    bearRBBox.push(rbBox)
+    bearRBTop.push(_top)
+    bearRBBot.push(_bot)
+    bearRBMit.push(false)
+    if i_showLabels and i_showZoneLabels
+        label.new(bar_index, _top, "RB▼", style=label.style_none, textcolor=C_BEAR, size=f_labelSize(i_labelSize))
+    bearRBBox.cleanupBoxes(i_rbMax)
+    if bearRBTop.size() > i_rbMax
+        bearRBTop.shift()
+        bearRBBot.shift()
+        bearRBMit.shift()
+
+// RB Management
+if i_showRB and bullRBBox.size() > 0
+    for i = 0 to bullRBBox.size() - 1
+        if i < bullRBMit.size() and not bullRBMit.get(i)
+            box bx = bullRBBox.get(i)
+            if not na(bx)
+                if low < bullRBBot.get(i)
+                    bullRBMit.set(i, true)
+                    if i_mitEffect
+                        bx.set_bgcolor(color.new(C_NEUTRAL, 95))
+                else
+                    bx.set_right(bar_index + 4)
+
+if i_showRB and bearRBBox.size() > 0
+    for i = 0 to bearRBBox.size() - 1
+        if i < bearRBMit.size() and not bearRBMit.get(i)
+            box bx = bearRBBox.get(i)
+            if not na(bx)
+                if high > bearRBTop.get(i)
+                    bearRBMit.set(i, true)
+                    if i_mitEffect
+                        bx.set_bgcolor(color.new(C_NEUTRAL, 95))
+                else
+                    bx.set_right(bar_index + 4)
+
+// ══════════════════════════════════════════════════════════════════════════════════════════════════════
+// ═══                                    VOLUME IMBALANCE                                            ═══
+// ══════════════════════════════════════════════════════════════════════════════════════════════════════
+
+bool vimbUp = open > close[1] and close[1] < open[1] and close > open and (open - close[1]) > minSize
+bool vimbDn = open < close[1] and close[1] > open[1] and close < open and (close[1] - open) > minSize
+
+if i_showVIMB and vimbUp
+    float _top = open
+    float _bot = close[1]
+    box newBox = box.new(bar_index - 1, _top, bar_index + 3, _bot, 
+         bgcolor=color.new(C_VIMB, i_zoneTrans), 
+         border_color=C_VIMB, border_width=1, border_style=line.style_dashed)
+    vimbBox.push(newBox)
+    vimbTop.push(_top)
+    vimbBot.push(_bot)
+    vimbMit.push(false)
+    vimbBull.push(true)
+    if i_showLabels and i_showZoneLabels
+        label.new(bar_index - 1, _bot, "VI▲", style=label.style_none, textcolor=C_VIMB, size=f_labelSize(i_labelSize))
+    vimbBox.cleanupBoxes(i_vimbMax)
+    if vimbTop.size() > i_vimbMax
+        vimbTop.shift()
+        vimbBot.shift()
+        vimbMit.shift()
+        vimbBull.shift()
+
+if i_showVIMB and vimbDn
+    float _top = close[1]
+    float _bot = open
+    box newBox = box.new(bar_index - 1, _top, bar_index + 3, _bot, 
+         bgcolor=color.new(C_VIMB, i_zoneTrans), 
+         border_color=C_VIMB, border_width=1, border_style=line.style_dashed)
+    vimbBox.push(newBox)
+    vimbTop.push(_top)
+    vimbBot.push(_bot)
+    vimbMit.push(false)
+    vimbBull.push(false)
+    if i_showLabels and i_showZoneLabels
+        label.new(bar_index - 1, _top, "VI▼", style=label.style_none, textcolor=C_VIMB, size=f_labelSize(i_labelSize))
+    vimbBox.cleanupBoxes(i_vimbMax)
+    if vimbTop.size() > i_vimbMax
+        vimbTop.shift()
+        vimbBot.shift()
+        vimbMit.shift()
+        vimbBull.shift()
+
+// VIMB Management
+if i_showVIMB and vimbBox.size() > 0
+    for i = 0 to vimbBox.size() - 1
+        if i < vimbMit.size() and not vimbMit.get(i)
+            bool isBull  = vimbBull.get(i)
+            float topLvl = vimbTop.get(i)
+            float botLvl = vimbBot.get(i)
+            box bx       = vimbBox.get(i)
+            if not na(bx)
+                bool shouldMit = isBull ? low <= botLvl : high >= topLvl
+                if shouldMit
+                    vimbMit.set(i, true)
+                    if i_mitEffect
+                        bx.set_bgcolor(color.new(C_NEUTRAL, 94))
+                        bx.set_border_color(color.new(C_NEUTRAL, 75))
+                else
+                    bx.set_right(bar_index + 3)
+
+// ══════════════════════════════════════════════════════════════════════════════════════════════════════
+// ═══                                    EQUAL HIGHS / LOWS                                          ═══
+// ══════════════════════════════════════════════════════════════════════════════════════════════════════
+
+// EQH Detection
+if i_showEQHL and not na(swingHighEQ)
+    int currentBar = bar_index - 5
+    bool foundMatch = false
+    
+    if eqhPrice.size() > 0
+        for i = 0 to eqhPrice.size() - 1
+            if i < eqhSwept.size() and not eqhSwept.get(i) and math.abs(swingHighEQ - eqhPrice.get(i)) <= tolerance
+                if not eqhConfirmed.get(i)
+                    eqhConfirmed.set(i, true)
+                    line ln = eqhLine.get(i)
+                    if not na(ln)
+                        ln.set_style(line.style_solid)
+                        ln.set_width(2)
+                        ln.set_color(C_EQ)
+                foundMatch := true
+                break
+    
+    if not foundMatch
+        line newLn = line.new(currentBar, swingHighEQ, bar_index + 12, swingHighEQ, 
+             color=color.new(C_EQ, 45), style=line.style_dotted, width=1)
+        eqhLine.push(newLn)
+        eqhPrice.push(swingHighEQ)
+        eqhSwept.push(false)
+        eqhConfirmed.push(false)
+        if i_showLabels
+            label.new(bar_index + 14, swingHighEQ, "EQH", style=label.style_none, textcolor=C_EQ, size=f_labelSize(i_labelSize))
+        eqhLine.cleanupLines(i_eqhlMax)
+        if eqhPrice.size() > i_eqhlMax
+            eqhPrice.shift()
+            eqhSwept.shift()
+            eqhConfirmed.shift()
+
+// EQL Detection
+if i_showEQHL and not na(swingLowEQ)
+    int currentBar = bar_index - 5
+    bool foundMatch = false
+    
+    if eqlPrice.size() > 0
+        for i = 0 to eqlPrice.size() - 1
+            if i < eqlSwept.size() and not eqlSwept.get(i) and math.abs(swingLowEQ - eqlPrice.get(i)) <= tolerance
+                if not eqlConfirmed.get(i)
+                    eqlConfirmed.set(i, true)
+                    line ln = eqlLine.get(i)
+                    if not na(ln)
+                        ln.set_style(line.style_solid)
+                        ln.set_width(2)
+                        ln.set_color(C_EQ)
+                foundMatch := true
+                break
+    
+    if not foundMatch
+        line newLn = line.new(currentBar, swingLowEQ, bar_index + 12, swingLowEQ, 
+             color=color.new(C_EQ, 45), style=line.style_dotted, width=1)
+        eqlLine.push(newLn)
+        eqlPrice.push(swingLowEQ)
+        eqlSwept.push(false)
+        eqlConfirmed.push(false)
+        if i_showLabels
+            label.new(bar_index + 14, swingLowEQ, "EQL", style=label.style_none, textcolor=C_EQ, size=f_labelSize(i_labelSize))
+        eqlLine.cleanupLines(i_eqhlMax)
+        if eqlPrice.size() > i_eqhlMax
+            eqlPrice.shift()
+            eqlSwept.shift()
+            eqlConfirmed.shift()
+
+// EQH/EQL Sweep Detection
+if i_showEQHL and eqhLine.size() > 0
+    for i = 0 to eqhLine.size() - 1
+        if i < eqhSwept.size() and not eqhSwept.get(i)
+            line ln = eqhLine.get(i)
+            if high > eqhPrice.get(i)
+                eqhSwept.set(i, true)
+                if not na(ln)
+                    ln.set_color(color.new(C_NEUTRAL, 80))
+                    ln.set_x2(bar_index)
+                eqhSweptAlert := true
+            else if not na(ln)
+                ln.set_x2(bar_index + 12)
+
+if i_showEQHL and eqlLine.size() > 0
+    for i = 0 to eqlLine.size() - 1
+        if i < eqlSwept.size() and not eqlSwept.get(i)
+            line ln = eqlLine.get(i)
+            if low < eqlPrice.get(i)
+                eqlSwept.set(i, true)
+                if not na(ln)
+                    ln.set_color(color.new(C_NEUTRAL, 80))
+                    ln.set_x2(bar_index)
+                eqlSweptAlert := true
+            else if not na(ln)
+                ln.set_x2(bar_index + 12)
+
+// ══════════════════════════════════════════════════════════════════════════════════════════════════════
+// ═══                                    LIQUIDITY LEVELS                                            ═══
+// ══════════════════════════════════════════════════════════════════════════════════════════════════════
+
+// BSL Creation
+if i_showLiq and not na(pivotHi)
+    int _bar = bar_index - i_liqSwingLen
+    line newLn = line.new(_bar, pivotHi, bar_index + 8, pivotHi, 
+         color=color.new(C_BULL, 50), style=line.style_dotted, width=1)
+    bslLine.push(newLn)
+    bslPrice.push(pivotHi)
+    bslSwept.push(false)
+    bslLine.cleanupLines(i_liqMax)
+    if bslPrice.size() > i_liqMax
+        bslPrice.shift()
+        bslSwept.shift()
+
+// SSL Creation
+if i_showLiq and not na(pivotLo)
+    int _bar = bar_index - i_liqSwingLen
+    line newLn = line.new(_bar, pivotLo, bar_index + 8, pivotLo, 
+         color=color.new(C_BEAR, 50), style=line.style_dotted, width=1)
+    sslLine.push(newLn)
+    sslPrice.push(pivotLo)
+    sslSwept.push(false)
+    sslLine.cleanupLines(i_liqMax)
+    if sslPrice.size() > i_liqMax
+        sslPrice.shift()
+        sslSwept.shift()
+
+// Liquidity Sweep Detection
+if i_showLiq and bslLine.size() > 0
+    for i = 0 to bslLine.size() - 1
+        if i < bslSwept.size() and not bslSwept.get(i)
+            line ln = bslLine.get(i)
+            if high > bslPrice.get(i)
+                bslSwept.set(i, true)
+                if not na(ln)
+                    ln.set_color(color.new(C_NEUTRAL, 80))
+                    ln.set_x2(bar_index)
+                bslSweptAlert := true
+            else if not na(ln)
+                ln.set_x2(bar_index + 8)
+
+if i_showLiq and sslLine.size() > 0
+    for i = 0 to sslLine.size() - 1
+        if i < sslSwept.size() and not sslSwept.get(i)
+            line ln = sslLine.get(i)
+            if low < sslPrice.get(i)
+                sslSwept.set(i, true)
+                if not na(ln)
+                    ln.set_color(color.new(C_NEUTRAL, 80))
+                    ln.set_x2(bar_index)
+                sslSweptAlert := true
+            else if not na(ln)
+                ln.set_x2(bar_index + 8)
+
+// ══════════════════════════════════════════════════════════════════════════════════════════════════════
+// ═══                                    MARKET STRUCTURE                                            ═══
+// ══════════════════════════════════════════════════════════════════════════════════════════════════════
+
+if i_showMSS
+    if not na(mssPivotHi)
+        mssSwingH := mssPivotHi
+        mssSwingHBar := bar_index - i_mssLen
+    
+    if not na(mssPivotLo)
+        mssSwingL := mssPivotLo
+        mssSwingLBar := bar_index - i_mssLen
+    
+    // Bullish MSS
+    if mssDirection <= 0 and not na(mssSwingH) and close > mssSwingH
+        bullMSS := true
+        mssDirection := 1
+        line.new(f_clampBar(mssSwingHBar), mssSwingH, bar_index, mssSwingH, color=C_BULL, width=2)
+        if i_showLabels
+            label.new(bar_index, mssSwingH, "MSS▲", style=label.style_label_down, textcolor=color.white, color=color.new(C_BULL, 70), size=size.tiny)
+    
+    // Bearish MSS
+    if mssDirection >= 0 and not na(mssSwingL) and close < mssSwingL
+        bearMSS := true
+        mssDirection := -1
+        line.new(f_clampBar(mssSwingLBar), mssSwingL, bar_index, mssSwingL, color=C_BEAR, width=2)
+        if i_showLabels
+            label.new(bar_index, mssSwingL, "MSS▼", style=label.style_label_up, textcolor=color.white, color=color.new(C_BEAR, 70), size=size.tiny)
+
+// ══════════════════════════════════════════════════════════════════════════════════════════════════════
+// ═══                                  STRUCTURE TRACKING & OTE                                      ═══
+// ══════════════════════════════════════════════════════════════════════════════════════════════════════
+
+if not na(pivotHi)
+    structHi := pivotHi
+    structHiBar := bar_index - i_liqSwingLen
+
+if not na(pivotLo)
+    structLo := pivotLo
+    structLoBar := bar_index - i_liqSwingLen
+
+// Calculate OTE Zone (61.8% - 79% Retracement) - CORRECTED
+if not na(structHi) and not na(structLo) and structHi > structLo
+    float rng = structHi - structLo
+    if mssDirection >= 0  // Bullish - looking for discount entries
+        oteBot := structLo + rng * 0.21
+        oteMid := structLo + rng * 0.295
+        oteTop := structLo + rng * 0.382
+    else  // Bearish - looking for premium entries
+        oteBot := structLo + rng * 0.618
+        oteMid := structLo + rng * 0.705
+        oteTop := structLo + rng * 0.79
+
+// ══════════════════════════════════════════════════════════════════════════════════════════════════════
+// ═══                                    SESSION TRACKING                                            ═══
+// ══════════════════════════════════════════════════════════════════════════════════════════════════════
+
+if isNewWeek
+    weeklyOpen := open
+    weeklyBar := bar_index
+
+if isNewMonth
+    monthlyOpen := open
+    monthlyBar := bar_index
+
+if isNewDay
+    dailyOpen := open
+    dailyBar := bar_index
+
+// Previous H/L tracking
+if isNewDay
+    pdh := currDayH
+    pdl := currDayL
+    currDayH := high
+    currDayL := low
+else
+    currDayH := math.max(nz(currDayH, high), high)
+    currDayL := math.min(nz(currDayL, low), low)
+
+if isNewWeek
+    pwh := currWeekH
+    pwl := currWeekL
+    currWeekH := high
+    currWeekL := low
+else
+    currWeekH := math.max(nz(currWeekH, high), high)
+    currWeekL := math.min(nz(currWeekL, low), low)
+
+if isNewMonth
+    pmh := currMonthH
+    pml := currMonthL
+    currMonthH := high
+    currMonthL := low
+else
+    currMonthH := math.max(nz(currMonthH, high), high)
+    currMonthL := math.min(nz(currMonthL, low), low)
+
+// ══════════════════════════════════════════════════════════════════════════════════════════════════════
+// ═══                                    KILLZONE SESSIONS                                           ═══
+// ══════════════════════════════════════════════════════════════════════════════════════════════════════
+
+// Asia
+if i_showKZ and i_showAsia
+    if inAsia
+        if not wasInAsia
+            wasInAsia := true
+            asiaH := high
+            asiaL := low
+            asiaStartBar := bar_index
+            box.delete(asiaBox)
+            if i_kzBoxes
+                asiaBox := box.new(bar_index, high, bar_index, low, 
+                     bgcolor=color.new(C_ASIA, i_zoneTrans + 5), 
+                     border_color=color.new(C_ASIA, 50), border_width=1)
+        else
+            asiaH := math.max(asiaH, high)
+            asiaL := math.min(asiaL, low)
+            if i_kzBoxes and not na(asiaBox)
+                asiaBox.set_right(bar_index)
+                asiaBox.set_top(asiaH)
+                asiaBox.set_bottom(asiaL)
+    else
+        wasInAsia := false
+
+// London
+if i_showKZ and i_showLondon
+    if inLondon
+        if not wasInLondon
+            wasInLondon := true
+            londonH := high
+            londonL := low
+            londonStartBar := bar_index
+            box.delete(londonBox)
+            if i_kzBoxes
+                londonBox := box.new(bar_index, high, bar_index, low, 
+                     bgcolor=color.new(C_LONDON, i_zoneTrans + 5), 
+                     border_color=color.new(C_LONDON, 50), border_width=1)
+        else
+            londonH := math.max(londonH, high)
+            londonL := math.min(londonL, low)
+            if i_kzBoxes and not na(londonBox)
+                londonBox.set_right(bar_index)
+                londonBox.set_top(londonH)
+                londonBox.set_bottom(londonL)
+    else
+        wasInLondon := false
+
+// NY AM
+if i_showKZ and i_showNYAM
+    if inNYAM
+        if not wasInNYAM
+            wasInNYAM := true
+            nyamH := high
+            nyamL := low
+            nyamStartBar := bar_index
+            box.delete(nyamBox)
+            if i_kzBoxes
+                nyamBox := box.new(bar_index, high, bar_index, low, 
+                     bgcolor=color.new(C_NY, i_zoneTrans + 5), 
+                     border_color=color.new(C_NY, 50), border_width=1)
+        else
+            nyamH := math.max(nyamH, high)
+            nyamL := math.min(nyamL, low)
+            if i_kzBoxes and not na(nyamBox)
+                nyamBox.set_right(bar_index)
+                nyamBox.set_top(nyamH)
+                nyamBox.set_bottom(nyamL)
+    else
+        wasInNYAM := false
+
+// NY PM
+if i_showKZ and i_showNYPM
+    if inNYPM
+        if not wasInNYPM
+            wasInNYPM := true
+            nypmH := high
+            nypmL := low
+            nypmStartBar := bar_index
+            box.delete(nypmBox)
+            if i_kzBoxes
+                nypmBox := box.new(bar_index, high, bar_index, low, 
+                     bgcolor=color.new(C_IFVG, i_zoneTrans + 5), 
+                     border_color=color.new(C_IFVG, 50), border_width=1)
+        else
+            nypmH := math.max(nypmH, high)
+            nypmL := math.min(nypmL, low)
+            if i_kzBoxes and not na(nypmBox)
+                nypmBox.set_right(bar_index)
+                nypmBox.set_top(nypmH)
+                nypmBox.set_bottom(nypmL)
+    else
+        wasInNYPM := false
+
+// ══════════════════════════════════════════════════════════════════════════════════════════════════════
+// ═══                                  DEALING RANGE TRACKING                                        ═══
+// ══════════════════════════════════════════════════════════════════════════════════════════════════════
+
+int barsIn21D = timeframe.isintraday ? math.min(int(1440 / timeframe.multiplier) * 21, 5000) : 21
+int barsIn3D  = timeframe.isintraday ? math.min(int(1440 / timeframe.multiplier) * 3, 5000) : 3
+float dr21H   = ta.highest(high, math.min(barsIn21D, i_historyBars))
+float dr21L   = ta.lowest(low, math.min(barsIn21D, i_historyBars))
+float dr3H    = ta.highest(high, math.min(barsIn3D, i_historyBars))
+float dr3L    = ta.lowest(low, math.min(barsIn3D, i_historyBars))
+
+// Daily DR
+if isNewDay
+    dr1H := high
+    dr1L := low
+    dr1StartBar := bar_index
+else
+    dr1H := math.max(nz(dr1H, high), high)
+    dr1L := math.min(nz(dr1L, low), low)
+
+// Session DRs
+if inAsia
+    if not inAsia[1]
+        drAsiaH := high
+        drAsiaL := low
+        drAsiaStartBar := bar_index
+        drAsiaComplete := false
+    else
+        drAsiaH := math.max(drAsiaH, high)
+        drAsiaL := math.min(drAsiaL, low)
+else if inAsia[1]
+    drAsiaComplete := true
+
+if inLondon
+    if not inLondon[1]
+        drLdnH := high
+        drLdnL := low
+        drLdnStartBar := bar_index
+        drLdnComplete := false
+    else
+        drLdnH := math.max(drLdnH, high)
+        drLdnL := math.min(drLdnL, low)
+else if inLondon[1]
+    drLdnComplete := true
+
+if inNY
+    if not (inNYAM[1] or inNYPM[1])
+        drNyH := high
+        drNyL := low
+        drNyStartBar := bar_index
+        drNyComplete := false
+    else
+        drNyH := math.max(drNyH, high)
+        drNyL := math.min(drNyL, low)
+else if inNYAM[1] or inNYPM[1]
+    drNyComplete := true
+
+// ══════════════════════════════════════════════════════════════════════════════════════════════════════
+// ═══                                    ICT MACRO TIMES DRAWING                                     ═══
+// ══════════════════════════════════════════════════════════════════════════════════════════════════════
+
+if i_showMacros
+    float atrOffset = ta.atr(14) * 0.5
+    
+    // Macro just started
+    if inAnyMacro and not wasInMacro
+        macroStartBar := bar_index
+        macroSessionHigh := high
+        macroSessionLow := low
+        
+        float bracketY = high + atrOffset * 5
+        
+        // Background style
+        if i_macroStyle == "Background" or i_macroStyle == "Both"
+            box newBg = box.new(bar_index, high + atrOffset * 7, bar_index, low - atrOffset * 2, 
+                 bgcolor=color.new(i_macroColor, i_macroBgTrans), border_color=na)
+            macroBoxes.push(newBg)
+        
+        // Bracket style
+        if i_macroStyle == "Brackets" or i_macroStyle == "Both"
+            line leftBracket = line.new(bar_index, high + atrOffset, bar_index, bracketY, color=i_macroColor, width=1)
+            macroLines.push(leftBracket)
+            line topLine = line.new(bar_index, bracketY, bar_index, bracketY, color=i_macroColor, width=1)
+            macroLines.push(topLine)
+        
+        // Label
+        if i_macroLabels
+            string lblTxt = i_macroShowTime ? "MACRO\n" + currentMacroLbl : "MACRO"
+            label macroLbl = label.new(bar_index, bracketY, lblTxt, 
+                 style=label.style_label_down, color=color.new(i_macroColor, 85), 
+                 textcolor=i_macroColor, size=size.small)
+            macroLabels.push(macroLbl)
+    
+    // During macro - update
+    if inAnyMacro and wasInMacro
+        macroSessionHigh := math.max(macroSessionHigh, high)
+        macroSessionLow := math.min(macroSessionLow, low)
+        
+        float bracketY = macroSessionHigh + atrOffset * 5
+        
+        // Update background box
+        if (i_macroStyle == "Background" or i_macroStyle == "Both") and macroBoxes.size() > 0
+            box lastBox = macroBoxes.get(macroBoxes.size() - 1)
+            lastBox.set_right(bar_index)
+            lastBox.set_top(macroSessionHigh + atrOffset * 7)
+            lastBox.set_bottom(macroSessionLow - atrOffset * 2)
+        
+        // Update bracket lines
+        if (i_macroStyle == "Brackets" or i_macroStyle == "Both") and macroLines.size() >= 2
+            int sz = macroLines.size()
+            line leftBracket = macroLines.get(sz - 2)
+            leftBracket.set_y1(macroSessionHigh + atrOffset)
+            leftBracket.set_y2(bracketY)
+            line topLine = macroLines.get(sz - 1)
+            topLine.set_x2(bar_index)
+            topLine.set_y1(bracketY)
+            topLine.set_y2(bracketY)
+        
+        // Update label
+        if i_macroLabels and macroLabels.size() > 0
+            label lastLbl = macroLabels.get(macroLabels.size() - 1)
+            int midX = int(math.avg(macroStartBar, bar_index))
+            lastLbl.set_x(midX)
+            lastLbl.set_y(bracketY)
+    
+    // Macro just ended
+    if not inAnyMacro and wasInMacro
+        float bracketY = macroSessionHigh + atrOffset * 5
+        
+        // Add right bracket
+        if i_macroStyle == "Brackets" or i_macroStyle == "Both"
+            line rightBracket = line.new(bar_index, macroSessionHigh + atrOffset, bar_index, bracketY, color=i_macroColor, width=1)
+            macroLines.push(rightBracket)
+            
+            if macroLines.size() >= 2
+                line topLine = macroLines.get(macroLines.size() - 2)
+                topLine.set_x2(bar_index)
+        
+        // Center label
+        if i_macroLabels and macroLabels.size() > 0
+            label lastLbl = macroLabels.get(macroLabels.size() - 1)
+            int midX = int(math.avg(macroStartBar, bar_index))
+            lastLbl.set_x(midX)
+    
+    wasInMacro := inAnyMacro
+
+// Macro Memory Cleanup
+macroLines.cleanupLines(150)
+macroBoxes.cleanupBoxes(50)
+macroLabels.cleanupLabels(50)
+
+// ══════════════════════════════════════════════════════════════════════════════════════════════════════
+// ═══                                  CONFLUENCE DETECTION                                          ═══
+// ══════════════════════════════════════════════════════════════════════════════════════════════════════
+
+f_calcConfluence() =>
+    int score = 0
+    float priceLevel = close
+    float zoneTol = nz(ta.atr(14), close * 0.01) * 0.5
+    
+    // Discount Zone Check
+    if not na(structHi) and not na(structLo)
+        float eq = structLo + (structHi - structLo) * 0.5
+        if close < eq
+            score += 1
+    
+    // OTE Zone Check
+    if not na(oteTop) and not na(oteBot)
+        if close >= oteBot and close <= oteTop
+            score += 1
+    
+    // FVG Proximity - with size check
+    if bullFvgBox.size() > 0
+        int maxIdx = math.min(bullFvgBox.size() - 1, 4)
+        for i = 0 to maxIdx
+            if i < bullFvgMit.size() and not bullFvgMit.get(i)
+                float top = bullFvgTop.get(i)
+                float bot = bullFvgBot.get(i)
+                if priceLevel >= bot - zoneTol and priceLevel <= top + zoneTol
+                    score += 1
+                    break
+    
+    // OB Proximity - with size check
+    if bullOBBox.size() > 0
+        int maxIdx = math.min(bullOBBox.size() - 1, 4)
+        for i = 0 to maxIdx
+            if i < bullOBMit.size() and not bullOBMit.get(i)
+                float top = bullOBTop.get(i)
+                float bot = bullOBBot.get(i)
+                if priceLevel >= bot - zoneTol and priceLevel <= top + zoneTol
+                    score += 1
+                    break
+    
+    // Macro Time Bonus
+    if inAnyMacro
+        score += 1
+    
+    // EQ Level Proximity
+    if not na(structHi) and not na(structLo)
+        float eqLevel = structLo + (structHi - structLo) * 0.5
+        if math.abs(priceLevel - eqLevel) <= zoneTol
+            score += 1
+    
+    score
+
+// ══════════════════════════════════════════════════════════════════════════════════════════════════════
+// ═══                                  DEALING RANGE DRAWER                                          ═══
+// ══════════════════════════════════════════════════════════════════════════════════════════════════════
+
+f_drawDealingRange(int leftBar, int rightBar, float drHigh, float drLow, color baseCol, string drName, int eqWidth) =>
+    if not na(drHigh) and not na(drLow) and drHigh > drLow
+        float rng  = drHigh - drLow
+        float f0   = drLow
+        float f50  = drLow + rng * 0.5
+        float f100 = drHigh
+        int cLeft  = f_clampBar(leftBar)
+        int lblX   = rightBar + 2
+        
+        if i_drPDZones
+            box.new(cLeft, f100, rightBar, f50, bgcolor=color.new(C_BEAR, i_zoneTrans + 8), border_color=na)
+            box.new(cLeft, f50, rightBar, f0, bgcolor=color.new(C_BULL, i_zoneTrans + 8), border_color=na)
+        
+        if i_drFibs
+            line.new(cLeft, f0, rightBar, f0, color=color.new(baseCol, 65), style=line.style_dotted, width=1)
+            line.new(cLeft, f100, rightBar, f100, color=color.new(baseCol, 65), style=line.style_dotted, width=1)
+        
+        if i_drEQ
+            line.new(cLeft, f50, rightBar, f50, color=color.new(baseCol, 30), width=eqWidth)
+        
+        if i_drLabels and i_showLabels
+            string priceTxt = i_drPrice ? (" " + str.tostring(f50)) : ""
+            label.new(lblX, f50, drName + " EQ" + priceTxt, style=label.style_none, textcolor=color.new(baseCol, 20), size=f_labelSize(i_labelSize))
+
+// ══════════════════════════════════════════════════════════════════════════════════════════════════════
+// ═══                                       DASHBOARD DATA                                           ═══
+// ══════════════════════════════════════════════════════════════════════════════════════════════════════
+
+int activeBullFvg = bullFvgMit.countActive()
+int activeBearFvg = bearFvgMit.countActive()
+int activeVimb    = vimbMit.countActive()
+int activeBullOB  = bullOBMit.countActive()
+int activeBearOB  = bearOBMit.countActive()
+int activeEqh     = eqhSwept.countActive()
+int activeEql     = eqlSwept.countActive()
+int activeBsl     = bslSwept.countActive()
+int activeSsl     = sslSwept.countActive()
+int activeBullBB  = bullBBMit.countActive()
+int activeBearBB  = bearBBMit.countActive()
+int activeBullRB  = bullRBMit.countActive()
+int activeBearRB  = bearRBMit.countActive()
+int activeIfvg    = ifvgMit.countActive()
+
+// Calculate confluence BEFORE dashboard
+int currentConf = i_showConf ? f_calcConfluence() : 0
+
+if i_showConf and currentConf >= i_confThresh
+    highConfAlert := true
+
+// ══════════════════════════════════════════════════════════════════════════════════════════════════════
+// ═══                                    LAST BAR DRAWINGS                                           ═══
+// ══════════════════════════════════════════════════════════════════════════════════════════════════════
+
+if barstate.islast
+    // Cleanup HTF elements
+    for bx in htfBody
+        box.delete(bx)
+    htfBody.clear()
+    for ln in htfWick
+        line.delete(ln)
+    htfWick.clear()
+    line.delete(htfOpenLn)
+    line.delete(htfHighLn)
+    line.delete(htfLowLn)
+    label.delete(htfTimerLbl)
+    
+    // Cleanup structure elements
+    line.delete(lnOteTop)
+    line.delete(lnOteBot)
+    box.delete(oteBox)
+    line.delete(ln0)
+    line.delete(ln50)
+    line.delete(ln100)
+    box.delete(premBox)
+    box.delete(discBox)
+    
+    // ══════════════════════════════════════════════════════════════════════════════════
+    //                              HTF ORDERFLOW CANDLES
+    // ══════════════════════════════════════════════════════════════════════════════════
+    
+    if i_showHTF
+        int startX = bar_index + i_htfOffset
+        int candleW = 3
+        int spacing = 2
+        int numCandles = math.min(i_htfCount, 6)
+        bool htfValid = not na(htfH) and not na(htfL) and not na(htfO) and not na(htfC)
+        
+        if htfValid
+            // Current candle
+            if numCandles >= 1 and not na(htfO)
+                bool isBull = htfC >= htfO
+                color bodyCol = isBull ? color.new(C_BULL, 65) : color.new(C_BEAR, 65)
+                color borderCol = isBull ? C_BULL : C_BEAR
+                color wickCol = isBull ? color.new(C_BULL, 40) : color.new(C_BEAR, 40)
+                int leftX = startX
+                int midX = leftX + 1
+                
+                if i_htfStyle == "Hollow" and isBull
+                    bodyCol := color.new(C_BULL, 95)
+                
+                htfWick.push(line.new(midX, htfH, midX, htfL, color=wickCol, width=1))
+                htfBody.push(box.new(leftX, math.max(htfO, htfC), leftX + candleW, math.min(htfO, htfC), bgcolor=bodyCol, border_color=borderCol, border_width=1))
+            
+            // Historical candles
+            if numCandles >= 2 and not na(htfO1) and not na(htfH1)
+                bool isBull = htfC1 >= htfO1
+                color bodyCol = isBull ? color.new(C_BULL, 70) : color.new(C_BEAR, 70)
+                color borderCol = isBull ? color.new(C_BULL, 30) : color.new(C_BEAR, 30)
+                int leftX = startX + (candleW + spacing)
+                htfWick.push(line.new(leftX + 1, htfH1, leftX + 1, htfL1, color=color.new(borderCol, 20), width=1))
+                htfBody.push(box.new(leftX, math.max(htfO1, htfC1), leftX + candleW, math.min(htfO1, htfC1), bgcolor=bodyCol, border_color=borderCol, border_width=1))
+            
+            if numCandles >= 3 and not na(htfO2) and not na(htfH2)
+                bool isBull = htfC2 >= htfO2
+                color bodyCol = isBull ? color.new(C_BULL, 75) : color.new(C_BEAR, 75)
+                color borderCol = isBull ? color.new(C_BULL, 35) : color.new(C_BEAR, 35)
+                int leftX = startX + 2 * (candleW + spacing)
+                htfWick.push(line.new(leftX + 1, htfH2, leftX + 1, htfL2, color=color.new(borderCol, 20), width=1))
+                htfBody.push(box.new(leftX, math.max(htfO2, htfC2), leftX + candleW, math.min(htfO2, htfC2), bgcolor=bodyCol, border_color=borderCol, border_width=1))
+            
+            if numCandles >= 4 and not na(htfO3) and not na(htfH3)
+                bool isBull = htfC3 >= htfO3
+                color bodyCol = isBull ? color.new(C_BULL, 78) : color.new(C_BEAR, 78)
+                color borderCol = isBull ? color.new(C_BULL, 40) : color.new(C_BEAR, 40)
+                int leftX = startX + 3 * (candleW + spacing)
+                htfWick.push(line.new(leftX + 1, htfH3, leftX + 1, htfL3, color=color.new(borderCol, 20), width=1))
+                htfBody.push(box.new(leftX, math.max(htfO3, htfC3), leftX + candleW, math.min(htfO3, htfC3), bgcolor=bodyCol, border_color=borderCol, border_width=1))
+            
+            if numCandles >= 5 and not na(htfO4) and not na(htfH4)
+                bool isBull = htfC4 >= htfO4
+                color bodyCol = isBull ? color.new(C_BULL, 80) : color.new(C_BEAR, 80)
+                color borderCol = isBull ? color.new(C_BULL, 45) : color.new(C_BEAR, 45)
+                int leftX = startX + 4 * (candleW + spacing)
+                htfWick.push(line.new(leftX + 1, htfH4, leftX + 1, htfL4, color=color.new(borderCol, 20), width=1))
+                htfBody.push(box.new(leftX, math.max(htfO4, htfC4), leftX + candleW, math.min(htfO4, htfC4), bgcolor=bodyCol, border_color=borderCol, border_width=1))
+            
+            if numCandles >= 6 and not na(htfO5) and not na(htfH5)
+                bool isBull = htfC5 >= htfO5
+                color bodyCol = isBull ? color.new(C_BULL, 82) : color.new(C_BEAR, 82)
+                color borderCol = isBull ? color.new(C_BULL, 50) : color.new(C_BEAR, 50)
+                int leftX = startX + 5 * (candleW + spacing)
+                htfWick.push(line.new(leftX + 1, htfH5, leftX + 1, htfL5, color=color.new(borderCol, 20), width=1))
+                htfBody.push(box.new(leftX, math.max(htfO5, htfC5), leftX + candleW, math.min(htfO5, htfC5), bgcolor=bodyCol, border_color=borderCol, border_width=1))
+            
+            // O/H/L Lines
+            if i_htfOHL
+                int lineStart = bar_index - 40
+                int lineEnd = bar_index + i_htfOffset - 3
+                htfOpenLn := line.new(lineStart, htfO, lineEnd, htfO, color=color.new(C_EQ, 55), style=line.style_dotted, width=1)
+                htfHighLn := line.new(lineStart, htfH, lineEnd, htfH, color=color.new(C_NEUTRAL, 55), style=line.style_dotted, width=1)
+                htfLowLn := line.new(lineStart, htfL, lineEnd, htfL, color=color.new(C_NEUTRAL, 55), style=line.style_dotted, width=1)
+            
+            // Timer
+            if i_htfTimer
+                htfTimerLbl := label.new(startX + 2, htfH, htfTF + " ⏱ " + countdownStr, style=label.style_none, textcolor=C_EQ, size=f_labelSize(i_labelSize))
+    
+    // ══════════════════════════════════════════════════════════════════════════════════
+    //                                  OTE ZONE
+    // ══════════════════════════════════════════════════════════════════════════════════
+    
+    int structAge = bar_index - math.max(structHiBar, structLoBar)
+    
+    if i_showOTE and not na(oteTop) and not na(oteBot) and structAge < i_fibMaxAge
+        int oteLeft = f_clampBar(math.min(structHiBar, structLoBar))
+        int oteRight = bar_index + 6
+        
+        oteBox := box.new(oteLeft, oteTop, oteRight, oteBot, bgcolor=color.new(C_OTE, 88), border_color=na)
+        lnOteTop := line.new(oteLeft, oteTop, oteRight, oteTop, color=color.new(C_OTE, 45), style=line.style_dashed, width=1)
+        lnOteBot := line.new(oteLeft, oteBot, oteRight, oteBot, color=color.new(C_OTE, 45), style=line.style_dashed, width=1)
+        
+        if i_showLabels
+            label.new(oteRight + 1, oteMid, "◈ OTE", style=label.style_none, textcolor=C_OTE, size=f_labelSize(i_labelSize))
+    
+    // ══════════════════════════════════════════════════════════════════════════════════
+    //                                  DEALING RANGES
+    // ══════════════════════════════════════════════════════════════════════════════════
+    
+    if i_showDR
+        if i_showDR_21D and not na(dr21H) and dr21H > dr21L
+            f_drawDealingRange(f_clampBar(bar_index - barsIn21D), bar_index + 6, dr21H, dr21L, C_NY, "21D", 2)
+        
+        if i_showDR_3D and not na(dr3H) and dr3H > dr3L
+            f_drawDealingRange(f_clampBar(bar_index - barsIn3D), bar_index + 6, dr3H, dr3L, C_BB, "3D", 2)
+        
+        if i_showDR_1D and not na(dr1H) and dr1StartBar > 0 and dr1H > dr1L
+            f_drawDealingRange(f_clampBar(dr1StartBar), bar_index + 6, dr1H, dr1L, C_DAILY, "1D", 2)
+        
+        if i_showDR_Asia and drAsiaComplete and not na(drAsiaH) and drAsiaH > drAsiaL
+            f_drawDealingRange(f_clampBar(drAsiaStartBar), bar_index + 6, drAsiaH, drAsiaL, C_ASIA, "ASIA", 1)
+        
+        if i_showDR_LDN and drLdnComplete and not na(drLdnH) and drLdnH > drLdnL
+            f_drawDealingRange(f_clampBar(drLdnStartBar), bar_index + 6, drLdnH, drLdnL, C_LONDON, "LDN", 1)
+        
+        if i_showDR_NY and drNyComplete and not na(drNyH) and drNyH > drNyL
+            f_drawDealingRange(f_clampBar(drNyStartBar), bar_index + 6, drNyH, drNyL, C_NY, "NY", 1)
+    
+    // ══════════════════════════════════════════════════════════════════════════════════
+    //                                  STRUCTURE FIBS
+    // ══════════════════════════════════════════════════════════════════════════════════
+    
+    if i_showFibs and not na(structHi) and not na(structLo) and structHi > structLo and structAge < i_fibMaxAge
+        float rng = structHi - structLo
+        float f0 = structLo
+        float f50 = structLo + rng * 0.5
+        float f100 = structHi
+        
+        int leftX = f_clampBar(math.min(structHiBar, structLoBar))
+        int rightX = bar_index + 6
+        
+        if i_showPDZones
+            premBox := box.new(leftX, f100, rightX, f50, bgcolor=color.new(C_BEAR, 94), border_color=na)
+            discBox := box.new(leftX, f50, rightX, f0, bgcolor=color.new(C_BULL, 94), border_color=na)
+        
+        ln0 := line.new(leftX, f0, rightX, f0, color=color.new(C_NEUTRAL, 60), style=line.style_dashed, width=1)
+        ln50 := line.new(leftX, f50, rightX, f50, color=C_EQ, width=2)
+        ln100 := line.new(leftX, f100, rightX, f100, color=color.new(C_NEUTRAL, 60), style=line.style_dashed, width=1)
+        
+        if i_showLabels
+            label.new(rightX + 1, f0, "0%", style=label.style_none, textcolor=color.new(C_NEUTRAL, 50), size=f_labelSize(i_labelSize))
+            label.new(rightX + 1, f50, "≡ EQ", style=label.style_none, textcolor=C_EQ, size=f_labelSize(i_labelSize))
+            label.new(rightX + 1, f100, "100%", style=label.style_none, textcolor=color.new(C_NEUTRAL, 50), size=f_labelSize(i_labelSize))
+    
+    // ══════════════════════════════════════════════════════════════════════════════════
+    //                                  SESSION OPENS
+    // ══════════════════════════════════════════════════════════════════════════════════
+    
+    line.delete(wkLine)
+    line.delete(moLine)
+    line.delete(doLine)
+    label.delete(wkLbl)
+    label.delete(moLbl)
+    label.delete(doLbl)
+    
+    if i_showSessOpens
+        if i_showWO and not na(weeklyOpen) and weeklyBar > 0
+            wkLine := line.new(f_clampBar(weeklyBar), weeklyOpen, bar_index + 6, weeklyOpen, 
+                 color=color.new(C_WEEKLY, 35), style=line.style_dotted, width=1)
+            if i_showLabels
+                string txt = i_showPrices ? ("W.O " + str.tostring(weeklyOpen)) : "W.O"
+                wkLbl := label.new(bar_index + 7, weeklyOpen, txt, 
+                     style=label.style_label_left, color=color.new(C_WEEKLY, 85), 
+                     textcolor=C_WEEKLY, size=f_labelSize(i_labelSize))
+        
+        if i_showMO and not na(monthlyOpen) and monthlyBar > 0
+            moLine := line.new(f_clampBar(monthlyBar), monthlyOpen, bar_index + 6, monthlyOpen, 
+                 color=color.new(C_MONTHLY, 35), style=line.style_dotted, width=1)
+            if i_showLabels
+                string txt = i_showPrices ? ("M.O " + str.tostring(monthlyOpen)) : "M.O"
+                moLbl := label.new(bar_index + 7, monthlyOpen, txt, 
+                     style=label.style_label_left, color=color.new(C_MONTHLY, 85), 
+                     textcolor=C_MONTHLY, size=f_labelSize(i_labelSize))
+        
+        if i_showDO and not na(dailyOpen) and dailyBar > 0
+            doLine := line.new(f_clampBar(dailyBar), dailyOpen, bar_index + 6, dailyOpen, 
+                 color=color.new(C_DAILY, 35), style=line.style_dotted, width=1)
+            if i_showLabels
+                string txt = i_showPrices ? ("D.O " + str.tostring(dailyOpen)) : "D.O"
+                doLbl := label.new(bar_index + 7, dailyOpen, txt, 
+                     style=label.style_label_left, color=color.new(C_DAILY, 85), 
+                     textcolor=C_DAILY, size=f_labelSize(i_labelSize))
+    
+    // ══════════════════════════════════════════════════════════════════════════════════
+    //                                PREVIOUS HIGH/LOW
+    // ══════════════════════════════════════════════════════════════════════════════════
+    
+    line.delete(pdhLine)
+    line.delete(pdlLine)
+    line.delete(pwhLine)
+    line.delete(pwlLine)
+    line.delete(pmhLine)
+    line.delete(pmlLine)
+    label.delete(pdhLbl)
+    label.delete(pdlLbl)
+    label.delete(pwhLbl)
+    label.delete(pwlLbl)
+    label.delete(pmhLbl)
+    label.delete(pmlLbl)
+    
+    if i_showPrevHL
+        if i_showPDHL and not na(pdh) and not na(pdl)
+            int lineStart = bar_index - 60
+            pdhLine := line.new(lineStart, pdh, bar_index + 6, pdh, color=color.new(C_NEUTRAL, 25), style=line.style_dashed, width=1)
+            pdlLine := line.new(lineStart, pdl, bar_index + 6, pdl, color=color.new(C_NEUTRAL, 25), style=line.style_dashed, width=1)
+            if i_showLabels
+                pdhLbl := label.new(bar_index + 7, pdh, "PDH", style=label.style_none, textcolor=C_NEUTRAL, size=f_labelSize(i_labelSize))
+                pdlLbl := label.new(bar_index + 7, pdl, "PDL", style=label.style_none, textcolor=C_NEUTRAL, size=f_labelSize(i_labelSize))
+        
+        if i_showPWHL and not na(pwh) and not na(pwl)
+            int lineStart = bar_index - 120
+            pwhLine := line.new(lineStart, pwh, bar_index + 6, pwh, color=color.new(C_WEEKLY, 25), style=line.style_dashed, width=1)
+            pwlLine := line.new(lineStart, pwl, bar_index + 6, pwl, color=color.new(C_WEEKLY, 25), style=line.style_dashed, width=1)
+            if i_showLabels
+                pwhLbl := label.new(bar_index + 7, pwh, "PWH", style=label.style_none, textcolor=C_WEEKLY, size=f_labelSize(i_labelSize))
+                pwlLbl := label.new(bar_index + 7, pwl, "PWL", style=label.style_none, textcolor=C_WEEKLY, size=f_labelSize(i_labelSize))
+        
+        if i_showPMHL and not na(pmh) and not na(pml)
+            int lineStart = bar_index - 180
+            pmhLine := line.new(lineStart, pmh, bar_index + 6, pmh, color=color.new(C_MONTHLY, 25), style=line.style_dashed, width=1)
+            pmlLine := line.new(lineStart, pml, bar_index + 6, pml, color=color.new(C_MONTHLY, 25), style=line.style_dashed, width=1)
+            if i_showLabels
+                pmhLbl := label.new(bar_index + 7, pmh, "PMH", style=label.style_none, textcolor=C_MONTHLY, size=f_labelSize(i_labelSize))
+                pmlLbl := label.new(bar_index + 7, pml, "PML", style=label.style_none, textcolor=C_MONTHLY, size=f_labelSize(i_labelSize))
+    
+    // ══════════════════════════════════════════════════════════════════════════════════
+    //                              SESSION H/L LINES
+    // ══════════════════════════════════════════════════════════════════════════════════
+    
+    line.delete(asiaHLine)
+    line.delete(asiaLLine)
+    line.delete(londonHLine)
+    line.delete(londonLLine)
+    line.delete(nyamHLine)
+    line.delete(nyamLLine)
+    line.delete(nypmHLine)
+    line.delete(nypmLLine)
+    
+    if i_showKZ and i_kzHL
+        if i_showAsia and not na(asiaH) and not na(asiaL)
+            int rightExt = inAsia ? bar_index + 4 : (i_kzExtend ? bar_index + 12 : math.min(asiaStartBar + 40, bar_index + 6))
+            asiaHLine := line.new(f_clampBar(asiaStartBar), asiaH, rightExt, asiaH, color=C_ASIA, style=line.style_solid, width=1)
+            asiaLLine := line.new(f_clampBar(asiaStartBar), asiaL, rightExt, asiaL, color=C_ASIA, style=line.style_solid, width=1)
+        
+        if i_showLondon and not na(londonH) and not na(londonL)
+            int rightExt = inLondon ? bar_index + 4 : (i_kzExtend ? bar_index + 12 : math.min(londonStartBar + 40, bar_index + 6))
+            londonHLine := line.new(f_clampBar(londonStartBar), londonH, rightExt, londonH, color=C_LONDON, style=line.style_solid, width=1)
+            londonLLine := line.new(f_clampBar(londonStartBar), londonL, rightExt, londonL, color=C_LONDON, style=line.style_solid, width=1)
+        
+        if i_showNYAM and not na(nyamH) and not na(nyamL)
+            int rightExt = inNYAM ? bar_index + 4 : (i_kzExtend ? bar_index + 12 : math.min(nyamStartBar + 40, bar_index + 6))
+            nyamHLine := line.new(f_clampBar(nyamStartBar), nyamH, rightExt, nyamH, color=C_NY, style=line.style_solid, width=1)
+            nyamLLine := line.new(f_clampBar(nyamStartBar), nyamL, rightExt, nyamL, color=C_NY, style=line.style_solid, width=1)
+        
+        if i_showNYPM and not na(nypmH) and not na(nypmL)
+            int rightExt = inNYPM ? bar_index + 4 : (i_kzExtend ? bar_index + 12 : math.min(nypmStartBar + 40, bar_index + 6))
+            nypmHLine := line.new(f_clampBar(nypmStartBar), nypmH, rightExt, nypmH, color=C_IFVG, style=line.style_solid, width=1)
+            nypmLLine := line.new(f_clampBar(nypmStartBar), nypmL, rightExt, nypmL, color=C_IFVG, style=line.style_solid, width=1)
+
+// ══════════════════════════════════════════════════════════════════════════════════════════════════════
+// ═══                                       DASHBOARD                                                ═══
+// ══════════════════════════════════════════════════════════════════════════════════════════════════════
+
+if i_showDash and barstate.islast
+    // Zone
+    string zone = "—"
+    color zoneCol = C_NEUTRAL
+    if not na(structHi) and not na(structLo)
+        float eq = structLo + (structHi - structLo) * 0.5
+        zone := close > eq ? "PREMIUM ⬆" : "DISCOUNT ⬇"
+        zoneCol := close > eq ? C_BEAR : C_BULL
+    
+    // Structure
+    string msBias = mssDirection == 1 ? "BULLISH ▲" : mssDirection == -1 ? "BEARISH ▼" : "NEUTRAL ◆"
+    color msCol = mssDirection == 1 ? C_BULL : mssDirection == -1 ? C_BEAR : C_NEUTRAL
+    
+    // Session
+    string currSession = inAsia ? "ASIA 🌏" : inLondon ? "LONDON 🇬🇧" : inNYAM ? "NY AM 🇺🇸" : inNYPM ? "NY PM 🌆" : "OFF"
+    color sessionCol = inAsia ? C_ASIA : inLondon ? C_LONDON : inNYAM ? C_NY : inNYPM ? C_IFVG : C_NEUTRAL
+    
+    // OTE
+    string oteStatus = "—"
+    color oteStatCol = C_NEUTRAL
+    if not na(oteTop) and not na(oteBot)
+        if close >= oteBot and close <= oteTop
+            oteStatus := "✓ IN ZONE"
+            oteStatCol := C_OTE
+        else if close < oteBot
+            oteStatus := "↓ BELOW"
+            oteStatCol := C_BULL
+        else
+            oteStatus := "↑ ABOVE"
+            oteStatCol := C_BEAR
+    
+    // Confluence
+    string confStatus = str.tostring(currentConf)
+    color confCol = currentConf >= i_confThresh ? C_CONF : C_NEUTRAL
+    
+    // Macro
+    string macroStat = inAnyMacro ? ("● " + currentMacroLbl) : "○ IDLE"
+    color macroCol = inAnyMacro ? i_macroColor : C_NEUTRAL
+    
+    table.delete(dashboard)
+    
+    int numRows = i_dashStyle == "Minimal" ? 7 : i_dashStyle == "Compact" ? 12 : 16
+    
+    dashboard := table.new(f_dashPosition(i_dashPos), 2, numRows, 
+         bgcolor=color.new(#131722, i_dashTrans), 
+         frame_color=color.new(#363A45, 0), frame_width=1, 
+         border_color=color.new(#363A45, 50), border_width=1)
+    
+    // Row 0: Header
+    table.cell(dashboard, 0, 0, "⚡ ICT MATRIX", text_color=color.white, text_size=f_labelSize(i_dashSize), bgcolor=color.new(#2962FF, 15))
+    table.cell(dashboard, 1, 0, "v6.0", text_color=color.new(#2962FF, 0), text_size=f_labelSize(i_dashSize), bgcolor=color.new(#2962FF, 15))
+    
+    // Row 1: Structure
+    table.cell(dashboard, 0, 1, "Structure", text_color=color.new(C_NEUTRAL, 30), text_size=f_labelSize(i_dashSize))
+    table.cell(dashboard, 1, 1, msBias, text_color=msCol, text_size=f_labelSize(i_dashSize))
+    
+    // Row 2: Zone
+    table.cell(dashboard, 0, 2, "Zone", text_color=color.new(C_NEUTRAL, 30), text_size=f_labelSize(i_dashSize))
+    table.cell(dashboard, 1, 2, zone, text_color=zoneCol, text_size=f_labelSize(i_dashSize))
+    
+    // Row 3: Session
+    table.cell(dashboard, 0, 3, "Session", text_color=color.new(C_NEUTRAL, 30), text_size=f_labelSize(i_dashSize))
+    table.cell(dashboard, 1, 3, currSession, text_color=sessionCol, text_size=f_labelSize(i_dashSize))
+    
+    // Row 4: OTE
+    table.cell(dashboard, 0, 4, "OTE Zone", text_color=color.new(C_OTE, 30), text_size=f_labelSize(i_dashSize))
+    table.cell(dashboard, 1, 4, oteStatus, text_color=oteStatCol, text_size=f_labelSize(i_dashSize))
+    
+    // Row 5: Confluence
+    table.cell(dashboard, 0, 5, "Confluence", text_color=color.new(C_CONF, 30), text_size=f_labelSize(i_dashSize))
+    table.cell(dashboard, 1, 5, confStatus + " / " + str.tostring(i_confThresh), text_color=confCol, text_size=f_labelSize(i_dashSize))
+    
+    // Row 6: Macro
+    if i_showMacros
+        table.cell(dashboard, 0, 6, "Macro", text_color=color.new(i_macroColor, 30), text_size=f_labelSize(i_dashSize))
+        table.cell(dashboard, 1, 6, macroStat, text_color=macroCol, text_size=f_labelSize(i_dashSize))
+    
+    if i_dashStyle != "Minimal"
+        int rowOffset = i_showMacros ? 7 : 6
+        
+        // FVG
+        table.cell(dashboard, 0, rowOffset, "FVG ▲/▼", text_color=color.new(C_BULL, 30), text_size=f_labelSize(i_dashSize))
+        table.cell(dashboard, 1, rowOffset, str.tostring(activeBullFvg) + " / " + str.tostring(activeBearFvg), text_color=C_NEUTRAL, text_size=f_labelSize(i_dashSize))
+        
+        // iFVG
+        table.cell(dashboard, 0, rowOffset + 1, "iFVG", text_color=color.new(C_IFVG, 30), text_size=f_labelSize(i_dashSize))
+        table.cell(dashboard, 1, rowOffset + 1, str.tostring(activeIfvg), text_color=C_NEUTRAL, text_size=f_labelSize(i_dashSize))
+        
+        // OB
+        table.cell(dashboard, 0, rowOffset + 2, "OB ▲/▼", text_color=color.new(C_OB, 30), text_size=f_labelSize(i_dashSize))
+        table.cell(dashboard, 1, rowOffset + 2, str.tostring(activeBullOB) + " / " + str.tostring(activeBearOB), text_color=C_NEUTRAL, text_size=f_labelSize(i_dashSize))
+        
+        // BB
+        table.cell(dashboard, 0, rowOffset + 3, "BB ▲/▼", text_color=color.new(C_BB, 30), text_size=f_labelSize(i_dashSize))
+        table.cell(dashboard, 1, rowOffset + 3, str.tostring(activeBullBB) + " / " + str.tostring(activeBearBB), text_color=C_NEUTRAL, text_size=f_labelSize(i_dashSize))
+        
+        // VIMB
+        table.cell(dashboard, 0, rowOffset + 4, "VIMB", text_color=color.new(C_VIMB, 30), text_size=f_labelSize(i_dashSize))
+        table.cell(dashboard, 1, rowOffset + 4, str.tostring(activeVimb), text_color=C_NEUTRAL, text_size=f_labelSize(i_dashSize))
+    
+    if i_dashStyle == "Detailed"
+        int rowOffset = i_showMacros ? 12 : 11
+        
+        // RB
+        table.cell(dashboard, 0, rowOffset, "RB ▲/▼", text_color=color.new(C_BULL, 30), text_size=f_labelSize(i_dashSize))
+        table.cell(dashboard, 1, rowOffset, str.tostring(activeBullRB) + " / " + str.tostring(activeBearRB), text_color=C_NEUTRAL, text_size=f_labelSize(i_dashSize))
+        
+        // EQH/EQL
+        table.cell(dashboard, 0, rowOffset + 1, "EQH/EQL", text_color=color.new(C_EQ, 30), text_size=f_labelSize(i_dashSize))
+        table.cell(dashboard, 1, rowOffset + 1, str.tostring(activeEqh) + " / " + str.tostring(activeEql), text_color=C_NEUTRAL, text_size=f_labelSize(i_dashSize))
+        
+        // BSL/SSL
+        table.cell(dashboard, 0, rowOffset + 2, "BSL/SSL", text_color=color.new(C_BULL, 30), text_size=f_labelSize(i_dashSize))
+        table.cell(dashboard, 1, rowOffset + 2, str.tostring(activeBsl) + " / " + str.tostring(activeSsl), text_color=C_NEUTRAL, text_size=f_labelSize(i_dashSize))
+        
+        // HTF Timer
+        if i_showHTF
+            table.cell(dashboard, 0, rowOffset + 3, "HTF ⏱", text_color=color.new(C_EQ, 30), text_size=f_labelSize(i_dashSize))
+            table.cell(dashboard, 1, rowOffset + 3, htfTF + " " + countdownStr, text_color=C_EQ, text_size=f_labelSize(i_dashSize))
+
+// ══════════════════════════════════════════════════════════════════════════════════════════════════════
+// ═══                                  VISUAL INDICATORS                                             ═══
+// ══════════════════════════════════════════════════════════════════════════════════════════════════════
+
+// Confluence background
+bool highConf = i_showConf and currentConf >= i_confThresh
+bgcolor(highConf ? color.new(C_CONF, 94) : na, title="High Confluence Zone")
+
+// Macro background
+bgcolor(i_showMacros and inAnyMacro and i_macroStyle == "Background" ? color.new(i_macroColor, 95) : na, title="Macro Active")
+
+// Confluence label
+if barstate.islast and i_showConf and i_confShowLbl and currentConf >= i_confThresh
+    label.new(bar_index + 3, close, "★ " + str.tostring(currentConf), 
+         style=label.style_label_left, color=color.new(C_CONF, 75), 
+         textcolor=C_CONF, size=size.small)
+
+// ══════════════════════════════════════════════════════════════════════════════════════════════════════
+// ═══                                        PLOT SIGNALS                                            ═══
+// ══════════════════════════════════════════════════════════════════════════════════════════════════════
+
+plotshape(bullMSS and i_showMSS, title="Bullish MSS", style=shape.triangleup, location=location.belowbar, color=C_BULL, size=size.tiny)
+plotshape(bearMSS and i_showMSS, title="Bearish MSS", style=shape.triangledown, location=location.abovebar, color=C_BEAR, size=size.tiny)
+plotshape(eqhSweptAlert and i_showEQHL, title="EQH Swept", style=shape.xcross, location=location.abovebar, color=C_EQ, size=size.tiny)
+plotshape(eqlSweptAlert and i_showEQHL, title="EQL Swept", style=shape.xcross, location=location.belowbar, color=C_EQ, size=size.tiny)
+plotshape(highConfAlert and i_showConf, title="High Confluence", style=shape.diamond, location=location.abovebar, color=C_CONF, size=size.tiny)
+
+// ══════════════════════════════════════════════════════════════════════════════════════════════════════
+// ═══                                          ALERTS                                                ═══
+// ══════════════════════════════════════════════════════════════════════════════════════════════════════
+
+// FVG Alerts
+alertcondition(bullFVG, title="🟢 Bullish FVG", message="Bullish Fair Value Gap detected")
+alertcondition(bearFVG, title="🔴 Bearish FVG", message="Bearish Fair Value Gap detected")
+
+// iFVG Alerts
+alertcondition(ifvgFormed, title="🔷 iFVG Created", message="Inverse FVG zone formed")
+
+// Order Block Alerts
+alertcondition(bullOB, title="🔵 Bullish OB", message="Bullish Order Block identified")
+alertcondition(bearOB, title="🟠 Bearish OB", message="Bearish Order Block identified")
+
+// Breaker Block Alerts
+alertcondition(bullBreakerFormed, title="💜 Bullish Breaker", message="Bullish Breaker Block formed")
+alertcondition(bearBreakerFormed, title="🟣 Bearish Breaker", message="Bearish Breaker Block formed")
+
+// Rejection Block Alerts
+alertcondition(bullRejection, title="💚 Bullish Rejection", message="Bullish Rejection Block")
+alertcondition(bearRejection, title="❤️ Bearish Rejection", message="Bearish Rejection Block")
+
+// Volume Imbalance Alerts
+alertcondition(vimbUp, title="🟡 Bullish VIMB", message="Bullish Volume Imbalance")
+alertcondition(vimbDn, title="🟡 Bearish VIMB", message="Bearish Volume Imbalance")
+
+// Liquidity Alerts
+alertcondition(eqhSweptAlert, title="💧 EQH Swept", message="Equal Highs liquidity taken")
+alertcondition(eqlSweptAlert, title="💧 EQL Swept", message="Equal Lows liquidity taken")
+alertcondition(bslSweptAlert, title="🌊 BSL Swept", message="Buyside Liquidity swept")
+alertcondition(sslSweptAlert, title="🌊 SSL Swept", message="Sellside Liquidity swept")
+
+// Market Structure Alerts
+alertcondition(bullMSS, title="📈 Bullish MSS", message="Bullish Market Structure Shift")
+alertcondition(bearMSS, title="📉 Bearish MSS", message="Bearish Market Structure Shift")
+
+// Confluence Alert
+alertcondition(highConfAlert, title="⚡ High Confluence", message="Multiple ICT concepts aligned")
+
+// OTE Alert
+bool enteredOTE = not na(oteTop) and not na(oteBot) and close >= oteBot and close <= oteTop and (close[1] < oteBot or close[1] > oteTop)
+alertcondition(enteredOTE, title="🎯 Entered OTE", message="Price entered OTE zone")
+
+// Macro Alerts
+bool macroStarted = inAnyMacro and not inAnyMacro[1]
+bool macroEnded = not inAnyMacro and inAnyMacro[1]
+alertcondition(macroStarted, title="⏱️ Macro Started", message="ICT Macro time window opened")
+alertcondition(macroEnded, title="⏱️ Macro Ended", message="ICT Macro time window closed")
+
+// Combo Alerts
+alertcondition(bullFVG or bullOB, title="🟢 Bullish Setup", message="Bullish FVG or OB formed")
+alertcondition(bearFVG or bearOB, title="🔴 Bearish Setup", message="Bearish FVG or OB formed")
+alertcondition(inAnyMacro and highConfAlert, title="⚡ Macro + Confluence", message="Macro active with high confluence!")
+
+// Session Alerts
+alertcondition(inAsia and not inAsia[1], title="🌏 Asia Open", message="Asia session started")
+alertcondition(inLondon and not inLondon[1], title="🇬🇧 London Open", message="London session started")
+alertcondition(inNYAM and not inNYAM[1], title="🇺🇸 NY AM Open", message="NY AM session started")
+alertcondition(inNYPM and not inNYPM[1], title="🇺🇸 NY PM Open", message="NY PM session started")
+
+// ══════════════════════════════════════════════════════════════════════════════════════════════════════
+// ═══                                      END OF SCRIPT                                             ═══
+// ══════════════════════════════════════════════════════════════════════════════════════════════════════
