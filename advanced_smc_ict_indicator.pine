@@ -77,6 +77,7 @@ showProtectedLevels = input.bool(true, "Show protected high / low", group=groupS
 showActiveDealingRange = input.bool(true, "Show active dealing range", group=groupStyle)
 showPremiumDiscount = input.bool(true, "Show premium / discount zones", group=groupStyle)
 showKillzoneVisual = input.bool(true, "Shade killzone on chart", group=groupStyle)
+showLiquidityRightLabels = input.bool(true, "Show right-edge liquidity labels", group=groupStyle)
 
 groupMobile = "10. Mobile / Android"
 androidCompactMode = input.bool(false, "Android compact mode", group=groupMobile)
@@ -146,6 +147,19 @@ var bool[] obTouched = array.new_bool()
 var float[] obEntries = array.new_float()
 var line[] eqHighLines = array.new_line()
 var line[] eqLowLines = array.new_line()
+var label prevSessionHighLabel = na
+var label prevSessionLowLabel = na
+var label prevDayHighLabel = na
+var label prevDayLowLabel = na
+var label prevWeekHighLabel = na
+var label prevWeekLowLabel = na
+var label prevMonthHighLabel = na
+var label prevMonthLowLabel = na
+var label protectedHighLabel = na
+var label protectedLowLabel = na
+var label internalHighLabel = na
+var label internalLowLabel = na
+var label internalEqLabel = na
 
 f_breakUp(float level) =>
     breakMode == "Full Body Through" ? bodyLow > level : close > level
@@ -305,6 +319,24 @@ f_horizontalLevel(float level, bool enabled) =>
         bool changed = f_levelChanged(level, level[1])
         result := changed and not na(level[1]) ? na : level
     result
+
+f_syncRightEdgeLabel(label currentLabel, float level, string labelText, color labelColor, color textColor, bool enabled) =>
+    label updatedLabel = currentLabel
+    if enabled and not na(level)
+        if na(updatedLabel)
+            updatedLabel := label.new(x=bar_index, y=level, xloc=xloc.bar_index, text=labelText, style=label.style_label_left, color=labelColor, textcolor=textColor, size=size.tiny)
+        else
+            label.set_x(updatedLabel, bar_index)
+            label.set_y(updatedLabel, level)
+            label.set_text(updatedLabel, labelText)
+            label.set_color(updatedLabel, labelColor)
+            label.set_textcolor(updatedLabel, textColor)
+            label.set_style(updatedLabel, label.style_label_left)
+            label.set_size(updatedLabel, size.tiny)
+    else if not na(updatedLabel)
+        label.delete(updatedLabel)
+        updatedLabel := na
+    updatedLabel
 
 f_strictChecklist(bool biasPass, bool sweepPass, bool mssPass, bool pdPass, bool otePass, bool kzPass, bool compactText) =>
     compactText ? "B" + f_boolFlag(biasPass) + " S" + f_boolFlag(sweepPass) + " M" + f_boolFlag(mssPass) + " P" + f_boolFlag(pdPass) + " O" + f_boolFlag(otePass) + " K" + f_boolFlag(kzPass) : "B:" + f_boolFlag(biasPass) + " S:" + f_boolFlag(sweepPass) + " M:" + f_boolFlag(mssPass) + " PD:" + f_boolFlag(pdPass) + " OTE:" + f_boolFlag(otePass) + " KZ:" + f_boolFlag(kzPass)
@@ -1244,6 +1276,22 @@ internalEqPlot = plot(internalEqLevel, "ICT Equilibrium", color=color.new(neutra
 fill(internalHighPlot, internalLowPlot, color=showLiquidity and displayDealingRange ? color.new(color.silver, 95) : na)
 fill(internalHighPlot, internalEqPlot, color=showLiquidity and displayPremiumDiscount ? color.new(bearColor, 90) : na)
 fill(internalEqPlot, internalLowPlot, color=showLiquidity and displayPremiumDiscount ? color.new(bullColor, 90) : na)
+
+if barstate.islast
+    bool rightEdgeLiquidityLabels = showLiquidityRightLabels
+    prevSessionHighLabel := f_syncRightEdgeLabel(prevSessionHighLabel, prevSessionHigh, "Sess H", color.new(liqHighColor, 5), color.white, rightEdgeLiquidityLabels and showLiquidity and showPrevSession)
+    prevSessionLowLabel := f_syncRightEdgeLabel(prevSessionLowLabel, prevSessionLow, "Sess L", color.new(liqLowColor, 5), color.white, rightEdgeLiquidityLabels and showLiquidity and showPrevSession)
+    prevDayHighLabel := f_syncRightEdgeLabel(prevDayHighLabel, prevDayHigh, "PDH", color.new(liqHighColor, 0), color.white, rightEdgeLiquidityLabels and showLiquidity and showHigherPeriodLiquidity)
+    prevDayLowLabel := f_syncRightEdgeLabel(prevDayLowLabel, prevDayLow, "PDL", color.new(liqLowColor, 0), color.white, rightEdgeLiquidityLabels and showLiquidity and showHigherPeriodLiquidity)
+    prevWeekHighLabel := f_syncRightEdgeLabel(prevWeekHighLabel, prevWeekHigh, "PWH", color.new(liqHighColor, 20), color.white, rightEdgeLiquidityLabels and showLiquidity and displayWeekMonthLiquidity)
+    prevWeekLowLabel := f_syncRightEdgeLabel(prevWeekLowLabel, prevWeekLow, "PWL", color.new(liqLowColor, 20), color.white, rightEdgeLiquidityLabels and showLiquidity and displayWeekMonthLiquidity)
+    prevMonthHighLabel := f_syncRightEdgeLabel(prevMonthHighLabel, prevMonthHigh, "PMH", color.new(liqHighColor, 35), color.white, rightEdgeLiquidityLabels and showLiquidity and displayWeekMonthLiquidity)
+    prevMonthLowLabel := f_syncRightEdgeLabel(prevMonthLowLabel, prevMonthLow, "PML", color.new(liqLowColor, 35), color.white, rightEdgeLiquidityLabels and showLiquidity and displayWeekMonthLiquidity)
+    protectedHighLabel := f_syncRightEdgeLabel(protectedHighLabel, activeProtectedHigh, "Prot H", color.new(liqHighColor, 8), color.white, rightEdgeLiquidityLabels and showLiquidity and displayProtectedLevels)
+    protectedLowLabel := f_syncRightEdgeLabel(protectedLowLabel, activeProtectedLow, "Prot L", color.new(liqLowColor, 8), color.white, rightEdgeLiquidityLabels and showLiquidity and displayProtectedLevels)
+    internalHighLabel := f_syncRightEdgeLabel(internalHighLabel, activeRangeHigh, "Range H", color.new(color.silver, 10), color.black, rightEdgeLiquidityLabels and showLiquidity and displayDealingRange)
+    internalLowLabel := f_syncRightEdgeLabel(internalLowLabel, activeRangeLow, "Range L", color.new(color.silver, 10), color.black, rightEdgeLiquidityLabels and showLiquidity and displayDealingRange)
+    internalEqLabel := f_syncRightEdgeLabel(internalEqLabel, activeRangeEquilibrium, "EQ", color.new(neutralColor, 10), color.white, rightEdgeLiquidityLabels and showLiquidity and displayDealingRange)
 
 oteLongTopPlot = plot(strictIctMode and strictShowOte ? oteLongTop : na, "OTE Long Top", color=color.new(bullColor, 40), linewidth=1, style=plot.style_linebr)
 oteLongBottomPlot = plot(strictIctMode and strictShowOte ? oteLongBottom : na, "OTE Long Bottom", color=color.new(bullColor, 40), linewidth=1, style=plot.style_linebr)
