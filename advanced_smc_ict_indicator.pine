@@ -87,8 +87,6 @@ mobileHideSecondaryLiquidity = input.bool(true, "Hide weekly / monthly liquidity
 mobileHideTrendlineLiquidity = input.bool(true, "Hide trendline liquidity", group=groupMobile)
 mobileHideInternalRange = input.bool(true, "Hide internal range fill", group=groupMobile)
 mobileHideTrendBackground = input.bool(true, "Hide trend background tint", group=groupMobile)
-mobileMaxObVisible = input.int(5, "Max OB zones in compact mode", minval=2, maxval=12, group=groupMobile)
-mobileMaxFvgVisible = input.int(6, "Max FVG zones in compact mode", minval=2, maxval=16, group=groupMobile)
 
 //------------------------------------------------------------------------------
 // Styling and helpers
@@ -120,8 +118,6 @@ displayProtectedLevels = showProtectedLevels and not compactMode
 displayDealingRange = showActiveDealingRange and not (compactMode and mobileHideInternalRange)
 displayPremiumDiscount = showPremiumDiscount and displayDealingRange
 displayKillzoneVisual = showKillzoneVisual and not (compactMode and mobileHideTrendBackground)
-effectiveMaxObZones = compactMode ? math.min(maxObZones, mobileMaxObVisible) : maxObZones
-effectiveMaxFvgZones = compactMode ? math.min(maxFvgZones, mobileMaxFvgVisible) : maxFvgZones
 
 //------------------------------------------------------------------------------
 // Stateful arrays for FVG / OB tracking
@@ -269,8 +265,30 @@ f_htfStateText(string chartTf, string minTf, string maxTf, string selectedTf, bo
         stateText := chartTf + " | ICT TF invalid"
     stateText
 
-f_rrBand(float rr) =>
-    na(rr) ? 0.0 : rr >= 2.0 ? 1.0 : rr >= 1.2 ? 0.5 : 0.0
+f_rrPoints(float rr) =>
+    na(rr) ? 0.0 : rr >= 2.0 ? 2.0 : rr >= 1.2 ? 1.0 : 0.0
+
+f_nearestAbove(float entry, float level1, float level2, float level3, float level4, float level5, float level6, float level7) =>
+    float target = na
+    target := f_selectAbove(entry, target, level1)
+    target := f_selectAbove(entry, target, level2)
+    target := f_selectAbove(entry, target, level3)
+    target := f_selectAbove(entry, target, level4)
+    target := f_selectAbove(entry, target, level5)
+    target := f_selectAbove(entry, target, level6)
+    target := f_selectAbove(entry, target, level7)
+    target
+
+f_nearestBelow(float entry, float level1, float level2, float level3, float level4, float level5, float level6, float level7) =>
+    float target = na
+    target := f_selectBelow(entry, target, level1)
+    target := f_selectBelow(entry, target, level2)
+    target := f_selectBelow(entry, target, level3)
+    target := f_selectBelow(entry, target, level4)
+    target := f_selectBelow(entry, target, level5)
+    target := f_selectBelow(entry, target, level6)
+    target := f_selectBelow(entry, target, level7)
+    target
 
 f_strictChecklist(bool biasPass, bool sweepPass, bool mssPass, bool pdPass, bool otePass, bool kzPass, bool compactText) =>
     compactText ? "B" + f_boolFlag(biasPass) + " S" + f_boolFlag(sweepPass) + " M" + f_boolFlag(mssPass) + " P" + f_boolFlag(pdPass) + " O" + f_boolFlag(otePass) + " K" + f_boolFlag(kzPass) : "B:" + f_boolFlag(biasPass) + " S:" + f_boolFlag(sweepPass) + " M:" + f_boolFlag(mssPass) + " PD:" + f_boolFlag(pdPass) + " OTE:" + f_boolFlag(otePass) + " KZ:" + f_boolFlag(kzPass)
@@ -305,39 +323,38 @@ f_setupStatus(bool hasSetup, bool stopHit, bool structureInvalidated, bool repla
 f_isActionable(string statusText) =>
     statusText != "No setup" and statusText != "Invalidated" and statusText != "Expired" and statusText != "Chased" and statusText != "Filtered"
 
-f_setupScore(bool hasSetup, bool biasAligned, bool htfAligned, bool sweepSeen, bool displacementSeen, bool hasOb, bool hasBreaker, bool hasFvg, bool idmSeen, bool priceInZone, bool priceNearZone, float rr, bool fresh, bool managed, bool strictModeEnabled, bool strictContextPass, bool strictKillzonePass, bool replaced, bool chased, bool expired, bool invalidated) =>
+f_setupScore(bool hasSetup, bool biasAligned, bool htfAligned, bool sweepSeen, bool displacementSeen, bool hasOb, bool hasFvg, bool priceInZone, bool priceNearZone, float rr, bool fresh, bool managed, bool strictModeEnabled, bool strictContextPass, bool strictKillzonePass, bool replaced, bool chased, bool expired, bool invalidated) =>
     float score = na
     if hasSetup
-        score := 20.0
-        score += biasAligned ? 16.0 : -10.0
-        score += htfAligned ? 10.0 : 0.0
-        score += sweepSeen ? 12.0 : 0.0
-        score += displacementSeen ? 12.0 : 0.0
-        score += hasOb ? (hasBreaker ? 8.0 : 12.0) : hasFvg ? 10.0 : 0.0
-        score += idmSeen ? 4.0 : 0.0
-        score += priceInZone ? 14.0 : priceNearZone ? 8.0 : 0.0
-        score += f_rrBand(rr) * 16.0
-        score += fresh ? 4.0 : 0.0
-        score += managed ? 6.0 : 0.0
-        score += strictModeEnabled and strictContextPass and strictKillzonePass ? 8.0 : 0.0
-        score -= strictModeEnabled and (not strictContextPass or not strictKillzonePass) ? 12.0 : 0.0
-        score -= replaced ? 6.0 : 0.0
-        score -= chased ? 16.0 : 0.0
-        score -= expired ? 18.0 : 0.0
-        score -= invalidated ? 30.0 : 0.0
-        score := f_clamp(score, 0.0, 100.0)
+        float points = 1.0
+        float maxPoints = 13.0
+        points += biasAligned ? 2.0 : 0.0
+        points += htfAligned ? 1.0 : 0.0
+        points += sweepSeen ? 1.0 : 0.0
+        points += displacementSeen ? 1.0 : 0.0
+        points += hasOb ? 1.0 : hasFvg ? 1.0 : 0.0
+        points += priceInZone ? 2.0 : priceNearZone ? 1.0 : 0.0
+        points += f_rrPoints(rr)
+        points += fresh ? 1.0 : 0.0
+        points += managed ? 1.0 : 0.0
+        points += strictModeEnabled and strictContextPass and strictKillzonePass ? 1.0 : 0.0
+        points -= replaced ? 1.0 : 0.0
+        points -= chased ? 2.0 : 0.0
+        points -= expired ? 2.0 : 0.0
+        points -= invalidated ? 4.0 : 0.0
+        score := f_clamp(points / maxPoints * 100.0, 0.0, 100.0)
     score
 
 f_tpProbability(float confidence, float rr, bool priceInZone, bool priceNearZone, bool managed, bool strictModeEnabled, bool strictContextPass, bool strictKillzonePass, bool chased, bool expired, bool invalidated) =>
     float probability = na
     if not na(confidence)
-        probability := confidence * 0.75
-        probability += rr >= 2.0 ? 8.0 : rr >= 1.2 ? 3.0 : -10.0
-        probability += managed ? 6.0 : priceInZone ? 4.0 : priceNearZone ? 2.0 : 0.0
-        probability -= strictModeEnabled and (not strictContextPass or not strictKillzonePass) ? 8.0 : 0.0
-        probability -= chased ? 14.0 : 0.0
-        probability -= expired ? 16.0 : 0.0
-        probability -= invalidated ? 30.0 : 0.0
+        probability := confidence
+        probability += rr >= 2.0 ? 6.0 : rr >= 1.2 ? 3.0 : -6.0
+        probability += managed ? 4.0 : priceInZone ? 3.0 : priceNearZone ? 1.0 : 0.0
+        probability -= strictModeEnabled and (not strictContextPass or not strictKillzonePass) ? 10.0 : 0.0
+        probability -= chased ? 12.0 : 0.0
+        probability -= expired ? 14.0 : 0.0
+        probability -= invalidated ? 25.0 : 0.0
         probability := f_clamp(probability, 5.0, 95.0)
     probability
 
@@ -905,7 +922,6 @@ activeRangeLow = activeBias == 1 ? bullDealingRangeLow : activeBias == -1 ? bear
 activeRangeEquilibrium = activeBias == 1 ? bullEquilibrium : activeBias == -1 ? bearEquilibrium : na
 activeProtectedHigh = activeBias == -1 ? protectedHigh : na
 activeProtectedLow = activeBias == 1 ? protectedLow : na
-activeRangeLabel = activeBias == 1 ? "Bull Leg" : activeBias == -1 ? "Bear Leg" : "Range"
 
 //------------------------------------------------------------------------------
 // Risk cues from latest live zone or structure
@@ -1021,13 +1037,7 @@ else if preferBullFvg
     tradeLongTouched := latestBullFvgTouched
 
 if not na(tradeLongEntry)
-    tradeLongTarget := f_selectAbove(tradeLongEntry, tradeLongTarget, lastSwingHigh)
-    tradeLongTarget := f_selectAbove(tradeLongEntry, tradeLongTarget, latestEqh)
-    tradeLongTarget := f_selectAbove(tradeLongEntry, tradeLongTarget, prevSessionHigh)
-    tradeLongTarget := f_selectAbove(tradeLongEntry, tradeLongTarget, prevDayHigh)
-    tradeLongTarget := f_selectAbove(tradeLongEntry, tradeLongTarget, prevWeekHigh)
-    tradeLongTarget := f_selectAbove(tradeLongEntry, tradeLongTarget, prevMonthHigh)
-    tradeLongTarget := f_selectAbove(tradeLongEntry, tradeLongTarget, htfStructureHigh)
+    tradeLongTarget := f_nearestAbove(tradeLongEntry, lastSwingHigh, latestEqh, prevSessionHigh, prevDayHigh, prevWeekHigh, prevMonthHigh, htfStructureHigh)
     float tempLongRisk = not na(tradeLongStop) ? tradeLongEntry - tradeLongStop : na
     if na(tradeLongTarget) and not na(tempLongRisk) and tempLongRisk > 0
         tradeLongTarget := tradeLongEntry + tempLongRisk * 2.0
@@ -1063,13 +1073,7 @@ else if preferBearFvg
     tradeShortTouched := latestBearFvgTouched
 
 if not na(tradeShortEntry)
-    tradeShortTarget := f_selectBelow(tradeShortEntry, tradeShortTarget, lastSwingLow)
-    tradeShortTarget := f_selectBelow(tradeShortEntry, tradeShortTarget, latestEql)
-    tradeShortTarget := f_selectBelow(tradeShortEntry, tradeShortTarget, prevSessionLow)
-    tradeShortTarget := f_selectBelow(tradeShortEntry, tradeShortTarget, prevDayLow)
-    tradeShortTarget := f_selectBelow(tradeShortEntry, tradeShortTarget, prevWeekLow)
-    tradeShortTarget := f_selectBelow(tradeShortEntry, tradeShortTarget, prevMonthLow)
-    tradeShortTarget := f_selectBelow(tradeShortEntry, tradeShortTarget, htfStructureLow)
+    tradeShortTarget := f_nearestBelow(tradeShortEntry, lastSwingLow, latestEql, prevSessionLow, prevDayLow, prevWeekLow, prevMonthLow, htfStructureLow)
     float tempShortRisk = not na(tradeShortStop) ? tradeShortStop - tradeShortEntry : na
     if na(tradeShortTarget) and not na(tempShortRisk) and tempShortRisk > 0
         tradeShortTarget := tradeShortEntry - tempShortRisk * 2.0
@@ -1136,10 +1140,10 @@ bool shortHtfAligned = htfBias == -1
 bool longDisplacementSeen = bullLegHasDisplacement or recentBullFvg or (not na(lastBullDisplacementBar) and bar_index - lastBullDisplacementBar <= obValidationLookback)
 bool shortDisplacementSeen = bearLegHasDisplacement or recentBearFvg or (not na(lastBearDisplacementBar) and bar_index - lastBearDisplacementBar <= obValidationLookback)
 
-float longConfidence = f_setupScore(not na(tradeLongEntry), longBiasAligned, longHtfAligned, bullLegHasSweep, longDisplacementSeen, tradeLongIsOb, latestBullZoneIsBreaker, tradeLongIsFvg, bullishIdm, longPriceInZone, longPriceNearZone, longRr, longFresh, longManaged, strictIctMode, strictLongContextPass, strictLongKillzonePass, longReplaced, longChased, longExpired, longInvalidated)
+float longConfidence = f_setupScore(not na(tradeLongEntry), longBiasAligned, longHtfAligned, bullLegHasSweep, longDisplacementSeen, tradeLongIsOb, tradeLongIsFvg, longPriceInZone, longPriceNearZone, longRr, longFresh, longManaged, strictIctMode, strictLongContextPass, strictLongKillzonePass, longReplaced, longChased, longExpired, longInvalidated)
 float longTpProbability = f_tpProbability(longConfidence, longRr, longPriceInZone, longPriceNearZone, longManaged, strictIctMode, strictLongContextPass, strictLongKillzonePass, longChased, longExpired, longInvalidated)
 
-float shortConfidence = f_setupScore(not na(tradeShortEntry), shortBiasAligned, shortHtfAligned, bearLegHasSweep, shortDisplacementSeen, tradeShortIsOb, latestBearZoneIsBreaker, tradeShortIsFvg, bearishIdm, shortPriceInZone, shortPriceNearZone, shortRr, shortFresh, shortManaged, strictIctMode, strictShortContextPass, strictShortKillzonePass, shortReplaced, shortChased, shortExpired, shortInvalidated)
+float shortConfidence = f_setupScore(not na(tradeShortEntry), shortBiasAligned, shortHtfAligned, bearLegHasSweep, shortDisplacementSeen, tradeShortIsOb, tradeShortIsFvg, shortPriceInZone, shortPriceNearZone, shortRr, shortFresh, shortManaged, strictIctMode, strictShortContextPass, strictShortKillzonePass, shortReplaced, shortChased, shortExpired, shortInvalidated)
 float shortTpProbability = f_tpProbability(shortConfidence, shortRr, shortPriceInZone, shortPriceNearZone, shortManaged, strictIctMode, strictShortContextPass, strictShortKillzonePass, shortChased, shortExpired, shortInvalidated)
 
 string preferredDirection = "Wait"
