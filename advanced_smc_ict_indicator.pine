@@ -12,6 +12,7 @@ showTrendBackground = input.bool(true, "Tint background by current bias", group=
 swingLen = input.int(3, "Swing confirmation length", minval=2, maxval=10, group=groupStructure)
 consolidationBars = input.int(18, "Bars without BOS before consolidation", minval=5, maxval=100, group=groupStructure)
 breakMode = input.string("Close Through", "Structure confirmation", options=["Close Through", "Full Body Through"], group=groupStructure)
+engineDisplacementLookback = input.int(10, "Engine displacement lookback", minval=2, maxval=50, group=groupStructure)
 
 groupLiquidity = "2. Liquidity"
 showLiquidity = input.bool(true, "Show liquidity pools", group=groupLiquidity)
@@ -113,7 +114,7 @@ displayInternalRange = showInternalRange and not (compactMode and mobileHideInte
 displayTrendBackground = showTrendBackground and not (compactMode and mobileHideTrendBackground)
 displayWeekMonthLiquidity = showHigherPeriodLiquidity and not (compactMode and mobileHideSecondaryLiquidity)
 displayProtectedLevels = showProtectedLevels and not compactMode
-displayDealingRange = showActiveDealingRange and displayInternalRange
+displayDealingRange = showActiveDealingRange and not (compactMode and mobileHideInternalRange)
 displayPremiumDiscount = showPremiumDiscount and displayDealingRange
 displayKillzoneVisual = showKillzoneVisual and not (compactMode and mobileHideTrendBackground)
 effectiveMaxObZones = compactMode ? math.min(maxObZones, mobileMaxObVisible) : maxObZones
@@ -232,8 +233,8 @@ f_legHighSince(int sourceBar, int maxBars) =>
 
 f_sessionPreset(string sessionMode, string customSession) =>
     sessionMode == "ICT Asia" ? "2000-0000" :
-         sessionMode == "ICT London" ? "0200-0500" :
-         sessionMode == "ICT New York" ? "0700-1000" : customSession
+         sessionMode == "ICT London" ? "0100-0500" :
+         sessionMode == "ICT New York" ? "0700-1200" : customSession
 
 f_sessionLabel(string sessionMode, string effectiveSession) =>
     sessionMode == "Custom" ? "Custom " + effectiveSession : sessionMode
@@ -353,6 +354,9 @@ htfStateText = f_htfStateText(chartTfLabel, ictMinHtfTf, ictMaxHtfTf, effectiveH
 
 if stopOnInvalidTf and tfPairInvalid
     runtime.error(not ictChartTfValid ? "Invalid ICT chart timeframe: " + chartTfLabel + ". Use an execution timeframe from 1m up to 1D." : "Invalid ICT TF pairing: chart " + chartTfLabel + " requires HTF inside " + ictMinHtfTf + "-" + ictMaxHtfTf + ", but manual override uses " + htfTf + ".")
+
+if strictIctMode and strictRequireKillzone and not timeframe.isintraday
+    runtime.error("Strict ICT killzone requires an intraday chart timeframe.")
 
 f_trimFvg() =>
     if array.size(fvgBoxes) > effectiveMaxFvgZones
@@ -684,8 +688,8 @@ if array.size(fvgBoxes) > 0
 
 bullSequenceValid = not na(lastSellSideSweepBar) and not na(lastBullFvgBar) and (bar_index - lastSellSideSweepBar) <= obValidationLookback and (bar_index - lastBullFvgBar) <= obValidationLookback and lastBullFvgBar >= lastSellSideSweepBar
 bearSequenceValid = not na(lastBuySideSweepBar) and not na(lastBearFvgBar) and (bar_index - lastBuySideSweepBar) <= obValidationLookback and (bar_index - lastBearFvgBar) <= obValidationLookback and lastBearFvgBar >= lastBuySideSweepBar
-recentBullDisplacement = not na(lastBullDisplacementBar) and (bar_index - lastBullDisplacementBar) <= strictMssLookback
-recentBearDisplacement = not na(lastBearDisplacementBar) and (bar_index - lastBearDisplacementBar) <= strictMssLookback
+recentBullDisplacement = not na(lastBullDisplacementBar) and (bar_index - lastBullDisplacementBar) <= engineDisplacementLookback
+recentBearDisplacement = not na(lastBearDisplacementBar) and (bar_index - lastBearDisplacementBar) <= engineDisplacementLookback
 bullMssLevel = not na(protectedHigh) ? protectedHigh : lastSwingHigh
 bearMssLevel = not na(protectedLow) ? protectedLow : lastSwingLow
 bullMss = not na(bullMssLevel) and trendBias != 1 and f_breakUp(bullMssLevel) and bullSequenceValid and recentBullDisplacement
@@ -695,6 +699,7 @@ bearBos = trendBias == -1 and bearBreak
 
 if bullMss or bullBos
     bool resetBullLeg = bullMss or trendBias != 1
+    int bullSourceBar = resetBullLeg ? (bullSequenceValid ? lastSellSideSweepBar : na(protectedLowBar) ? lastSwingLowBar : protectedLowBar) : bullLegStartBar
     float bullEventLevel = bullMss ? bullMssLevel : lastSwingHigh
     int bullEventBar = bullMss and not na(protectedHighBar) ? protectedHighBar : lastSwingHighBar
     f_drawStructureEvent(bullEventBar, bullEventLevel, bullMss ? "MSS" : "BOS", true)
@@ -703,9 +708,9 @@ if bullMss or bullBos
     lastHighBroken := true
     if bullMss
         lastBullMssBar := bar_index
-    bullLegLow := bullSequenceValid ? f_legLowSince(lastSellSideSweepBar, legSearchBars) : na(protectedLow) ? lastSwingLow : protectedLow
-    bullLegHigh := high
-    bullLegStartBar := bullSequenceValid ? lastSellSideSweepBar : na(protectedLowBar) ? lastSwingLowBar : protectedLowBar
+    bullLegStartBar := bullSourceBar
+    bullLegLow := f_legLowSince(bullLegStartBar, legSearchBars)
+    bullLegHigh := f_legHighSince(bullLegStartBar, legSearchBars)
     bullLegEndBar := bar_index
     bullLegHasSweep := resetBullLeg ? bullSequenceValid : (bullLegHasSweep or bullSequenceValid)
     bullLegHasDisplacement := resetBullLeg ? recentBullDisplacement : (bullLegHasDisplacement or recentBullDisplacement)
@@ -719,6 +724,7 @@ if bullMss or bullBos
 
 if bearMss or bearBos
     bool resetBearLeg = bearMss or trendBias != -1
+    int bearSourceBar = resetBearLeg ? (bearSequenceValid ? lastBuySideSweepBar : na(protectedHighBar) ? lastSwingHighBar : protectedHighBar) : bearLegStartBar
     float bearEventLevel = bearMss ? bearMssLevel : lastSwingLow
     int bearEventBar = bearMss and not na(protectedLowBar) ? protectedLowBar : lastSwingLowBar
     f_drawStructureEvent(bearEventBar, bearEventLevel, bearMss ? "MSS" : "BOS", false)
@@ -727,9 +733,9 @@ if bearMss or bearBos
     lastLowBroken := true
     if bearMss
         lastBearMssBar := bar_index
-    bearLegHigh := bearSequenceValid ? f_legHighSince(lastBuySideSweepBar, legSearchBars) : na(protectedHigh) ? lastSwingHigh : protectedHigh
-    bearLegLow := low
-    bearLegStartBar := bearSequenceValid ? lastBuySideSweepBar : na(protectedHighBar) ? lastSwingHighBar : protectedHighBar
+    bearLegStartBar := bearSourceBar
+    bearLegHigh := f_legHighSince(bearLegStartBar, legSearchBars)
+    bearLegLow := f_legLowSince(bearLegStartBar, legSearchBars)
     bearLegEndBar := bar_index
     bearLegHasSweep := resetBearLeg ? bearSequenceValid : (bearLegHasSweep or bearSequenceValid)
     bearLegHasDisplacement := resetBearLeg ? recentBearDisplacement : (bearLegHasDisplacement or recentBearDisplacement)
@@ -863,8 +869,8 @@ oteShortBottom = not na(bearDealingRangeSize) and bearDealingRangeSize > 0 ? bea
 activeRangeHigh = activeBias == 1 ? bullDealingRangeHigh : activeBias == -1 ? bearDealingRangeHigh : na
 activeRangeLow = activeBias == 1 ? bullDealingRangeLow : activeBias == -1 ? bearDealingRangeLow : na
 activeRangeEquilibrium = activeBias == 1 ? bullEquilibrium : activeBias == -1 ? bearEquilibrium : na
-activeProtectedHigh = protectedHigh
-activeProtectedLow = protectedLow
+activeProtectedHigh = activeBias == -1 ? protectedHigh : na
+activeProtectedLow = activeBias == 1 ? protectedLow : na
 activeRangeLabel = activeBias == 1 ? "Bull Leg" : activeBias == -1 ? "Bear Leg" : "Range"
 
 //------------------------------------------------------------------------------
@@ -1050,7 +1056,7 @@ bool strictLongSweepPass = not strictIctMode or bullLegHasSweep
 bool strictLongMssPass = not strictIctMode or (bullLegHasMss and not na(lastBullMssBar) and activeBias == 1)
 bool strictLongPdPass = not strictIctMode or (not strictRequirePd or (not na(tradeLongValidTop) and not na(bullEquilibrium) and f_zoneMid(tradeLongValidTop, tradeLongValidBottom) < bullEquilibrium))
 bool strictLongOtePass = not strictIctMode or (not strictRequireOte or f_zoneIntersects(tradeLongValidTop, tradeLongValidBottom, oteLongTop, oteLongBottom))
-bool strictLongKillzonePass = not strictIctMode or (not strictRequireKillzone or not timeframe.isintraday or strictKillzoneActive)
+bool strictLongKillzonePass = not strictIctMode or (not strictRequireKillzone or strictKillzoneActive)
 bool strictLongContextPass = strictLongBiasPass and strictLongSweepPass and strictLongMssPass and strictLongPdPass and strictLongOtePass
 string strictLongMap = strictIctMode ? f_strictChecklist(strictLongBiasPass, strictLongSweepPass, strictLongMssPass, strictLongPdPass, strictLongOtePass, strictLongKillzonePass, false) : "Off"
 string strictLongMapCompact = strictIctMode ? f_strictChecklist(strictLongBiasPass, strictLongSweepPass, strictLongMssPass, strictLongPdPass, strictLongOtePass, strictLongKillzonePass, true) : "Off"
@@ -1077,7 +1083,7 @@ bool strictShortSweepPass = not strictIctMode or bearLegHasSweep
 bool strictShortMssPass = not strictIctMode or (bearLegHasMss and not na(lastBearMssBar) and activeBias == -1)
 bool strictShortPdPass = not strictIctMode or (not strictRequirePd or (not na(tradeShortValidTop) and not na(bearEquilibrium) and f_zoneMid(tradeShortValidTop, tradeShortValidBottom) > bearEquilibrium))
 bool strictShortOtePass = not strictIctMode or (not strictRequireOte or f_zoneIntersects(tradeShortValidTop, tradeShortValidBottom, oteShortTop, oteShortBottom))
-bool strictShortKillzonePass = not strictIctMode or (not strictRequireKillzone or not timeframe.isintraday or strictKillzoneActive)
+bool strictShortKillzonePass = not strictIctMode or (not strictRequireKillzone or strictKillzoneActive)
 bool strictShortContextPass = strictShortBiasPass and strictShortSweepPass and strictShortMssPass and strictShortPdPass and strictShortOtePass
 string strictShortMap = strictIctMode ? f_strictChecklist(strictShortBiasPass, strictShortSweepPass, strictShortMssPass, strictShortPdPass, strictShortOtePass, strictShortKillzonePass, false) : "Off"
 string strictShortMapCompact = strictIctMode ? f_strictChecklist(strictShortBiasPass, strictShortSweepPass, strictShortMssPass, strictShortPdPass, strictShortOtePass, strictShortKillzonePass, true) : "Off"
@@ -1096,10 +1102,10 @@ bool shortHtfAligned = htfBias == -1
 bool longDisplacementSeen = bullLegHasDisplacement or recentBullFvg or (not na(lastBullDisplacementBar) and bar_index - lastBullDisplacementBar <= obValidationLookback)
 bool shortDisplacementSeen = bearLegHasDisplacement or recentBearFvg or (not na(lastBearDisplacementBar) and bar_index - lastBearDisplacementBar <= obValidationLookback)
 
-float longConfidence = f_setupScore(not na(tradeLongEntry), longBiasAligned, longHtfAligned, recentSellSideSweep, longDisplacementSeen, tradeLongIsOb, latestBullZoneIsBreaker, tradeLongIsFvg, bullishIdm, longPriceInZone, longPriceNearZone, longRr, longFresh, longManaged, strictIctMode, strictLongContextPass, strictLongKillzonePass, longReplaced, longChased, longExpired, longInvalidated)
+float longConfidence = f_setupScore(not na(tradeLongEntry), longBiasAligned, longHtfAligned, bullLegHasSweep, longDisplacementSeen, tradeLongIsOb, latestBullZoneIsBreaker, tradeLongIsFvg, bullishIdm, longPriceInZone, longPriceNearZone, longRr, longFresh, longManaged, strictIctMode, strictLongContextPass, strictLongKillzonePass, longReplaced, longChased, longExpired, longInvalidated)
 float longTpProbability = f_tpProbability(longConfidence, longRr, longPriceInZone, longPriceNearZone, longManaged, strictIctMode, strictLongContextPass, strictLongKillzonePass, longChased, longExpired, longInvalidated)
 
-float shortConfidence = f_setupScore(not na(tradeShortEntry), shortBiasAligned, shortHtfAligned, recentBuySideSweep, shortDisplacementSeen, tradeShortIsOb, latestBearZoneIsBreaker, tradeShortIsFvg, bearishIdm, shortPriceInZone, shortPriceNearZone, shortRr, shortFresh, shortManaged, strictIctMode, strictShortContextPass, strictShortKillzonePass, shortReplaced, shortChased, shortExpired, shortInvalidated)
+float shortConfidence = f_setupScore(not na(tradeShortEntry), shortBiasAligned, shortHtfAligned, bearLegHasSweep, shortDisplacementSeen, tradeShortIsOb, latestBearZoneIsBreaker, tradeShortIsFvg, bearishIdm, shortPriceInZone, shortPriceNearZone, shortRr, shortFresh, shortManaged, strictIctMode, strictShortContextPass, strictShortKillzonePass, shortReplaced, shortChased, shortExpired, shortInvalidated)
 float shortTpProbability = f_tpProbability(shortConfidence, shortRr, shortPriceInZone, shortPriceNearZone, shortManaged, strictIctMode, strictShortContextPass, strictShortKillzonePass, shortChased, shortExpired, shortInvalidated)
 
 string preferredDirection = "Wait"
