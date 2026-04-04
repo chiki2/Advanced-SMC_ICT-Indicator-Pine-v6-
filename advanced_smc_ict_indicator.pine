@@ -110,18 +110,22 @@ equalTolerance = atr * equalToleranceAtr
 compactMode = androidCompactMode
 compactDashboardMode = androidCompactMode and mobileCompactDashboard
 displayStructureLabels = showStructureLabels and not (compactMode and mobileHideStructureLabels)
-displayTrendlineLiquidity = showTrendlineLiquidity and not (compactMode and mobileHideTrendlineLiquidity)
+displayTrendlineLiquidity = showLiquidity and showTrendlineLiquidity and not (compactMode and mobileHideTrendlineLiquidity)
 displayInternalRange = showInternalRange and not (compactMode and mobileHideInternalRange)
+displayEqLiquidity = showLiquidity
+displaySweepMarkers = showLiquidity and showSweeps
 displayTrendBackground = showTrendBackground and not (compactMode and mobileHideTrendBackground)
 displayWeekMonthLiquidity = showHigherPeriodLiquidity and not (compactMode and mobileHideSecondaryLiquidity)
 displayProtectedLevels = showProtectedLevels and not compactMode
-displayDealingRange = showActiveDealingRange and not (compactMode and mobileHideInternalRange)
+displayDealingRange = displayInternalRange and showActiveDealingRange
 displayPremiumDiscount = showPremiumDiscount and displayDealingRange
 displayKillzoneVisual = showKillzoneVisual and not (compactMode and mobileHideTrendBackground)
 
 //------------------------------------------------------------------------------
 // Stateful arrays for FVG / OB tracking
 //------------------------------------------------------------------------------
+liquidityLinkLimit = 80
+
 var box[] fvgBoxes = array.new_box()
 var float[] fvgTops = array.new_float()
 var float[] fvgBottoms = array.new_float()
@@ -140,6 +144,8 @@ var label[] obLabels = array.new_label()
 var int[] obCreatedBars = array.new_int()
 var bool[] obTouched = array.new_bool()
 var float[] obEntries = array.new_float()
+var line[] eqHighLines = array.new_line()
+var line[] eqLowLines = array.new_line()
 
 f_breakUp(float level) =>
     breakMode == "Full Body Through" ? bodyLow > level : close > level
@@ -290,6 +296,16 @@ f_nearestBelow(float entry, float level1, float level2, float level3, float leve
     target := f_selectBelow(entry, target, level7)
     target
 
+f_levelChanged(float currentLevel, float previousLevel) =>
+    na(currentLevel) != na(previousLevel) ? true : na(currentLevel) ? false : math.abs(currentLevel - previousLevel) > syminfo.mintick * 0.5
+
+f_horizontalLevel(float level, bool enabled) =>
+    float result = na
+    if enabled and not na(level)
+        bool changed = f_levelChanged(level, level[1])
+        result := changed and not na(level[1]) ? na : level
+    result
+
 f_strictChecklist(bool biasPass, bool sweepPass, bool mssPass, bool pdPass, bool otePass, bool kzPass, bool compactText) =>
     compactText ? "B" + f_boolFlag(biasPass) + " S" + f_boolFlag(sweepPass) + " M" + f_boolFlag(mssPass) + " P" + f_boolFlag(pdPass) + " O" + f_boolFlag(otePass) + " K" + f_boolFlag(kzPass) : "B:" + f_boolFlag(biasPass) + " S:" + f_boolFlag(sweepPass) + " M:" + f_boolFlag(mssPass) + " PD:" + f_boolFlag(pdPass) + " OTE:" + f_boolFlag(otePass) + " KZ:" + f_boolFlag(kzPass)
 
@@ -411,6 +427,17 @@ f_trimOb() =>
         array.shift(obCreatedBars)
         array.shift(obTouched)
         array.shift(obEntries)
+
+f_trimLineArray(array<line> lineArray, int maxCount) =>
+    while array.size(lineArray) > maxCount
+        oldLine = array.shift(lineArray)
+        if not na(oldLine)
+            line.delete(oldLine)
+
+f_addLiquidityLink(array<line> lineArray, int x1, float y1, int x2, float y2, color lineColor) =>
+    line newLine = line.new(x1=x1, y1=y1, x2=x2, y2=y2, xloc=xloc.bar_index, color=lineColor, style=line.style_dotted)
+    array.push(lineArray, newLine)
+    f_trimLineArray(lineArray, liquidityLinkLimit)
 
 f_drawStructureEvent(int fromBar, float level, string eventText, bool isBull) =>
     if showBosChoch and not na(fromBar)
@@ -560,7 +587,8 @@ if not na(pivotHigh)
         label.new(x=pBar, y=pPrice, xloc=xloc.bar_index, text=structureText, style=label.style_label_down, color=color.new(liqHighColor, 0), textcolor=color.white, size=size.tiny)
     if structureText == "EQH" and not na(lastSwingHighBar)
         latestEqh := math.max(pPrice, lastSwingHigh)
-        line.new(x1=lastSwingHighBar, y1=lastSwingHigh, x2=pBar, y2=pPrice, xloc=xloc.bar_index, color=color.new(liqHighColor, 15), style=line.style_dotted)
+        if displayEqLiquidity
+            f_addLiquidityLink(eqHighLines, lastSwingHighBar, lastSwingHigh, pBar, pPrice, color.new(liqHighColor, 15))
     prevSwingHigh := lastSwingHigh
     prevSwingHighBar := lastSwingHighBar
     lastSwingHigh := pPrice
@@ -580,7 +608,8 @@ if not na(pivotLow)
         label.new(x=pBar, y=pPrice, xloc=xloc.bar_index, text=structureText, style=label.style_label_up, color=color.new(liqLowColor, 0), textcolor=color.white, size=size.tiny)
     if structureText == "EQL" and not na(lastSwingLowBar)
         latestEql := math.min(pPrice, lastSwingLow)
-        line.new(x1=lastSwingLowBar, y1=lastSwingLow, x2=pBar, y2=pPrice, xloc=xloc.bar_index, color=color.new(liqLowColor, 15), style=line.style_dotted)
+        if displayEqLiquidity
+            f_addLiquidityLink(eqLowLines, lastSwingLowBar, lastSwingLow, pBar, pPrice, color.new(liqLowColor, 15))
     prevSwingLow := lastSwingLow
     prevSwingLowBar := lastSwingLowBar
     lastSwingLow := pPrice
@@ -614,8 +643,8 @@ buySideSweep = (not na(lastSwingHigh) and high > lastSwingHigh and not f_breakUp
      (not na(latestEqh) and high > latestEqh and close < latestEqh) or
      (useTrendlineLiquidityInEngine and not na(bearTrendlinePrice) and high > bearTrendlinePrice and close < bearTrendlinePrice)
 
-plotshape(showSweeps and sellSideSweep, title="Sell-side liquidity sweep", style=shape.triangleup, location=location.belowbar, color=bullColor, size=size.tiny, text="Sweep")
-plotshape(showSweeps and buySideSweep, title="Buy-side liquidity sweep", style=shape.triangledown, location=location.abovebar, color=bearColor, size=size.tiny, text="Sweep")
+plotshape(displaySweepMarkers and sellSideSweep, title="Sell-side liquidity sweep", style=shape.triangleup, location=location.belowbar, color=bullColor, size=size.tiny, text="Sweep")
+plotshape(displaySweepMarkers and buySideSweep, title="Buy-side liquidity sweep", style=shape.triangledown, location=location.abovebar, color=bearColor, size=size.tiny, text="Sweep")
 
 var int lastSellSideSweepBar = na
 var int lastBuySideSweepBar = na
@@ -1183,21 +1212,35 @@ bearStop = not na(tradeShortStop) ? tradeShortStop : not na(lastSwingHigh) ? las
 //------------------------------------------------------------------------------
 // Plots
 //------------------------------------------------------------------------------
-plotPrevSessionHigh = plot(showLiquidity and showPrevSession ? prevSessionHigh : na, "Prev Session High", color=color.new(liqHighColor, 20), linewidth=1, style=plot.style_linebr)
-plotPrevSessionLow = plot(showLiquidity and showPrevSession ? prevSessionLow : na, "Prev Session Low", color=color.new(liqLowColor, 20), linewidth=1, style=plot.style_linebr)
-plotPrevDayHigh = plot(showLiquidity and showHigherPeriodLiquidity ? prevDayHigh : na, "PDH", color=color.new(liqHighColor, 0), linewidth=1, style=plot.style_linebr)
-plotPrevDayLow = plot(showLiquidity and showHigherPeriodLiquidity ? prevDayLow : na, "PDL", color=color.new(liqLowColor, 0), linewidth=1, style=plot.style_linebr)
-plotPrevWeekHigh = plot(showLiquidity and displayWeekMonthLiquidity ? prevWeekHigh : na, "PWH", color=color.new(liqHighColor, 30), linewidth=1, style=plot.style_linebr)
-plotPrevWeekLow = plot(showLiquidity and displayWeekMonthLiquidity ? prevWeekLow : na, "PWL", color=color.new(liqLowColor, 30), linewidth=1, style=plot.style_linebr)
-plotPrevMonthHigh = plot(showLiquidity and displayWeekMonthLiquidity ? prevMonthHigh : na, "PMH", color=color.new(liqHighColor, 55), linewidth=1, style=plot.style_linebr)
-plotPrevMonthLow = plot(showLiquidity and displayWeekMonthLiquidity ? prevMonthLow : na, "PML", color=color.new(liqLowColor, 55), linewidth=1, style=plot.style_linebr)
+prevSessionHighLevel = f_horizontalLevel(prevSessionHigh, showLiquidity and showPrevSession)
+prevSessionLowLevel = f_horizontalLevel(prevSessionLow, showLiquidity and showPrevSession)
+prevDayHighLevel = f_horizontalLevel(prevDayHigh, showLiquidity and showHigherPeriodLiquidity)
+prevDayLowLevel = f_horizontalLevel(prevDayLow, showLiquidity and showHigherPeriodLiquidity)
+prevWeekHighLevel = f_horizontalLevel(prevWeekHigh, showLiquidity and displayWeekMonthLiquidity)
+prevWeekLowLevel = f_horizontalLevel(prevWeekLow, showLiquidity and displayWeekMonthLiquidity)
+prevMonthHighLevel = f_horizontalLevel(prevMonthHigh, showLiquidity and displayWeekMonthLiquidity)
+prevMonthLowLevel = f_horizontalLevel(prevMonthLow, showLiquidity and displayWeekMonthLiquidity)
+protectedHighLevel = f_horizontalLevel(activeProtectedHigh, showLiquidity and displayProtectedLevels)
+protectedLowLevel = f_horizontalLevel(activeProtectedLow, showLiquidity and displayProtectedLevels)
+internalHighLevel = f_horizontalLevel(activeRangeHigh, showLiquidity and displayDealingRange)
+internalLowLevel = f_horizontalLevel(activeRangeLow, showLiquidity and displayDealingRange)
+internalEqLevel = f_horizontalLevel(activeRangeEquilibrium, showLiquidity and displayDealingRange)
 
-protectedHighPlot = plot(showLiquidity and displayProtectedLevels ? activeProtectedHigh : na, "Protected High", color=color.new(liqHighColor, 8), linewidth=2, style=plot.style_linebr)
-protectedLowPlot = plot(showLiquidity and displayProtectedLevels ? activeProtectedLow : na, "Protected Low", color=color.new(liqLowColor, 8), linewidth=2, style=plot.style_linebr)
+plotPrevSessionHigh = plot(prevSessionHighLevel, "Prev Session High", color=color.new(liqHighColor, 20), linewidth=1, style=plot.style_linebr)
+plotPrevSessionLow = plot(prevSessionLowLevel, "Prev Session Low", color=color.new(liqLowColor, 20), linewidth=1, style=plot.style_linebr)
+plotPrevDayHigh = plot(prevDayHighLevel, "PDH", color=color.new(liqHighColor, 0), linewidth=1, style=plot.style_linebr)
+plotPrevDayLow = plot(prevDayLowLevel, "PDL", color=color.new(liqLowColor, 0), linewidth=1, style=plot.style_linebr)
+plotPrevWeekHigh = plot(prevWeekHighLevel, "PWH", color=color.new(liqHighColor, 30), linewidth=1, style=plot.style_linebr)
+plotPrevWeekLow = plot(prevWeekLowLevel, "PWL", color=color.new(liqLowColor, 30), linewidth=1, style=plot.style_linebr)
+plotPrevMonthHigh = plot(prevMonthHighLevel, "PMH", color=color.new(liqHighColor, 55), linewidth=1, style=plot.style_linebr)
+plotPrevMonthLow = plot(prevMonthLowLevel, "PML", color=color.new(liqLowColor, 55), linewidth=1, style=plot.style_linebr)
 
-internalHighPlot = plot(showLiquidity and displayDealingRange ? activeRangeHigh : na, "ICT Dealing Range High", color=color.new(color.silver, 20), linewidth=1, style=plot.style_linebr)
-internalLowPlot = plot(showLiquidity and displayDealingRange ? activeRangeLow : na, "ICT Dealing Range Low", color=color.new(color.silver, 20), linewidth=1, style=plot.style_linebr)
-internalEqPlot = plot(showLiquidity and displayDealingRange ? activeRangeEquilibrium : na, "ICT Equilibrium", color=color.new(neutralColor, 20), linewidth=1, style=plot.style_linebr)
+protectedHighPlot = plot(protectedHighLevel, "Protected High", color=color.new(liqHighColor, 8), linewidth=2, style=plot.style_linebr)
+protectedLowPlot = plot(protectedLowLevel, "Protected Low", color=color.new(liqLowColor, 8), linewidth=2, style=plot.style_linebr)
+
+internalHighPlot = plot(internalHighLevel, "ICT Dealing Range High", color=color.new(color.silver, 20), linewidth=1, style=plot.style_linebr)
+internalLowPlot = plot(internalLowLevel, "ICT Dealing Range Low", color=color.new(color.silver, 20), linewidth=1, style=plot.style_linebr)
+internalEqPlot = plot(internalEqLevel, "ICT Equilibrium", color=color.new(neutralColor, 20), linewidth=1, style=plot.style_linebr)
 fill(internalHighPlot, internalLowPlot, color=showLiquidity and displayDealingRange ? color.new(color.silver, 95) : na)
 fill(internalHighPlot, internalEqPlot, color=showLiquidity and displayPremiumDiscount ? color.new(bearColor, 90) : na)
 fill(internalEqPlot, internalLowPlot, color=showLiquidity and displayPremiumDiscount ? color.new(bullColor, 90) : na)
