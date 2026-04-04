@@ -111,7 +111,8 @@ equalTolerance = atr * equalToleranceAtr
 compactMode = androidCompactMode
 compactDashboardMode = androidCompactMode and mobileCompactDashboard
 displayStructureLabels = showStructureLabels and not (compactMode and mobileHideStructureLabels)
-displayTrendlineLiquidity = showLiquidity and showTrendlineLiquidity and not (compactMode and mobileHideTrendlineLiquidity)
+// Trendline liquidity stays in the engine, but visual liquidity is forced horizontal-only.
+displayTrendlineLiquidity = false
 displayInternalRange = showInternalRange and not (compactMode and mobileHideInternalRange)
 displayEqLiquidity = showLiquidity
 displaySweepMarkers = showLiquidity and showSweeps
@@ -125,8 +126,6 @@ displayKillzoneVisual = showKillzoneVisual and not (compactMode and mobileHideTr
 //------------------------------------------------------------------------------
 // Stateful arrays for FVG / OB tracking
 //------------------------------------------------------------------------------
-liquidityLinkLimit = 80
-
 var box[] fvgBoxes = array.new_box()
 var float[] fvgTops = array.new_float()
 var float[] fvgBottoms = array.new_float()
@@ -145,8 +144,6 @@ var label[] obLabels = array.new_label()
 var int[] obCreatedBars = array.new_int()
 var bool[] obTouched = array.new_bool()
 var float[] obEntries = array.new_float()
-var line[] eqHighLines = array.new_line()
-var line[] eqLowLines = array.new_line()
 var label prevSessionHighLabel = na
 var label prevSessionLowLabel = na
 var label prevDayHighLabel = na
@@ -155,6 +152,8 @@ var label prevWeekHighLabel = na
 var label prevWeekLowLabel = na
 var label prevMonthHighLabel = na
 var label prevMonthLowLabel = na
+var label eqHighLabel = na
+var label eqLowLabel = na
 var label protectedHighLabel = na
 var label protectedLowLabel = na
 var label internalHighLabel = na
@@ -460,17 +459,6 @@ f_trimOb() =>
         array.shift(obTouched)
         array.shift(obEntries)
 
-f_trimLineArray(array<line> lineArray, int maxCount) =>
-    while array.size(lineArray) > maxCount
-        oldLine = array.shift(lineArray)
-        if not na(oldLine)
-            line.delete(oldLine)
-
-f_addLiquidityLink(array<line> lineArray, int x1, float y1, int x2, float y2, color lineColor) =>
-    line newLine = line.new(x1=x1, y1=y1, x2=x2, y2=y2, xloc=xloc.bar_index, color=lineColor, style=line.style_dotted)
-    array.push(lineArray, newLine)
-    f_trimLineArray(lineArray, liquidityLinkLimit)
-
 f_drawStructureEvent(int fromBar, float level, string eventText, bool isBull) =>
     if showBosChoch and not na(fromBar)
         eventColor = isBull ? bullColor : bearColor
@@ -619,8 +607,6 @@ if not na(pivotHigh)
         label.new(x=pBar, y=pPrice, xloc=xloc.bar_index, text=structureText, style=label.style_label_down, color=color.new(liqHighColor, 0), textcolor=color.white, size=size.tiny)
     if structureText == "EQH" and not na(lastSwingHighBar)
         latestEqh := math.max(pPrice, lastSwingHigh)
-        if displayEqLiquidity
-            f_addLiquidityLink(eqHighLines, lastSwingHighBar, lastSwingHigh, pBar, pPrice, color.new(liqHighColor, 15))
     prevSwingHigh := lastSwingHigh
     prevSwingHighBar := lastSwingHighBar
     lastSwingHigh := pPrice
@@ -640,8 +626,6 @@ if not na(pivotLow)
         label.new(x=pBar, y=pPrice, xloc=xloc.bar_index, text=structureText, style=label.style_label_up, color=color.new(liqLowColor, 0), textcolor=color.white, size=size.tiny)
     if structureText == "EQL" and not na(lastSwingLowBar)
         latestEql := math.min(pPrice, lastSwingLow)
-        if displayEqLiquidity
-            f_addLiquidityLink(eqLowLines, lastSwingLowBar, lastSwingLow, pBar, pPrice, color.new(liqLowColor, 15))
     prevSwingLow := lastSwingLow
     prevSwingLowBar := lastSwingLowBar
     lastSwingLow := pPrice
@@ -1252,6 +1236,8 @@ prevWeekHighLevel = f_horizontalLevel(prevWeekHigh, showLiquidity and displayWee
 prevWeekLowLevel = f_horizontalLevel(prevWeekLow, showLiquidity and displayWeekMonthLiquidity)
 prevMonthHighLevel = f_horizontalLevel(prevMonthHigh, showLiquidity and displayWeekMonthLiquidity)
 prevMonthLowLevel = f_horizontalLevel(prevMonthLow, showLiquidity and displayWeekMonthLiquidity)
+eqHighLevel = f_horizontalLevel(latestEqh, showLiquidity and displayEqLiquidity)
+eqLowLevel = f_horizontalLevel(latestEql, showLiquidity and displayEqLiquidity)
 protectedHighLevel = f_horizontalLevel(activeProtectedHigh, showLiquidity and displayProtectedLevels)
 protectedLowLevel = f_horizontalLevel(activeProtectedLow, showLiquidity and displayProtectedLevels)
 internalHighLevel = f_horizontalLevel(activeRangeHigh, showLiquidity and displayDealingRange)
@@ -1266,6 +1252,8 @@ plotPrevWeekHigh = plot(prevWeekHighLevel, "PWH", color=color.new(liqHighColor, 
 plotPrevWeekLow = plot(prevWeekLowLevel, "PWL", color=color.new(liqLowColor, 30), linewidth=1, style=plot.style_linebr)
 plotPrevMonthHigh = plot(prevMonthHighLevel, "PMH", color=color.new(liqHighColor, 55), linewidth=1, style=plot.style_linebr)
 plotPrevMonthLow = plot(prevMonthLowLevel, "PML", color=color.new(liqLowColor, 55), linewidth=1, style=plot.style_linebr)
+plotEqHigh = plot(eqHighLevel, "EQH Liquidity", color=color.new(liqHighColor, 12), linewidth=1, style=plot.style_linebr)
+plotEqLow = plot(eqLowLevel, "EQL Liquidity", color=color.new(liqLowColor, 12), linewidth=1, style=plot.style_linebr)
 
 protectedHighPlot = plot(protectedHighLevel, "Protected High", color=color.new(liqHighColor, 8), linewidth=2, style=plot.style_linebr)
 protectedLowPlot = plot(protectedLowLevel, "Protected Low", color=color.new(liqLowColor, 8), linewidth=2, style=plot.style_linebr)
@@ -1273,9 +1261,6 @@ protectedLowPlot = plot(protectedLowLevel, "Protected Low", color=color.new(liqL
 internalHighPlot = plot(internalHighLevel, "ICT Dealing Range High", color=color.new(color.silver, 20), linewidth=1, style=plot.style_linebr)
 internalLowPlot = plot(internalLowLevel, "ICT Dealing Range Low", color=color.new(color.silver, 20), linewidth=1, style=plot.style_linebr)
 internalEqPlot = plot(internalEqLevel, "ICT Equilibrium", color=color.new(neutralColor, 20), linewidth=1, style=plot.style_linebr)
-fill(internalHighPlot, internalLowPlot, color=showLiquidity and displayDealingRange ? color.new(color.silver, 95) : na)
-fill(internalHighPlot, internalEqPlot, color=showLiquidity and displayPremiumDiscount ? color.new(bearColor, 90) : na)
-fill(internalEqPlot, internalLowPlot, color=showLiquidity and displayPremiumDiscount ? color.new(bullColor, 90) : na)
 
 if barstate.islast
     bool rightEdgeLiquidityLabels = showLiquidityRightLabels
@@ -1287,6 +1272,8 @@ if barstate.islast
     prevWeekLowLabel := f_syncRightEdgeLabel(prevWeekLowLabel, prevWeekLow, "PWL", color.new(liqLowColor, 20), color.white, rightEdgeLiquidityLabels and showLiquidity and displayWeekMonthLiquidity)
     prevMonthHighLabel := f_syncRightEdgeLabel(prevMonthHighLabel, prevMonthHigh, "PMH", color.new(liqHighColor, 35), color.white, rightEdgeLiquidityLabels and showLiquidity and displayWeekMonthLiquidity)
     prevMonthLowLabel := f_syncRightEdgeLabel(prevMonthLowLabel, prevMonthLow, "PML", color.new(liqLowColor, 35), color.white, rightEdgeLiquidityLabels and showLiquidity and displayWeekMonthLiquidity)
+    eqHighLabel := f_syncRightEdgeLabel(eqHighLabel, latestEqh, "EQH", color.new(liqHighColor, 12), color.white, rightEdgeLiquidityLabels and showLiquidity and displayEqLiquidity)
+    eqLowLabel := f_syncRightEdgeLabel(eqLowLabel, latestEql, "EQL", color.new(liqLowColor, 12), color.white, rightEdgeLiquidityLabels and showLiquidity and displayEqLiquidity)
     protectedHighLabel := f_syncRightEdgeLabel(protectedHighLabel, activeProtectedHigh, "Prot H", color.new(liqHighColor, 8), color.white, rightEdgeLiquidityLabels and showLiquidity and displayProtectedLevels)
     protectedLowLabel := f_syncRightEdgeLabel(protectedLowLabel, activeProtectedLow, "Prot L", color.new(liqLowColor, 8), color.white, rightEdgeLiquidityLabels and showLiquidity and displayProtectedLevels)
     internalHighLabel := f_syncRightEdgeLabel(internalHighLabel, activeRangeHigh, "Range H", color.new(color.silver, 10), color.black, rightEdgeLiquidityLabels and showLiquidity and displayDealingRange)
