@@ -21,6 +21,9 @@ showHigherPeriodLiquidity = input.bool(true, "Show previous day / week / month h
 showInternalRange = input.bool(true, "Show internal range liquidity", group=groupLiquidity)
 showTrendlineLiquidity = input.bool(true, "Show trendline liquidity", group=groupLiquidity)
 showSweeps = input.bool(true, "Show liquidity sweep markers", group=groupLiquidity)
+usePrevSessionInEngine = input.bool(true, "Use previous session liquidity in engine", group=groupLiquidity)
+useHigherPeriodLiquidityInEngine = input.bool(true, "Use previous day / week / month liquidity in engine", group=groupLiquidity)
+useTrendlineLiquidityInEngine = input.bool(true, "Use trendline liquidity in engine", group=groupLiquidity)
 liquiditySessionMode = input.string("ICT Asia", "Liquidity session source", options=["ICT Asia", "ICT London", "ICT New York", "Custom"], group=groupLiquidity)
 sessionInput = input.session("0000-2359", "Session for previous session liquidity", group=groupLiquidity)
 ictSessionTimezone = input.string("America/New_York", "ICT session timezone", group=groupLiquidity)
@@ -140,6 +143,7 @@ var bool[] obBreaker = array.new_bool()
 var label[] obLabels = array.new_label()
 var int[] obCreatedBars = array.new_int()
 var bool[] obTouched = array.new_bool()
+var float[] obEntries = array.new_float()
 
 f_breakUp(float level) =>
     breakMode == "Full Body Through" ? bodyLow > level : close > level
@@ -359,11 +363,13 @@ if strictIctMode and strictRequireKillzone and not timeframe.isintraday
     runtime.error("Strict ICT killzone requires an intraday chart timeframe.")
 
 f_trimFvg() =>
-    if array.size(fvgBoxes) > effectiveMaxFvgZones
+    if array.size(fvgBoxes) > maxFvgZones
         oldBox = array.shift(fvgBoxes)
-        box.delete(oldBox)
+        if not na(oldBox)
+            box.delete(oldBox)
         oldLabel = array.shift(fvgLabels)
-        label.delete(oldLabel)
+        if not na(oldLabel)
+            label.delete(oldLabel)
         array.shift(fvgTops)
         array.shift(fvgBottoms)
         array.shift(fvgBull)
@@ -371,19 +377,23 @@ f_trimFvg() =>
         array.shift(fvgTouched)
 
 f_trimOb() =>
-    if array.size(obBoxes) > effectiveMaxObZones
+    if array.size(obBoxes) > maxObZones
         oldBox = array.shift(obBoxes)
-        box.delete(oldBox)
+        if not na(oldBox)
+            box.delete(oldBox)
         oldLine = array.shift(obEntryLines)
-        line.delete(oldLine)
+        if not na(oldLine)
+            line.delete(oldLine)
         oldLabel = array.shift(obLabels)
-        label.delete(oldLabel)
+        if not na(oldLabel)
+            label.delete(oldLabel)
         array.shift(obTops)
         array.shift(obBottoms)
         array.shift(obBull)
         array.shift(obBreaker)
         array.shift(obCreatedBars)
         array.shift(obTouched)
+        array.shift(obEntries)
 
 f_drawStructureEvent(int fromBar, float level, string eventText, bool isBull) =>
     if showBosChoch and not na(fromBar)
@@ -429,39 +439,45 @@ f_obEntry(bool isBull, int shift, float zoneTop, float zoneBottom) =>
     entry
 
 f_addFvg(bool isBull, float zoneTop, float zoneBottom) =>
+    borderClr = isBull ? color.new(bullColor, 30) : color.new(bearColor, 30)
+    fillClr = isBull ? fvgBullColor : fvgBearColor
+    box newBox = na
+    label newLabel = na
     if showFvg
-        borderClr = isBull ? color.new(bullColor, 30) : color.new(bearColor, 30)
-        fillClr = isBull ? fvgBullColor : fvgBearColor
-        newBox = box.new(left=bar_index - 2, top=zoneTop, right=bar_index, bottom=zoneBottom, xloc=xloc.bar_index, extend=extend.right, bgcolor=fillClr, border_color=borderClr)
-        newLabel = label.new(x=bar_index - 2, y=f_zoneMid(zoneTop, zoneBottom), xloc=xloc.bar_index, text=f_fvgLabelText(isBull), style=label.style_label_left, color=color.new(borderClr, 0), textcolor=color.white, size=size.tiny)
-        array.push(fvgBoxes, newBox)
-        array.push(fvgLabels, newLabel)
-        array.push(fvgTops, zoneTop)
-        array.push(fvgBottoms, zoneBottom)
-        array.push(fvgBull, isBull)
-        array.push(fvgCreatedBars, bar_index)
-        array.push(fvgTouched, false)
-        f_trimFvg()
+        newBox := box.new(left=bar_index - 2, top=zoneTop, right=bar_index, bottom=zoneBottom, xloc=xloc.bar_index, extend=extend.right, bgcolor=fillClr, border_color=borderClr)
+        newLabel := label.new(x=bar_index - 2, y=f_zoneMid(zoneTop, zoneBottom), xloc=xloc.bar_index, text=f_fvgLabelText(isBull), style=label.style_label_left, color=color.new(borderClr, 0), textcolor=color.white, size=size.tiny)
+    array.push(fvgBoxes, newBox)
+    array.push(fvgLabels, newLabel)
+    array.push(fvgTops, zoneTop)
+    array.push(fvgBottoms, zoneBottom)
+    array.push(fvgBull, isBull)
+    array.push(fvgCreatedBars, bar_index)
+    array.push(fvgTouched, false)
+    f_trimFvg()
 
 f_addOb(bool isBull, int shift) =>
+    [zoneTop, zoneBottom] = f_obBounds(isBull, shift)
+    entry = f_obEntry(isBull, shift, zoneTop, zoneBottom)
+    zoneColor = isBull ? obBullColor : obBearColor
+    borderClr = isBull ? bullColor : bearColor
+    box newBox = na
+    line newLine = na
+    label newLabel = na
     if showOb
-        [zoneTop, zoneBottom] = f_obBounds(isBull, shift)
-        entry = f_obEntry(isBull, shift, zoneTop, zoneBottom)
-        zoneColor = isBull ? obBullColor : obBearColor
-        borderClr = isBull ? bullColor : bearColor
-        newBox = box.new(left=bar_index - shift, top=zoneTop, right=bar_index, bottom=zoneBottom, xloc=xloc.bar_index, extend=extend.right, bgcolor=zoneColor, border_color=borderClr)
-        newLine = line.new(x1=bar_index - shift, y1=entry, x2=bar_index, y2=entry, xloc=xloc.bar_index, extend=extend.right, color=borderClr, style=line.style_dashed)
-        newLabel = label.new(x=bar_index - shift, y=f_zoneMid(zoneTop, zoneBottom), xloc=xloc.bar_index, text=f_obLabelText(isBull, false), style=label.style_label_left, color=color.new(borderClr, 0), textcolor=color.white, size=size.tiny)
-        array.push(obBoxes, newBox)
-        array.push(obEntryLines, newLine)
-        array.push(obLabels, newLabel)
-        array.push(obTops, zoneTop)
-        array.push(obBottoms, zoneBottom)
-        array.push(obBull, isBull)
-        array.push(obBreaker, false)
-        array.push(obCreatedBars, bar_index)
-        array.push(obTouched, false)
-        f_trimOb()
+        newBox := box.new(left=bar_index - shift, top=zoneTop, right=bar_index, bottom=zoneBottom, xloc=xloc.bar_index, extend=extend.right, bgcolor=zoneColor, border_color=borderClr)
+        newLine := line.new(x1=bar_index - shift, y1=entry, x2=bar_index, y2=entry, xloc=xloc.bar_index, extend=extend.right, color=borderClr, style=line.style_dashed)
+        newLabel := label.new(x=bar_index - shift, y=f_zoneMid(zoneTop, zoneBottom), xloc=xloc.bar_index, text=f_obLabelText(isBull, false), style=label.style_label_left, color=color.new(borderClr, 0), textcolor=color.white, size=size.tiny)
+    array.push(obBoxes, newBox)
+    array.push(obEntryLines, newLine)
+    array.push(obLabels, newLabel)
+    array.push(obTops, zoneTop)
+    array.push(obBottoms, zoneBottom)
+    array.push(obBull, isBull)
+    array.push(obBreaker, false)
+    array.push(obCreatedBars, bar_index)
+    array.push(obTouched, false)
+    array.push(obEntries, entry)
+    f_trimOb()
 
 //------------------------------------------------------------------------------
 // Session liquidity tracking
@@ -533,10 +549,11 @@ if not na(pivotHigh)
     lastSwingHigh := pPrice
     lastSwingHighBar := pBar
     lastHighBroken := false
-    if displayTrendlineLiquidity and not na(prevSwingHigh) and not na(prevSwingHighBar)
+    if (useTrendlineLiquidityInEngine or displayTrendlineLiquidity) and not na(prevSwingHigh) and not na(prevSwingHighBar)
         if not na(bearTrendline)
             line.delete(bearTrendline)
-        bearTrendline := line.new(x1=prevSwingHighBar, y1=prevSwingHigh, x2=lastSwingHighBar, y2=lastSwingHigh, xloc=xloc.bar_index, extend=extend.right, color=color.new(liqHighColor, 30), style=line.style_dashed)
+        trendlineColor = displayTrendlineLiquidity ? color.new(liqHighColor, 30) : color.new(liqHighColor, 100)
+        bearTrendline := line.new(x1=prevSwingHighBar, y1=prevSwingHigh, x2=lastSwingHighBar, y2=lastSwingHigh, xloc=xloc.bar_index, extend=extend.right, color=trendlineColor, style=line.style_dashed)
 
 if not na(pivotLow)
     pBar = bar_index - swingLen
@@ -552,10 +569,11 @@ if not na(pivotLow)
     lastSwingLow := pPrice
     lastSwingLowBar := pBar
     lastLowBroken := false
-    if displayTrendlineLiquidity and not na(prevSwingLow) and not na(prevSwingLowBar)
+    if (useTrendlineLiquidityInEngine or displayTrendlineLiquidity) and not na(prevSwingLow) and not na(prevSwingLowBar)
         if not na(bullTrendline)
             line.delete(bullTrendline)
-        bullTrendline := line.new(x1=prevSwingLowBar, y1=prevSwingLow, x2=lastSwingLowBar, y2=lastSwingLow, xloc=xloc.bar_index, extend=extend.right, color=color.new(liqLowColor, 30), style=line.style_dashed)
+        trendlineColor = displayTrendlineLiquidity ? color.new(liqLowColor, 30) : color.new(liqLowColor, 100)
+        bullTrendline := line.new(x1=prevSwingLowBar, y1=prevSwingLow, x2=lastSwingLowBar, y2=lastSwingLow, xloc=xloc.bar_index, extend=extend.right, color=trendlineColor, style=line.style_dashed)
 
 //------------------------------------------------------------------------------
 // Liquidity sweeps, inducement, BOS / CHOCH
@@ -564,20 +582,20 @@ bullTrendlinePrice = not na(bullTrendline) ? line.get_price(bullTrendline, bar_i
 bearTrendlinePrice = not na(bearTrendline) ? line.get_price(bearTrendline, bar_index) : na
 
 sellSideSweep = (not na(lastSwingLow) and low < lastSwingLow and not f_breakDown(lastSwingLow)) or
-     (showPrevSession and not na(prevSessionLow) and low < prevSessionLow and close > prevSessionLow) or
-     (showHigherPeriodLiquidity and low < prevDayLow and close > prevDayLow) or
-     (showHigherPeriodLiquidity and low < prevWeekLow and close > prevWeekLow) or
-     (showHigherPeriodLiquidity and low < prevMonthLow and close > prevMonthLow) or
+     (usePrevSessionInEngine and not na(prevSessionLow) and low < prevSessionLow and close > prevSessionLow) or
+     (useHigherPeriodLiquidityInEngine and low < prevDayLow and close > prevDayLow) or
+     (useHigherPeriodLiquidityInEngine and low < prevWeekLow and close > prevWeekLow) or
+     (useHigherPeriodLiquidityInEngine and low < prevMonthLow and close > prevMonthLow) or
      (not na(latestEql) and low < latestEql and close > latestEql) or
-     (displayTrendlineLiquidity and not na(bullTrendlinePrice) and low < bullTrendlinePrice and close > bullTrendlinePrice)
+     (useTrendlineLiquidityInEngine and not na(bullTrendlinePrice) and low < bullTrendlinePrice and close > bullTrendlinePrice)
 
 buySideSweep = (not na(lastSwingHigh) and high > lastSwingHigh and not f_breakUp(lastSwingHigh)) or
-     (showPrevSession and not na(prevSessionHigh) and high > prevSessionHigh and close < prevSessionHigh) or
-     (showHigherPeriodLiquidity and high > prevDayHigh and close < prevDayHigh) or
-     (showHigherPeriodLiquidity and high > prevWeekHigh and close < prevWeekHigh) or
-     (showHigherPeriodLiquidity and high > prevMonthHigh and close < prevMonthHigh) or
+     (usePrevSessionInEngine and not na(prevSessionHigh) and high > prevSessionHigh and close < prevSessionHigh) or
+     (useHigherPeriodLiquidityInEngine and high > prevDayHigh and close < prevDayHigh) or
+     (useHigherPeriodLiquidityInEngine and high > prevWeekHigh and close < prevWeekHigh) or
+     (useHigherPeriodLiquidityInEngine and high > prevMonthHigh and close < prevMonthHigh) or
      (not na(latestEqh) and high > latestEqh and close < latestEqh) or
-     (displayTrendlineLiquidity and not na(bearTrendlinePrice) and high > bearTrendlinePrice and close < bearTrendlinePrice)
+     (useTrendlineLiquidityInEngine and not na(bearTrendlinePrice) and high > bearTrendlinePrice and close < bearTrendlinePrice)
 
 plotshape(showSweeps and sellSideSweep, title="Sell-side liquidity sweep", style=shape.triangleup, location=location.belowbar, color=bullColor, size=size.tiny, text="Sweep")
 plotshape(showSweeps and buySideSweep, title="Buy-side liquidity sweep", style=shape.triangledown, location=location.abovebar, color=bearColor, size=size.tiny, text="Sweep")
@@ -664,20 +682,25 @@ if array.size(fvgBoxes) > 0
             if low < zoneTop
                 zoneTop := math.max(low, zoneBottom)
                 array.set(fvgTops, i, zoneTop)
-                box.set_top(zoneBox, zoneTop)
+                if not na(zoneBox)
+                    box.set_top(zoneBox, zoneTop)
             if low <= zoneBottom
                 removeZone := true
         else
             if high > zoneBottom
                 zoneBottom := math.min(high, zoneTop)
                 array.set(fvgBottoms, i, zoneBottom)
-                box.set_bottom(zoneBox, zoneBottom)
+                if not na(zoneBox)
+                    box.set_bottom(zoneBox, zoneBottom)
             if high >= zoneTop
                 removeZone := true
-        label.set_y(zoneLabel, f_zoneMid(zoneTop, zoneBottom))
+        if not na(zoneLabel)
+            label.set_y(zoneLabel, f_zoneMid(zoneTop, zoneBottom))
         if removeZone
-            box.delete(zoneBox)
-            label.delete(zoneLabel)
+            if not na(zoneBox)
+                box.delete(zoneBox)
+            if not na(zoneLabel)
+                label.delete(zoneLabel)
             array.remove(fvgBoxes, i)
             array.remove(fvgLabels, i)
             array.remove(fvgTops, i)
@@ -780,7 +803,8 @@ if array.size(obBoxes) > 0
         zoneTouched = array.get(obTouched, i)
         deleteZone = false
 
-        label.set_y(zoneLabel, f_zoneMid(zoneTop, zoneBottom))
+        if not na(zoneLabel)
+            label.set_y(zoneLabel, f_zoneMid(zoneTop, zoneBottom))
         if f_zoneTouched(zoneTop, zoneBottom)
             array.set(obTouched, i, true)
 
@@ -790,12 +814,15 @@ if array.size(obBoxes) > 0
                 array.set(obBreaker, i, true)
                 array.set(obCreatedBars, i, bar_index)
                 array.set(obTouched, i, false)
-                box.set_bgcolor(zoneBox, bbBearColor)
-                box.set_border_color(zoneBox, color.new(bearColor, 0))
-                line.set_color(zoneLine, bearColor)
-                line.set_style(zoneLine, line.style_dotted)
-                label.set_text(zoneLabel, f_obLabelText(false, true))
-                label.set_color(zoneLabel, bearColor)
+                if not na(zoneBox)
+                    box.set_bgcolor(zoneBox, bbBearColor)
+                    box.set_border_color(zoneBox, color.new(bearColor, 0))
+                if not na(zoneLine)
+                    line.set_color(zoneLine, bearColor)
+                    line.set_style(zoneLine, line.style_dotted)
+                if not na(zoneLabel)
+                    label.set_text(zoneLabel, f_obLabelText(false, true))
+                    label.set_color(zoneLabel, bearColor)
             else
                 deleteZone := true
         else if not zoneBull and close > zoneTop and zoneTouched and (bullMss or bullBos)
@@ -804,19 +831,25 @@ if array.size(obBoxes) > 0
                 array.set(obBreaker, i, true)
                 array.set(obCreatedBars, i, bar_index)
                 array.set(obTouched, i, false)
-                box.set_bgcolor(zoneBox, bbBullColor)
-                box.set_border_color(zoneBox, color.new(bullColor, 0))
-                line.set_color(zoneLine, bullColor)
-                line.set_style(zoneLine, line.style_dotted)
-                label.set_text(zoneLabel, f_obLabelText(true, true))
-                label.set_color(zoneLabel, bullColor)
+                if not na(zoneBox)
+                    box.set_bgcolor(zoneBox, bbBullColor)
+                    box.set_border_color(zoneBox, color.new(bullColor, 0))
+                if not na(zoneLine)
+                    line.set_color(zoneLine, bullColor)
+                    line.set_style(zoneLine, line.style_dotted)
+                if not na(zoneLabel)
+                    label.set_text(zoneLabel, f_obLabelText(true, true))
+                    label.set_color(zoneLabel, bullColor)
             else
                 deleteZone := true
 
         if deleteZone
-            box.delete(zoneBox)
-            line.delete(zoneLine)
-            label.delete(zoneLabel)
+            if not na(zoneBox)
+                box.delete(zoneBox)
+            if not na(zoneLine)
+                line.delete(zoneLine)
+            if not na(zoneLabel)
+                label.delete(zoneLabel)
             array.remove(obBoxes, i)
             array.remove(obEntryLines, i)
             array.remove(obLabels, i)
@@ -826,6 +859,7 @@ if array.size(obBoxes) > 0
             array.remove(obBreaker, i)
             array.remove(obCreatedBars, i)
             array.remove(obTouched, i)
+            array.remove(obEntries, i)
 
 //------------------------------------------------------------------------------
 // Higher timeframe structure context
@@ -931,14 +965,14 @@ if array.size(obBoxes) > 0
         if zoneBull and bullLegMatch and na(latestBullZoneBottom)
             latestBullZoneTop := zoneTop
             latestBullZoneBottom := zoneBottom
-            latestBullEntry := line.get_y1(array.get(obEntryLines, i))
+            latestBullEntry := array.get(obEntries, i)
             latestBullZoneIsBreaker := zoneBreaker
             latestBullZoneCreatedBar := zoneCreatedBar
             latestBullZoneTouched := array.get(obTouched, i)
         if not zoneBull and bearLegMatch and na(latestBearZoneTop)
             latestBearZoneBottom := zoneBottom
             latestBearZoneTop := zoneTop
-            latestBearEntry := line.get_y1(array.get(obEntryLines, i))
+            latestBearEntry := array.get(obEntries, i)
             latestBearZoneIsBreaker := zoneBreaker
             latestBearZoneCreatedBar := zoneCreatedBar
             latestBearZoneTouched := array.get(obTouched, i)
