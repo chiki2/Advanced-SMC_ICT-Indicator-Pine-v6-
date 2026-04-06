@@ -19,7 +19,6 @@ showLiquidity = input.bool(true, "Show liquidity pools", group=groupLiquidity)
 showPrevSession = input.bool(true, "Show previous session high / low", group=groupLiquidity)
 showHigherPeriodLiquidity = input.bool(true, "Show previous day / week / month high / low", group=groupLiquidity)
 showInternalRange = input.bool(true, "Show internal range liquidity", group=groupLiquidity)
-showTrendlineLiquidity = input.bool(true, "Show trendline liquidity", group=groupLiquidity)
 showSweeps = input.bool(true, "Show liquidity sweep markers", group=groupLiquidity)
 usePrevSessionInEngine = input.bool(true, "Use previous session liquidity in engine", group=groupLiquidity)
 useHigherPeriodLiquidityInEngine = input.bool(true, "Use previous day / week / month liquidity in engine", group=groupLiquidity)
@@ -75,7 +74,6 @@ groupStyle = "9. Style"
 showDashboard = input.bool(true, "Show context dashboard", group=groupStyle)
 showProtectedLevels = input.bool(true, "Show protected high / low", group=groupStyle)
 showActiveDealingRange = input.bool(true, "Show active dealing range", group=groupStyle)
-showPremiumDiscount = input.bool(true, "Show premium / discount zones", group=groupStyle)
 showKillzoneVisual = input.bool(true, "Shade killzone on chart", group=groupStyle)
 showLiquidityRightLabels = input.bool(true, "Show right-edge liquidity labels", group=groupStyle)
 
@@ -85,8 +83,11 @@ mobileCompactDashboard = input.bool(true, "Use compact dashboard", group=groupMo
 mobileCompactLabels = input.bool(true, "Use short labels", group=groupMobile)
 mobileHideStructureLabels = input.bool(true, "Hide structure labels", group=groupMobile)
 mobileHideSecondaryLiquidity = input.bool(true, "Hide weekly / monthly liquidity", group=groupMobile)
-mobileHideTrendlineLiquidity = input.bool(true, "Hide trendline liquidity", group=groupMobile)
-mobileHideInternalRange = input.bool(true, "Hide internal range fill", group=groupMobile)
+mobileHideEqLiquidity = input.bool(true, "Hide EQH / EQL liquidity", group=groupMobile)
+mobileHideInternalRange = input.bool(true, "Hide active dealing range", group=groupMobile)
+mobileHideLiquidityRightLabels = input.bool(true, "Hide liquidity right labels", group=groupMobile)
+mobileHideHtfLines = input.bool(true, "Hide HTF structure lines", group=groupMobile)
+mobileHideRiskLines = input.bool(true, "Hide risk cue lines", group=groupMobile)
 mobileHideTrendBackground = input.bool(true, "Hide trend background tint", group=groupMobile)
 
 //------------------------------------------------------------------------------
@@ -103,6 +104,7 @@ obBullColor = color.new(color.rgb(33, 150, 120), 82)
 obBearColor = color.new(color.rgb(206, 81, 81), 82)
 bbBullColor = color.new(color.rgb(33, 100, 180), 80)
 bbBearColor = color.new(color.rgb(180, 110, 33), 80)
+overlayLineDisplay = display.all - display.price_scale - display.status_line
 
 atr = ta.atr(14)
 bodyHigh = math.max(open, close)
@@ -111,16 +113,16 @@ equalTolerance = atr * equalToleranceAtr
 compactMode = androidCompactMode
 compactDashboardMode = androidCompactMode and mobileCompactDashboard
 displayStructureLabels = showStructureLabels and not (compactMode and mobileHideStructureLabels)
-// Trendline liquidity stays in the engine, but visual liquidity is forced horizontal-only.
-displayTrendlineLiquidity = false
 displayInternalRange = showInternalRange and not (compactMode and mobileHideInternalRange)
-displayEqLiquidity = showLiquidity
+displayEqLiquidity = showLiquidity and not (compactMode and mobileHideEqLiquidity)
 displaySweepMarkers = showLiquidity and showSweeps
 displayTrendBackground = showTrendBackground and not (compactMode and mobileHideTrendBackground)
 displayWeekMonthLiquidity = showHigherPeriodLiquidity and not (compactMode and mobileHideSecondaryLiquidity)
 displayProtectedLevels = showProtectedLevels and not compactMode
 displayDealingRange = displayInternalRange and showActiveDealingRange
-displayPremiumDiscount = showPremiumDiscount and displayDealingRange
+displayLiquidityRightLabels = showLiquidityRightLabels and not (compactMode and mobileHideLiquidityRightLabels)
+displayHtfLines = showHtf and not (compactMode and mobileHideHtfLines)
+displayRiskLines = showRisk and not (compactMode and mobileHideRiskLines)
 displayKillzoneVisual = showKillzoneVisual and not (compactMode and mobileHideTrendBackground)
 
 //------------------------------------------------------------------------------
@@ -612,10 +614,10 @@ if not na(pivotHigh)
     lastSwingHigh := pPrice
     lastSwingHighBar := pBar
     lastHighBroken := false
-    if (useTrendlineLiquidityInEngine or displayTrendlineLiquidity) and not na(prevSwingHigh) and not na(prevSwingHighBar)
+    if useTrendlineLiquidityInEngine and not na(prevSwingHigh) and not na(prevSwingHighBar)
         if not na(bearTrendline)
             line.delete(bearTrendline)
-        trendlineColor = displayTrendlineLiquidity ? color.new(liqHighColor, 30) : color.new(liqHighColor, 100)
+        trendlineColor = color.new(liqHighColor, 100)
         bearTrendline := line.new(x1=prevSwingHighBar, y1=prevSwingHigh, x2=lastSwingHighBar, y2=lastSwingHigh, xloc=xloc.bar_index, extend=extend.right, color=trendlineColor, style=line.style_dashed)
 
 if not na(pivotLow)
@@ -631,10 +633,10 @@ if not na(pivotLow)
     lastSwingLow := pPrice
     lastSwingLowBar := pBar
     lastLowBroken := false
-    if (useTrendlineLiquidityInEngine or displayTrendlineLiquidity) and not na(prevSwingLow) and not na(prevSwingLowBar)
+    if useTrendlineLiquidityInEngine and not na(prevSwingLow) and not na(prevSwingLowBar)
         if not na(bullTrendline)
             line.delete(bullTrendline)
-        trendlineColor = displayTrendlineLiquidity ? color.new(liqLowColor, 30) : color.new(liqLowColor, 100)
+        trendlineColor = color.new(liqLowColor, 100)
         bullTrendline := line.new(x1=prevSwingLowBar, y1=prevSwingLow, x2=lastSwingLowBar, y2=lastSwingLow, xloc=xloc.bar_index, extend=extend.right, color=trendlineColor, style=line.style_dashed)
 
 //------------------------------------------------------------------------------
@@ -659,8 +661,8 @@ buySideSweep = (not na(lastSwingHigh) and high > lastSwingHigh and not f_breakUp
      (not na(latestEqh) and high > latestEqh and close < latestEqh) or
      (useTrendlineLiquidityInEngine and not na(bearTrendlinePrice) and high > bearTrendlinePrice and close < bearTrendlinePrice)
 
-plotshape(displaySweepMarkers and sellSideSweep, title="Sell-side liquidity sweep", style=shape.triangleup, location=location.belowbar, color=bullColor, size=size.tiny, text="Sweep")
-plotshape(displaySweepMarkers and buySideSweep, title="Buy-side liquidity sweep", style=shape.triangledown, location=location.abovebar, color=bearColor, size=size.tiny, text="Sweep")
+plotshape(displaySweepMarkers and sellSideSweep, title="Sell-side liquidity sweep", style=shape.triangleup, location=location.belowbar, color=bullColor, size=size.tiny, text="")
+plotshape(displaySweepMarkers and buySideSweep, title="Buy-side liquidity sweep", style=shape.triangledown, location=location.abovebar, color=bearColor, size=size.tiny, text="")
 
 var int lastSellSideSweepBar = na
 var int lastBuySideSweepBar = na
@@ -684,8 +686,8 @@ bearishIdm = trendBias == -1 and not na(prevSwingHigh) and high > prevSwingHigh 
 impulsiveBull = (high - low) >= atr * obImpulseAtr and close > open
 impulsiveBear = (high - low) >= atr * obImpulseAtr and close < open
 
-plotshape(showIdm and bullishIdm, title="Bullish IDM", style=shape.circle, location=location.belowbar, size=size.tiny, color=color.new(bullColor, 0), text="IDM")
-plotshape(showIdm and bearishIdm, title="Bearish IDM", style=shape.circle, location=location.abovebar, size=size.tiny, color=color.new(bearColor, 0), text="IDM")
+plotshape(showIdm and bullishIdm, title="Bullish IDM", style=shape.circle, location=location.belowbar, size=size.tiny, color=color.new(bullColor, 0), text="")
+plotshape(showIdm and bearishIdm, title="Bearish IDM", style=shape.circle, location=location.abovebar, size=size.tiny, color=color.new(bearColor, 0), text="")
 
 bullBreak = not na(lastSwingHigh) and not lastHighBroken and f_breakUp(lastSwingHigh)
 bearBreak = not na(lastSwingLow) and not lastLowBroken and f_breakDown(lastSwingLow)
@@ -1243,59 +1245,66 @@ protectedLowLevel = f_horizontalLevel(activeProtectedLow, showLiquidity and disp
 internalHighLevel = f_horizontalLevel(activeRangeHigh, showLiquidity and displayDealingRange)
 internalLowLevel = f_horizontalLevel(activeRangeLow, showLiquidity and displayDealingRange)
 internalEqLevel = f_horizontalLevel(activeRangeEquilibrium, showLiquidity and displayDealingRange)
+htfStructureHighLevel = f_horizontalLevel(htfStructureHigh, displayHtfLines and htfContextReady)
+htfStructureLowLevel = f_horizontalLevel(htfStructureLow, displayHtfLines and htfContextReady)
+riskLongEntryLevel = f_horizontalLevel(tradeLongEntry, displayRiskLines)
+riskShortEntryLevel = f_horizontalLevel(tradeShortEntry, displayRiskLines)
+riskBullStopLevel = f_horizontalLevel(bullStop, displayRiskLines)
+riskBearStopLevel = f_horizontalLevel(bearStop, displayRiskLines)
+riskLongTargetLevel = f_horizontalLevel(tradeLongTarget, displayRiskLines)
+riskShortTargetLevel = f_horizontalLevel(tradeShortTarget, displayRiskLines)
 
-plotPrevSessionHigh = plot(prevSessionHighLevel, "Prev Session High", color=color.new(liqHighColor, 20), linewidth=1, style=plot.style_linebr)
-plotPrevSessionLow = plot(prevSessionLowLevel, "Prev Session Low", color=color.new(liqLowColor, 20), linewidth=1, style=plot.style_linebr)
-plotPrevDayHigh = plot(prevDayHighLevel, "PDH", color=color.new(liqHighColor, 0), linewidth=1, style=plot.style_linebr)
-plotPrevDayLow = plot(prevDayLowLevel, "PDL", color=color.new(liqLowColor, 0), linewidth=1, style=plot.style_linebr)
-plotPrevWeekHigh = plot(prevWeekHighLevel, "PWH", color=color.new(liqHighColor, 30), linewidth=1, style=plot.style_linebr)
-plotPrevWeekLow = plot(prevWeekLowLevel, "PWL", color=color.new(liqLowColor, 30), linewidth=1, style=plot.style_linebr)
-plotPrevMonthHigh = plot(prevMonthHighLevel, "PMH", color=color.new(liqHighColor, 55), linewidth=1, style=plot.style_linebr)
-plotPrevMonthLow = plot(prevMonthLowLevel, "PML", color=color.new(liqLowColor, 55), linewidth=1, style=plot.style_linebr)
-plotEqHigh = plot(eqHighLevel, "EQH Liquidity", color=color.new(liqHighColor, 12), linewidth=1, style=plot.style_linebr)
-plotEqLow = plot(eqLowLevel, "EQL Liquidity", color=color.new(liqLowColor, 12), linewidth=1, style=plot.style_linebr)
+plotPrevSessionHigh = plot(prevSessionHighLevel, "Prev Session High", color=color.new(liqHighColor, 20), linewidth=1, style=plot.style_linebr, display=overlayLineDisplay)
+plotPrevSessionLow = plot(prevSessionLowLevel, "Prev Session Low", color=color.new(liqLowColor, 20), linewidth=1, style=plot.style_linebr, display=overlayLineDisplay)
+plotPrevDayHigh = plot(prevDayHighLevel, "PDH", color=color.new(liqHighColor, 0), linewidth=1, style=plot.style_linebr, display=overlayLineDisplay)
+plotPrevDayLow = plot(prevDayLowLevel, "PDL", color=color.new(liqLowColor, 0), linewidth=1, style=plot.style_linebr, display=overlayLineDisplay)
+plotPrevWeekHigh = plot(prevWeekHighLevel, "PWH", color=color.new(liqHighColor, 30), linewidth=1, style=plot.style_linebr, display=overlayLineDisplay)
+plotPrevWeekLow = plot(prevWeekLowLevel, "PWL", color=color.new(liqLowColor, 30), linewidth=1, style=plot.style_linebr, display=overlayLineDisplay)
+plotPrevMonthHigh = plot(prevMonthHighLevel, "PMH", color=color.new(liqHighColor, 55), linewidth=1, style=plot.style_linebr, display=overlayLineDisplay)
+plotPrevMonthLow = plot(prevMonthLowLevel, "PML", color=color.new(liqLowColor, 55), linewidth=1, style=plot.style_linebr, display=overlayLineDisplay)
+plotEqHigh = plot(eqHighLevel, "EQH Liquidity", color=color.new(liqHighColor, 12), linewidth=1, style=plot.style_linebr, display=overlayLineDisplay)
+plotEqLow = plot(eqLowLevel, "EQL Liquidity", color=color.new(liqLowColor, 12), linewidth=1, style=plot.style_linebr, display=overlayLineDisplay)
 
-protectedHighPlot = plot(protectedHighLevel, "Protected High", color=color.new(liqHighColor, 8), linewidth=2, style=plot.style_linebr)
-protectedLowPlot = plot(protectedLowLevel, "Protected Low", color=color.new(liqLowColor, 8), linewidth=2, style=plot.style_linebr)
+protectedHighPlot = plot(protectedHighLevel, "Protected High", color=color.new(liqHighColor, 8), linewidth=2, style=plot.style_linebr, display=overlayLineDisplay)
+protectedLowPlot = plot(protectedLowLevel, "Protected Low", color=color.new(liqLowColor, 8), linewidth=2, style=plot.style_linebr, display=overlayLineDisplay)
 
-internalHighPlot = plot(internalHighLevel, "ICT Dealing Range High", color=color.new(color.silver, 20), linewidth=1, style=plot.style_linebr)
-internalLowPlot = plot(internalLowLevel, "ICT Dealing Range Low", color=color.new(color.silver, 20), linewidth=1, style=plot.style_linebr)
-internalEqPlot = plot(internalEqLevel, "ICT Equilibrium", color=color.new(neutralColor, 20), linewidth=1, style=plot.style_linebr)
+internalHighPlot = plot(internalHighLevel, "ICT Dealing Range High", color=color.new(color.silver, 20), linewidth=1, style=plot.style_linebr, display=overlayLineDisplay)
+internalLowPlot = plot(internalLowLevel, "ICT Dealing Range Low", color=color.new(color.silver, 20), linewidth=1, style=plot.style_linebr, display=overlayLineDisplay)
+internalEqPlot = plot(internalEqLevel, "ICT Equilibrium", color=color.new(neutralColor, 20), linewidth=1, style=plot.style_linebr, display=overlayLineDisplay)
 
 if barstate.islast
-    bool rightEdgeLiquidityLabels = showLiquidityRightLabels
-    prevSessionHighLabel := f_syncRightEdgeLabel(prevSessionHighLabel, prevSessionHigh, "Sess H", color.new(liqHighColor, 5), color.white, rightEdgeLiquidityLabels and showLiquidity and showPrevSession)
-    prevSessionLowLabel := f_syncRightEdgeLabel(prevSessionLowLabel, prevSessionLow, "Sess L", color.new(liqLowColor, 5), color.white, rightEdgeLiquidityLabels and showLiquidity and showPrevSession)
-    prevDayHighLabel := f_syncRightEdgeLabel(prevDayHighLabel, prevDayHigh, "PDH", color.new(liqHighColor, 0), color.white, rightEdgeLiquidityLabels and showLiquidity and showHigherPeriodLiquidity)
-    prevDayLowLabel := f_syncRightEdgeLabel(prevDayLowLabel, prevDayLow, "PDL", color.new(liqLowColor, 0), color.white, rightEdgeLiquidityLabels and showLiquidity and showHigherPeriodLiquidity)
-    prevWeekHighLabel := f_syncRightEdgeLabel(prevWeekHighLabel, prevWeekHigh, "PWH", color.new(liqHighColor, 20), color.white, rightEdgeLiquidityLabels and showLiquidity and displayWeekMonthLiquidity)
-    prevWeekLowLabel := f_syncRightEdgeLabel(prevWeekLowLabel, prevWeekLow, "PWL", color.new(liqLowColor, 20), color.white, rightEdgeLiquidityLabels and showLiquidity and displayWeekMonthLiquidity)
-    prevMonthHighLabel := f_syncRightEdgeLabel(prevMonthHighLabel, prevMonthHigh, "PMH", color.new(liqHighColor, 35), color.white, rightEdgeLiquidityLabels and showLiquidity and displayWeekMonthLiquidity)
-    prevMonthLowLabel := f_syncRightEdgeLabel(prevMonthLowLabel, prevMonthLow, "PML", color.new(liqLowColor, 35), color.white, rightEdgeLiquidityLabels and showLiquidity and displayWeekMonthLiquidity)
-    eqHighLabel := f_syncRightEdgeLabel(eqHighLabel, latestEqh, "EQH", color.new(liqHighColor, 12), color.white, rightEdgeLiquidityLabels and showLiquidity and displayEqLiquidity)
-    eqLowLabel := f_syncRightEdgeLabel(eqLowLabel, latestEql, "EQL", color.new(liqLowColor, 12), color.white, rightEdgeLiquidityLabels and showLiquidity and displayEqLiquidity)
-    protectedHighLabel := f_syncRightEdgeLabel(protectedHighLabel, activeProtectedHigh, "Prot H", color.new(liqHighColor, 8), color.white, rightEdgeLiquidityLabels and showLiquidity and displayProtectedLevels)
-    protectedLowLabel := f_syncRightEdgeLabel(protectedLowLabel, activeProtectedLow, "Prot L", color.new(liqLowColor, 8), color.white, rightEdgeLiquidityLabels and showLiquidity and displayProtectedLevels)
-    internalHighLabel := f_syncRightEdgeLabel(internalHighLabel, activeRangeHigh, "Range H", color.new(color.silver, 10), color.black, rightEdgeLiquidityLabels and showLiquidity and displayDealingRange)
-    internalLowLabel := f_syncRightEdgeLabel(internalLowLabel, activeRangeLow, "Range L", color.new(color.silver, 10), color.black, rightEdgeLiquidityLabels and showLiquidity and displayDealingRange)
-    internalEqLabel := f_syncRightEdgeLabel(internalEqLabel, activeRangeEquilibrium, "EQ", color.new(neutralColor, 10), color.white, rightEdgeLiquidityLabels and showLiquidity and displayDealingRange)
+    prevSessionHighLabel := f_syncRightEdgeLabel(prevSessionHighLabel, prevSessionHigh, "Sess H", color.new(liqHighColor, 5), color.white, displayLiquidityRightLabels and showLiquidity and showPrevSession)
+    prevSessionLowLabel := f_syncRightEdgeLabel(prevSessionLowLabel, prevSessionLow, "Sess L", color.new(liqLowColor, 5), color.white, displayLiquidityRightLabels and showLiquidity and showPrevSession)
+    prevDayHighLabel := f_syncRightEdgeLabel(prevDayHighLabel, prevDayHigh, "PDH", color.new(liqHighColor, 0), color.white, displayLiquidityRightLabels and showLiquidity and showHigherPeriodLiquidity)
+    prevDayLowLabel := f_syncRightEdgeLabel(prevDayLowLabel, prevDayLow, "PDL", color.new(liqLowColor, 0), color.white, displayLiquidityRightLabels and showLiquidity and showHigherPeriodLiquidity)
+    prevWeekHighLabel := f_syncRightEdgeLabel(prevWeekHighLabel, prevWeekHigh, "PWH", color.new(liqHighColor, 20), color.white, displayLiquidityRightLabels and showLiquidity and displayWeekMonthLiquidity)
+    prevWeekLowLabel := f_syncRightEdgeLabel(prevWeekLowLabel, prevWeekLow, "PWL", color.new(liqLowColor, 20), color.white, displayLiquidityRightLabels and showLiquidity and displayWeekMonthLiquidity)
+    prevMonthHighLabel := f_syncRightEdgeLabel(prevMonthHighLabel, prevMonthHigh, "PMH", color.new(liqHighColor, 35), color.white, displayLiquidityRightLabels and showLiquidity and displayWeekMonthLiquidity)
+    prevMonthLowLabel := f_syncRightEdgeLabel(prevMonthLowLabel, prevMonthLow, "PML", color.new(liqLowColor, 35), color.white, displayLiquidityRightLabels and showLiquidity and displayWeekMonthLiquidity)
+    eqHighLabel := f_syncRightEdgeLabel(eqHighLabel, latestEqh, "EQH", color.new(liqHighColor, 12), color.white, displayLiquidityRightLabels and showLiquidity and displayEqLiquidity)
+    eqLowLabel := f_syncRightEdgeLabel(eqLowLabel, latestEql, "EQL", color.new(liqLowColor, 12), color.white, displayLiquidityRightLabels and showLiquidity and displayEqLiquidity)
+    protectedHighLabel := f_syncRightEdgeLabel(protectedHighLabel, activeProtectedHigh, "Prot H", color.new(liqHighColor, 8), color.white, displayLiquidityRightLabels and showLiquidity and displayProtectedLevels)
+    protectedLowLabel := f_syncRightEdgeLabel(protectedLowLabel, activeProtectedLow, "Prot L", color.new(liqLowColor, 8), color.white, displayLiquidityRightLabels and showLiquidity and displayProtectedLevels)
+    internalHighLabel := f_syncRightEdgeLabel(internalHighLabel, activeRangeHigh, "Range H", color.new(color.silver, 10), color.black, displayLiquidityRightLabels and showLiquidity and displayDealingRange)
+    internalLowLabel := f_syncRightEdgeLabel(internalLowLabel, activeRangeLow, "Range L", color.new(color.silver, 10), color.black, displayLiquidityRightLabels and showLiquidity and displayDealingRange)
+    internalEqLabel := f_syncRightEdgeLabel(internalEqLabel, activeRangeEquilibrium, "EQ", color.new(neutralColor, 10), color.white, displayLiquidityRightLabels and showLiquidity and displayDealingRange)
 
-oteLongTopPlot = plot(strictIctMode and strictShowOte ? oteLongTop : na, "OTE Long Top", color=color.new(bullColor, 40), linewidth=1, style=plot.style_linebr)
-oteLongBottomPlot = plot(strictIctMode and strictShowOte ? oteLongBottom : na, "OTE Long Bottom", color=color.new(bullColor, 40), linewidth=1, style=plot.style_linebr)
-oteShortTopPlot = plot(strictIctMode and strictShowOte ? oteShortTop : na, "OTE Short Top", color=color.new(bearColor, 40), linewidth=1, style=plot.style_linebr)
-oteShortBottomPlot = plot(strictIctMode and strictShowOte ? oteShortBottom : na, "OTE Short Bottom", color=color.new(bearColor, 40), linewidth=1, style=plot.style_linebr)
+oteLongTopPlot = plot(strictIctMode and strictShowOte ? oteLongTop : na, "OTE Long Top", color=color.new(bullColor, 40), linewidth=1, style=plot.style_linebr, display=overlayLineDisplay)
+oteLongBottomPlot = plot(strictIctMode and strictShowOte ? oteLongBottom : na, "OTE Long Bottom", color=color.new(bullColor, 40), linewidth=1, style=plot.style_linebr, display=overlayLineDisplay)
+oteShortTopPlot = plot(strictIctMode and strictShowOte ? oteShortTop : na, "OTE Short Top", color=color.new(bearColor, 40), linewidth=1, style=plot.style_linebr, display=overlayLineDisplay)
+oteShortBottomPlot = plot(strictIctMode and strictShowOte ? oteShortBottom : na, "OTE Short Bottom", color=color.new(bearColor, 40), linewidth=1, style=plot.style_linebr, display=overlayLineDisplay)
 fill(oteLongTopPlot, oteLongBottomPlot, color=strictIctMode and strictShowOte ? color.new(bullColor, 92) : na)
 fill(oteShortTopPlot, oteShortBottomPlot, color=strictIctMode and strictShowOte ? color.new(bearColor, 92) : na)
 
-plot(showHtf and htfContextReady ? htfStructureHigh : na, "HTF Structure High", color=color.new(color.fuchsia, 15), linewidth=2, style=plot.style_linebr)
-plot(showHtf and htfContextReady ? htfStructureLow : na, "HTF Structure Low", color=color.new(color.fuchsia, 15), linewidth=2, style=plot.style_linebr)
+plot(htfStructureHighLevel, "HTF Structure High", color=color.new(color.fuchsia, 15), linewidth=2, style=plot.style_linebr, display=overlayLineDisplay)
+plot(htfStructureLowLevel, "HTF Structure Low", color=color.new(color.fuchsia, 15), linewidth=2, style=plot.style_linebr, display=overlayLineDisplay)
 
-plot(showRisk ? tradeLongEntry : na, "Bullish Entry Cue", color=color.new(bullColor, 0), linewidth=2, style=plot.style_linebr)
-plot(showRisk ? tradeShortEntry : na, "Bearish Entry Cue", color=color.new(bearColor, 0), linewidth=2, style=plot.style_linebr)
-plot(showRisk ? bullStop : na, "Bullish Stop Cue", color=color.new(bearColor, 0), linewidth=1, style=plot.style_linebr)
-plot(showRisk ? bearStop : na, "Bearish Stop Cue", color=color.new(bullColor, 0), linewidth=1, style=plot.style_linebr)
-plot(showRisk ? tradeLongTarget : na, "Bullish TP Cue", color=color.new(liqHighColor, 0), linewidth=1, style=plot.style_linebr)
-plot(showRisk ? tradeShortTarget : na, "Bearish TP Cue", color=color.new(liqLowColor, 0), linewidth=1, style=plot.style_linebr)
+plot(riskLongEntryLevel, "Bullish Entry Cue", color=color.new(bullColor, 0), linewidth=2, style=plot.style_linebr, display=overlayLineDisplay)
+plot(riskShortEntryLevel, "Bearish Entry Cue", color=color.new(bearColor, 0), linewidth=2, style=plot.style_linebr, display=overlayLineDisplay)
+plot(riskBullStopLevel, "Bullish Stop Cue", color=color.new(bearColor, 0), linewidth=1, style=plot.style_linebr, display=overlayLineDisplay)
+plot(riskBearStopLevel, "Bearish Stop Cue", color=color.new(bullColor, 0), linewidth=1, style=plot.style_linebr, display=overlayLineDisplay)
+plot(riskLongTargetLevel, "Bullish TP Cue", color=color.new(liqHighColor, 0), linewidth=1, style=plot.style_linebr, display=overlayLineDisplay)
+plot(riskShortTargetLevel, "Bearish TP Cue", color=color.new(liqLowColor, 0), linewidth=1, style=plot.style_linebr, display=overlayLineDisplay)
 
 chartBackdrop = displayKillzoneVisual and strictKillzoneActive ? color.new(color.rgb(217, 172, 61), 88) : displayTrendBackground ? color.new(activeBias == 1 ? bullColor : activeBias == -1 ? bearColor : neutralColor, 93) : na
 bgcolor(chartBackdrop)
