@@ -124,6 +124,8 @@ displayLiquidityRightLabels = showLiquidityRightLabels and not (compactMode and 
 displayHtfLines = showHtf and not (compactMode and mobileHideHtfLines)
 displayRiskLines = showRisk and not (compactMode and mobileHideRiskLines)
 displayKillzoneVisual = showKillzoneVisual and not (compactMode and mobileHideTrendBackground)
+maxStructureEventObjects = 80
+maxPivotLabelObjects = 160
 
 //------------------------------------------------------------------------------
 // Stateful arrays for FVG / OB tracking
@@ -146,6 +148,9 @@ var label[] obLabels = array.new_label()
 var int[] obCreatedBars = array.new_int()
 var bool[] obTouched = array.new_bool()
 var float[] obEntries = array.new_float()
+var line[] structureEventLines = array.new_line()
+var label[] structureEventLabels = array.new_label()
+var label[] pivotStructureLabels = array.new_label()
 var label prevSessionHighLabel = na
 var label prevSessionLowLabel = na
 var label prevDayHighLabel = na
@@ -461,11 +466,36 @@ f_trimOb() =>
         array.shift(obTouched)
         array.shift(obEntries)
 
+f_trimStructureEvents() =>
+    while array.size(structureEventLines) > maxStructureEventObjects
+        oldLine = array.shift(structureEventLines)
+        if not na(oldLine)
+            line.delete(oldLine)
+    while array.size(structureEventLabels) > maxStructureEventObjects
+        oldLabel = array.shift(structureEventLabels)
+        if not na(oldLabel)
+            label.delete(oldLabel)
+
+f_trimPivotLabels() =>
+    while array.size(pivotStructureLabels) > maxPivotLabelObjects
+        oldLabel = array.shift(pivotStructureLabels)
+        if not na(oldLabel)
+            label.delete(oldLabel)
+
+f_addPivotLabel(int pivotBar, float pivotPrice, string pivotText, bool isHigh) =>
+    if displayStructureLabels
+        pivotLabel = label.new(x=pivotBar, y=pivotPrice, xloc=xloc.bar_index, text=pivotText, style=isHigh ? label.style_label_down : label.style_label_up, color=color.new(isHigh ? liqHighColor : liqLowColor, 0), textcolor=color.white, size=size.tiny)
+        array.push(pivotStructureLabels, pivotLabel)
+        f_trimPivotLabels()
+
 f_drawStructureEvent(int fromBar, float level, string eventText, bool isBull) =>
     if showBosChoch and not na(fromBar)
         eventColor = isBull ? bullColor : bearColor
-        line.new(x1=fromBar, y1=level, x2=bar_index, y2=level, xloc=xloc.bar_index, color=eventColor, width=2)
-        label.new(x=bar_index, y=level, text=eventText, xloc=xloc.bar_index, style=isBull ? label.style_label_down : label.style_label_up, color=eventColor, textcolor=color.white, size=size.small)
+        eventLine = line.new(x1=fromBar, y1=level, x2=bar_index, y2=level, xloc=xloc.bar_index, color=eventColor, width=2)
+        eventLabel = label.new(x=bar_index, y=level, text=eventText, xloc=xloc.bar_index, style=isBull ? label.style_label_down : label.style_label_up, color=eventColor, textcolor=color.white, size=size.small)
+        array.push(structureEventLines, eventLine)
+        array.push(structureEventLabels, eventLabel)
+        f_trimStructureEvents()
 
 // Strict OB anchor: last opposing candle after the sweep but before the FVG/displacement leg.
 f_findLastOpposingCandle(bool isBull, int sourceBar, int anchorBar, int lookback) =>
@@ -605,8 +635,7 @@ if not na(pivotHigh)
     pBar = bar_index - swingLen
     pPrice = pivotHigh
     structureText = na(lastSwingHigh) ? "SH" : math.abs(pPrice - lastSwingHigh) <= equalTolerance ? "EQH" : pPrice > lastSwingHigh ? "HH" : "LH"
-    if displayStructureLabels
-        label.new(x=pBar, y=pPrice, xloc=xloc.bar_index, text=structureText, style=label.style_label_down, color=color.new(liqHighColor, 0), textcolor=color.white, size=size.tiny)
+    f_addPivotLabel(pBar, pPrice, structureText, true)
     if structureText == "EQH" and not na(lastSwingHighBar)
         latestEqh := math.max(pPrice, lastSwingHigh)
     prevSwingHigh := lastSwingHigh
@@ -624,8 +653,7 @@ if not na(pivotLow)
     pBar = bar_index - swingLen
     pPrice = pivotLow
     structureText = na(lastSwingLow) ? "SL" : math.abs(pPrice - lastSwingLow) <= equalTolerance ? "EQL" : pPrice > lastSwingLow ? "HL" : "LL"
-    if displayStructureLabels
-        label.new(x=pBar, y=pPrice, xloc=xloc.bar_index, text=structureText, style=label.style_label_up, color=color.new(liqLowColor, 0), textcolor=color.white, size=size.tiny)
+    f_addPivotLabel(pBar, pPrice, structureText, false)
     if structureText == "EQL" and not na(lastSwingLowBar)
         latestEql := math.min(pPrice, lastSwingLow)
     prevSwingLow := lastSwingLow
@@ -1247,7 +1275,8 @@ bool longManaged = tradeLongTouched and not na(longRisk) and high >= tradeLongEn
 bool longFresh = not tradeLongTouched and not na(longSetupAge) and longSetupAge <= setupFreshBars
 bool strictLongBiasPass = not strictIctMode or (activeBias == 1 and (not strictRequireHtfBias or (htfContextReady and htfBias == 1)))
 bool strictLongSweepPass = not strictIctMode or bullLegHasSweep
-bool strictLongMssPass = not strictIctMode or (bullLegHasMss and not na(lastBullMssBar) and activeBias == 1)
+bool strictLongMssFresh = not na(lastBullMssBar) and (bar_index - lastBullMssBar) <= strictMssLookback
+bool strictLongMssPass = not strictIctMode or (bullLegHasMss and strictLongMssFresh and activeBias == 1)
 bool strictLongPdPass = not strictIctMode or (not strictRequirePd or (not na(tradeLongValidTop) and not na(bullEquilibrium) and f_zoneMid(tradeLongValidTop, tradeLongValidBottom) < bullEquilibrium))
 bool strictLongOtePass = not strictIctMode or (not strictRequireOte or f_zoneIntersects(tradeLongValidTop, tradeLongValidBottom, oteLongTop, oteLongBottom))
 bool strictLongKillzonePass = not strictIctMode or (not strictRequireKillzone or strictKillzoneActive)
@@ -1274,7 +1303,8 @@ bool shortManaged = tradeShortTouched and not na(shortRisk) and low <= tradeShor
 bool shortFresh = not tradeShortTouched and not na(shortSetupAge) and shortSetupAge <= setupFreshBars
 bool strictShortBiasPass = not strictIctMode or (activeBias == -1 and (not strictRequireHtfBias or (htfContextReady and htfBias == -1)))
 bool strictShortSweepPass = not strictIctMode or bearLegHasSweep
-bool strictShortMssPass = not strictIctMode or (bearLegHasMss and not na(lastBearMssBar) and activeBias == -1)
+bool strictShortMssFresh = not na(lastBearMssBar) and (bar_index - lastBearMssBar) <= strictMssLookback
+bool strictShortMssPass = not strictIctMode or (bearLegHasMss and strictShortMssFresh and activeBias == -1)
 bool strictShortPdPass = not strictIctMode or (not strictRequirePd or (not na(tradeShortValidTop) and not na(bearEquilibrium) and f_zoneMid(tradeShortValidTop, tradeShortValidBottom) > bearEquilibrium))
 bool strictShortOtePass = not strictIctMode or (not strictRequireOte or f_zoneIntersects(tradeShortValidTop, tradeShortValidBottom, oteShortTop, oteShortBottom))
 bool strictShortKillzonePass = not strictIctMode or (not strictRequireKillzone or strictKillzoneActive)
