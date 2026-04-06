@@ -703,6 +703,11 @@ var int bullLegEndBar = na
 var bool bullLegHasSweep = false
 var bool bullLegHasDisplacement = false
 var bool bullLegHasMss = false
+var float bullOteTopState = na
+var float bullOteBottomState = na
+var int bullOteCreatedBar = na
+var bool bullOteMitigated = false
+var bool bullOteInvalidated = false
 var float bearLegLow = na
 var float bearLegHigh = na
 var int bearLegStartBar = na
@@ -710,6 +715,11 @@ var int bearLegEndBar = na
 var bool bearLegHasSweep = false
 var bool bearLegHasDisplacement = false
 var bool bearLegHasMss = false
+var float bearOteTopState = na
+var float bearOteBottomState = na
+var int bearOteCreatedBar = na
+var bool bearOteMitigated = false
+var bool bearOteInvalidated = false
 
 legSearchBars = obSearchBars + obValidationLookback + 2
 
@@ -960,10 +970,41 @@ bullDealingRangeSize = not na(bullDealingRangeHigh) and not na(bullDealingRangeL
 bearDealingRangeSize = not na(bearDealingRangeHigh) and not na(bearDealingRangeLow) ? bearDealingRangeHigh - bearDealingRangeLow : na
 bullEquilibrium = not na(bullDealingRangeHigh) and not na(bullDealingRangeLow) ? (bullDealingRangeHigh + bullDealingRangeLow) * 0.5 : na
 bearEquilibrium = not na(bearDealingRangeHigh) and not na(bearDealingRangeLow) ? (bearDealingRangeHigh + bearDealingRangeLow) * 0.5 : na
-oteLongTop = not na(bullDealingRangeSize) and bullDealingRangeSize > 0 ? bullDealingRangeHigh - bullDealingRangeSize * 0.62 : na
-oteLongBottom = not na(bullDealingRangeSize) and bullDealingRangeSize > 0 ? bullDealingRangeHigh - bullDealingRangeSize * 0.79 : na
-oteShortTop = not na(bearDealingRangeSize) and bearDealingRangeSize > 0 ? bearDealingRangeLow + bearDealingRangeSize * 0.79 : na
-oteShortBottom = not na(bearDealingRangeSize) and bearDealingRangeSize > 0 ? bearDealingRangeLow + bearDealingRangeSize * 0.62 : na
+bullOteRawTop = not na(bullDealingRangeSize) and bullDealingRangeSize > 0 ? bullDealingRangeHigh - bullDealingRangeSize * 0.62 : na
+bullOteRawBottom = not na(bullDealingRangeSize) and bullDealingRangeSize > 0 ? bullDealingRangeHigh - bullDealingRangeSize * 0.79 : na
+bearOteRawTop = not na(bearDealingRangeSize) and bearDealingRangeSize > 0 ? bearDealingRangeLow + bearDealingRangeSize * 0.79 : na
+bearOteRawBottom = not na(bearDealingRangeSize) and bearDealingRangeSize > 0 ? bearDealingRangeLow + bearDealingRangeSize * 0.62 : na
+
+if bullMss or bullBos
+    bullOteTopState := bullOteRawTop
+    bullOteBottomState := bullOteRawBottom
+    bullOteCreatedBar := bar_index
+    bullOteMitigated := false
+    bullOteInvalidated := false
+
+if bearMss
+    bullOteInvalidated := true
+
+if bearMss or bearBos
+    bearOteTopState := bearOteRawTop
+    bearOteBottomState := bearOteRawBottom
+    bearOteCreatedBar := bar_index
+    bearOteMitigated := false
+    bearOteInvalidated := false
+
+if bullMss
+    bearOteInvalidated := true
+
+if not bullOteMitigated and not bullOteInvalidated and not na(bullOteCreatedBar) and bar_index > bullOteCreatedBar and f_zoneTouched(bullOteTopState, bullOteBottomState)
+    bullOteMitigated := true
+
+if not bearOteMitigated and not bearOteInvalidated and not na(bearOteCreatedBar) and bar_index > bearOteCreatedBar and f_zoneTouched(bearOteTopState, bearOteBottomState)
+    bearOteMitigated := true
+
+oteLongTop = activeBias == 1 and not bullOteMitigated and not bullOteInvalidated ? bullOteTopState : na
+oteLongBottom = activeBias == 1 and not bullOteMitigated and not bullOteInvalidated ? bullOteBottomState : na
+oteShortTop = activeBias == -1 and not bearOteMitigated and not bearOteInvalidated ? bearOteTopState : na
+oteShortBottom = activeBias == -1 and not bearOteMitigated and not bearOteInvalidated ? bearOteBottomState : na
 activeRangeHigh = activeBias == 1 ? bullDealingRangeHigh : activeBias == -1 ? bearDealingRangeHigh : na
 activeRangeLow = activeBias == 1 ? bullDealingRangeLow : activeBias == -1 ? bearDealingRangeLow : na
 activeRangeEquilibrium = activeBias == 1 ? bullEquilibrium : activeBias == -1 ? bearEquilibrium : na
@@ -1253,6 +1294,10 @@ riskBullStopLevel = f_horizontalLevel(bullStop, displayRiskLines)
 riskBearStopLevel = f_horizontalLevel(bearStop, displayRiskLines)
 riskLongTargetLevel = f_horizontalLevel(tradeLongTarget, displayRiskLines)
 riskShortTargetLevel = f_horizontalLevel(tradeShortTarget, displayRiskLines)
+oteLongTopLevel = f_horizontalLevel(oteLongTop, strictIctMode and strictShowOte)
+oteLongBottomLevel = f_horizontalLevel(oteLongBottom, strictIctMode and strictShowOte)
+oteShortTopLevel = f_horizontalLevel(oteShortTop, strictIctMode and strictShowOte)
+oteShortBottomLevel = f_horizontalLevel(oteShortBottom, strictIctMode and strictShowOte)
 
 plotPrevSessionHigh = plot(prevSessionHighLevel, "Prev Session High", color=color.new(liqHighColor, 20), linewidth=1, style=plot.style_linebr, display=overlayLineDisplay)
 plotPrevSessionLow = plot(prevSessionLowLevel, "Prev Session Low", color=color.new(liqLowColor, 20), linewidth=1, style=plot.style_linebr, display=overlayLineDisplay)
@@ -1289,10 +1334,10 @@ if barstate.islast
     internalLowLabel := f_syncRightEdgeLabel(internalLowLabel, activeRangeLow, "Range L", color.new(color.silver, 10), color.black, displayLiquidityRightLabels and showLiquidity and displayDealingRange)
     internalEqLabel := f_syncRightEdgeLabel(internalEqLabel, activeRangeEquilibrium, "EQ", color.new(neutralColor, 10), color.white, displayLiquidityRightLabels and showLiquidity and displayDealingRange)
 
-oteLongTopPlot = plot(strictIctMode and strictShowOte ? oteLongTop : na, "OTE Long Top", color=color.new(bullColor, 40), linewidth=1, style=plot.style_linebr, display=overlayLineDisplay)
-oteLongBottomPlot = plot(strictIctMode and strictShowOte ? oteLongBottom : na, "OTE Long Bottom", color=color.new(bullColor, 40), linewidth=1, style=plot.style_linebr, display=overlayLineDisplay)
-oteShortTopPlot = plot(strictIctMode and strictShowOte ? oteShortTop : na, "OTE Short Top", color=color.new(bearColor, 40), linewidth=1, style=plot.style_linebr, display=overlayLineDisplay)
-oteShortBottomPlot = plot(strictIctMode and strictShowOte ? oteShortBottom : na, "OTE Short Bottom", color=color.new(bearColor, 40), linewidth=1, style=plot.style_linebr, display=overlayLineDisplay)
+oteLongTopPlot = plot(oteLongTopLevel, "OTE Long Top", color=color.new(bullColor, 40), linewidth=1, style=plot.style_linebr, display=overlayLineDisplay)
+oteLongBottomPlot = plot(oteLongBottomLevel, "OTE Long Bottom", color=color.new(bullColor, 40), linewidth=1, style=plot.style_linebr, display=overlayLineDisplay)
+oteShortTopPlot = plot(oteShortTopLevel, "OTE Short Top", color=color.new(bearColor, 40), linewidth=1, style=plot.style_linebr, display=overlayLineDisplay)
+oteShortBottomPlot = plot(oteShortBottomLevel, "OTE Short Bottom", color=color.new(bearColor, 40), linewidth=1, style=plot.style_linebr, display=overlayLineDisplay)
 fill(oteLongTopPlot, oteLongBottomPlot, color=strictIctMode and strictShowOte ? color.new(bullColor, 92) : na)
 fill(oteShortTopPlot, oteShortBottomPlot, color=strictIctMode and strictShowOte ? color.new(bearColor, 92) : na)
 
