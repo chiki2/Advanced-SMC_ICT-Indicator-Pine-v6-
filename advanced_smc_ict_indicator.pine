@@ -19,7 +19,7 @@ int engineDisplacementLookback = 10
 
 groupLiquidity = "2. Liquidity"
 showLiquidity = input.bool(true, "Show liquidity pools", group=groupLiquidity)
-showPrevSession = input.bool(true, "Show previous session high / low", group=groupLiquidity)
+showPrevSession = input.bool(true, "Show previous source high / low", group=groupLiquidity)
 showHigherPeriodLiquidity = input.bool(true, "Show previous day / week / month high / low", group=groupLiquidity)
 showInternalRange = input.bool(true, "Show internal range liquidity", group=groupLiquidity)
 showSweeps = input.bool(true, "Show liquidity sweep markers", group=groupLiquidity)
@@ -29,9 +29,9 @@ string asiaSessionWindow = "2000-0000"
 string londonSessionWindow = "0100-0700"
 string nyAmSessionWindow = "0700-1300"
 string nyPmSessionWindow = "1300-1600"
-bool usePrevSessionInEngine = true
-bool useHigherPeriodLiquidityInEngine = true
-bool useTrendlineLiquidityInEngine = true
+// Keep engine liquidity families aligned with their visible source toggles.
+bool usePrevSessionInEngine = showPrevSession
+bool useHigherPeriodLiquidityInEngine = showHigherPeriodLiquidity
 float equalToleranceAtr = 0.10
 
 groupOb = "3. Order Blocks / Breakers"
@@ -50,8 +50,6 @@ int maxFvgZones = 16
 
 groupHtf = "5. Higher Timeframe Context"
 showHtf = input.bool(true, "Show higher timeframe structure", group=groupHtf)
-string htfTf = "240"
-bool allowManualHtfOverride = false
 bool stopOnInvalidTf = true
 int htfSwingLen = 2
 
@@ -68,10 +66,6 @@ float setupManagedR = 1.00
 groupStrict = "8. Strict ICT Entry"
 strictIctMode = input.bool(false, "Enable Strict ICT Entry mode", group=groupStrict)
 strictShowOte = input.bool(true, "Show OTE zone overlay", group=groupStrict)
-bool strictRequireHtfBias = true
-bool strictRequirePd = true
-bool strictRequireOte = true
-bool strictRequireKillzone = true
 string strictKillzoneSession = "0200-0500,0700-1000,1300-1600"
 int strictMssLookback = 10
 
@@ -344,16 +338,6 @@ f_ictMaxHtf(float chartSeconds) =>
          chartSeconds <= timeframe.in_seconds("240") ? "1W" :
          chartSeconds <= timeframe.in_seconds("1D") ? "1M" : ""
 
-f_htfStateText(string chartTf, string minTf, string maxTf, string selectedTf, bool manualAllowed, bool manualValid, bool ready) =>
-    string stateText = chartTf + " | ICT " + minTf
-    if ready and maxTf != ""
-        stateText := chartTf + " | ICT " + minTf + "-" + maxTf + " | " + selectedTf
-    if manualAllowed and not manualValid
-        stateText := chartTf + " | Manual " + selectedTf + " outside ICT band"
-    else if not ready
-        stateText := chartTf + " | ICT TF invalid"
-    stateText
-
 f_rrPoints(float rr) =>
     na(rr) ? 0.0 : rr >= 2.0 ? 2.0 : rr >= 1.2 ? 1.0 : 0.0
 
@@ -510,20 +494,15 @@ chartTfSeconds = timeframe.in_seconds()
 ictMinHtfTf = f_ictMinHtf(chartTfSeconds)
 ictMaxHtfTf = f_ictMaxHtf(chartTfSeconds)
 ictChartTfValid = ictMinHtfTf != "" and ictMaxHtfTf != ""
-ictMinHtfSeconds = ictChartTfValid ? timeframe.in_seconds(ictMinHtfTf) : na
-ictMaxHtfSeconds = ictChartTfValid ? timeframe.in_seconds(ictMaxHtfTf) : na
-manualHtfSeconds = timeframe.in_seconds(htfTf)
-manualHtfValid = allowManualHtfOverride and ictChartTfValid and not na(manualHtfSeconds) and manualHtfSeconds > chartTfSeconds and manualHtfSeconds >= ictMinHtfSeconds and manualHtfSeconds <= ictMaxHtfSeconds
-effectiveHtfTf = manualHtfValid ? htfTf : ictChartTfValid ? ictMinHtfTf : timeframe.main_period
+effectiveHtfTf = ictChartTfValid ? ictMinHtfTf : timeframe.main_period
 effectiveHtfSeconds = ictChartTfValid ? timeframe.in_seconds(effectiveHtfTf) : na
 htfContextReady = ictChartTfValid and not na(effectiveHtfSeconds) and effectiveHtfSeconds > chartTfSeconds
-tfPairInvalid = not ictChartTfValid or (allowManualHtfOverride and not manualHtfValid)
-htfStateText = f_htfStateText(chartTfLabel, ictMinHtfTf, ictMaxHtfTf, effectiveHtfTf, allowManualHtfOverride, manualHtfValid, htfContextReady)
+tfPairInvalid = not ictChartTfValid
 
 if stopOnInvalidTf and tfPairInvalid
-    runtime.error(not ictChartTfValid ? "Invalid ICT chart timeframe: " + chartTfLabel + ". Use an execution timeframe from 1m up to 1D." : "Invalid ICT TF pairing: chart " + chartTfLabel + " requires HTF inside " + ictMinHtfTf + "-" + ictMaxHtfTf + ", but manual override uses " + htfTf + ".")
+    runtime.error("Invalid ICT chart timeframe: " + chartTfLabel + ". Use an execution timeframe from 1m up to 1D.")
 
-if strictModeEnabled and strictRequireKillzone and not timeframe.isintraday
+if strictModeEnabled and not timeframe.isintraday
     runtime.error("Strict ICT killzone requires an intraday chart timeframe.")
 
 f_trimFvg() =>
@@ -774,8 +753,6 @@ var float lastNyAmHigh = na
 var float lastNyAmLow = na
 var float lastNyPmHigh = na
 var float lastNyPmLow = na
-var float sessionHigh = na
-var float sessionLow = na
 var float prevSessionHigh = na
 var float prevSessionLow = na
 
@@ -788,8 +765,6 @@ float lastNyCompositeHigh = f_mergeSessionHigh(lastNyAmHigh, lastNyPmHigh)
 float lastNyCompositeLow = f_mergeSessionLow(lastNyAmLow, lastNyPmLow)
 string currentSessionBlock = inAsiaSession ? "Asia" : inLondonSession ? "London" : inNyAmSession ? "New York AM" : inNyPmSession ? "New York PM" : "Inter-session"
 string liquiditySessionLabel = inLondonSession ? "Asia" : inNyAmSession ? "London" : inNyPmSession ? "New York AM" : "New York Composite"
-sessionHigh := inLondonSession ? asiaSessionHigh : inNyAmSession ? londonSessionHigh : inNyPmSession ? nyAmSessionHigh : f_mergeSessionHigh(nyAmSessionHigh, nyPmSessionHigh)
-sessionLow := inLondonSession ? asiaSessionLow : inNyAmSession ? londonSessionLow : inNyPmSession ? nyAmSessionLow : f_mergeSessionLow(nyAmSessionLow, nyPmSessionLow)
 prevSessionHigh := inLondonSession ? lastAsiaHigh : inNyAmSession ? lastLondonHigh : inNyPmSession ? lastNyAmHigh : lastNyCompositeHigh
 prevSessionLow := inLondonSession ? lastAsiaLow : inNyAmSession ? lastLondonLow : inNyPmSession ? lastNyAmLow : lastNyCompositeLow
 
@@ -799,6 +774,14 @@ prevWeekHigh = request.security(syminfo.tickerid, "W", high[1], lookahead=barmer
 prevWeekLow = request.security(syminfo.tickerid, "W", low[1], lookahead=barmerge.lookahead_off)
 prevMonthHigh = request.security(syminfo.tickerid, "M", high[1], lookahead=barmerge.lookahead_off)
 prevMonthLow = request.security(syminfo.tickerid, "M", low[1], lookahead=barmerge.lookahead_off)
+enginePrevSessionHigh = usePrevSessionInEngine ? prevSessionHigh : na
+enginePrevSessionLow = usePrevSessionInEngine ? prevSessionLow : na
+enginePrevDayHigh = useHigherPeriodLiquidityInEngine ? prevDayHigh : na
+enginePrevDayLow = useHigherPeriodLiquidityInEngine ? prevDayLow : na
+enginePrevWeekHigh = useHigherPeriodLiquidityInEngine ? prevWeekHigh : na
+enginePrevWeekLow = useHigherPeriodLiquidityInEngine ? prevWeekLow : na
+enginePrevMonthHigh = useHigherPeriodLiquidityInEngine ? prevMonthHigh : na
+enginePrevMonthLow = useHigherPeriodLiquidityInEngine ? prevMonthLow : na
 
 //------------------------------------------------------------------------------
 // Pivot-based market structure
@@ -821,9 +804,6 @@ var bool latestEqlActive = false
 var bool lastHighBroken = false
 var bool lastLowBroken = false
 
-var line bullTrendline = na
-var line bearTrendline = na
-
 if not na(pivotHigh)
     pBar = bar_index - swingLen
     pPrice = pivotHigh
@@ -837,11 +817,6 @@ if not na(pivotHigh)
     lastSwingHigh := pPrice
     lastSwingHighBar := pBar
     lastHighBroken := false
-    if useTrendlineLiquidityInEngine and not na(prevSwingHigh) and not na(prevSwingHighBar)
-        if not na(bearTrendline)
-            line.delete(bearTrendline)
-        trendlineColor = color.new(liqHighColor, 100)
-        bearTrendline := line.new(x1=prevSwingHighBar, y1=prevSwingHigh, x2=lastSwingHighBar, y2=lastSwingHigh, xloc=xloc.bar_index, extend=extend.right, color=trendlineColor, style=line.style_dashed)
 
 if not na(pivotLow)
     pBar = bar_index - swingLen
@@ -856,35 +831,26 @@ if not na(pivotLow)
     lastSwingLow := pPrice
     lastSwingLowBar := pBar
     lastLowBroken := false
-    if useTrendlineLiquidityInEngine and not na(prevSwingLow) and not na(prevSwingLowBar)
-        if not na(bullTrendline)
-            line.delete(bullTrendline)
-        trendlineColor = color.new(liqLowColor, 100)
-        bullTrendline := line.new(x1=prevSwingLowBar, y1=prevSwingLow, x2=lastSwingLowBar, y2=lastSwingLow, xloc=xloc.bar_index, extend=extend.right, color=trendlineColor, style=line.style_dashed)
 
 //------------------------------------------------------------------------------
 // Liquidity sweeps, inducement, BOS / CHOCH
 //------------------------------------------------------------------------------
-bullTrendlinePrice = not na(bullTrendline) ? line.get_price(bullTrendline, bar_index) : na
-bearTrendlinePrice = not na(bearTrendline) ? line.get_price(bearTrendline, bar_index) : na
 activeEqh = latestEqhActive ? latestEqh : na
 activeEql = latestEqlActive ? latestEql : na
 
 sellSideSweep = (not na(lastSwingLow) and low < lastSwingLow and not f_breakDown(lastSwingLow)) or
-     (usePrevSessionInEngine and not na(prevSessionLow) and low < prevSessionLow and close > prevSessionLow) or
-     (useHigherPeriodLiquidityInEngine and low < prevDayLow and close > prevDayLow) or
-     (useHigherPeriodLiquidityInEngine and low < prevWeekLow and close > prevWeekLow) or
-     (useHigherPeriodLiquidityInEngine and low < prevMonthLow and close > prevMonthLow) or
-     (not na(activeEql) and low < activeEql and close > activeEql) or
-     (useTrendlineLiquidityInEngine and not na(bullTrendlinePrice) and low < bullTrendlinePrice and close > bullTrendlinePrice)
+     (not na(enginePrevSessionLow) and low < enginePrevSessionLow and close > enginePrevSessionLow) or
+     (not na(enginePrevDayLow) and low < enginePrevDayLow and close > enginePrevDayLow) or
+     (not na(enginePrevWeekLow) and low < enginePrevWeekLow and close > enginePrevWeekLow) or
+     (not na(enginePrevMonthLow) and low < enginePrevMonthLow and close > enginePrevMonthLow) or
+     (not na(activeEql) and low < activeEql and close > activeEql)
 
 buySideSweep = (not na(lastSwingHigh) and high > lastSwingHigh and not f_breakUp(lastSwingHigh)) or
-     (usePrevSessionInEngine and not na(prevSessionHigh) and high > prevSessionHigh and close < prevSessionHigh) or
-     (useHigherPeriodLiquidityInEngine and high > prevDayHigh and close < prevDayHigh) or
-     (useHigherPeriodLiquidityInEngine and high > prevWeekHigh and close < prevWeekHigh) or
-     (useHigherPeriodLiquidityInEngine and high > prevMonthHigh and close < prevMonthHigh) or
-     (not na(activeEqh) and high > activeEqh and close < activeEqh) or
-     (useTrendlineLiquidityInEngine and not na(bearTrendlinePrice) and high > bearTrendlinePrice and close < bearTrendlinePrice)
+     (not na(enginePrevSessionHigh) and high > enginePrevSessionHigh and close < enginePrevSessionHigh) or
+     (not na(enginePrevDayHigh) and high > enginePrevDayHigh and close < enginePrevDayHigh) or
+     (not na(enginePrevWeekHigh) and high > enginePrevWeekHigh and close < enginePrevWeekHigh) or
+     (not na(enginePrevMonthHigh) and high > enginePrevMonthHigh and close < enginePrevMonthHigh) or
+     (not na(activeEqh) and high > activeEqh and close < activeEqh)
 
 plotshape(displaySweepMarkers and sellSideSweep, title="Sell-side liquidity sweep", style=shape.triangleup, location=location.belowbar, color=bullColor, size=size.tiny, text="")
 plotshape(displaySweepMarkers and buySideSweep, title="Buy-side liquidity sweep", style=shape.triangledown, location=location.abovebar, color=bearColor, size=size.tiny, text="")
@@ -1521,14 +1487,14 @@ if na(latestBearZoneTop)
     latestBearZoneCreatedBar := fallbackBearZoneCreatedBar
     latestBearZoneTouched := fallbackBearZoneTouched
 
-bool bullObPdPass = not strictRequirePd or (not na(latestBullZoneTop) and not na(bullEquilibriumActive) and f_zoneMid(latestBullZoneTop, latestBullZoneBottom) < bullEquilibriumActive)
-bool bullFvgPdPass = not strictRequirePd or (not na(latestBullFvgTop) and not na(bullEquilibriumActive) and f_zoneMid(latestBullFvgTop, latestBullFvgBottom) < bullEquilibriumActive)
-bool bearObPdPass = not strictRequirePd or (not na(latestBearZoneTop) and not na(bearEquilibriumActive) and f_zoneMid(latestBearZoneTop, latestBearZoneBottom) > bearEquilibriumActive)
-bool bearFvgPdPass = not strictRequirePd or (not na(latestBearFvgTop) and not na(bearEquilibriumActive) and f_zoneMid(latestBearFvgTop, latestBearFvgBottom) > bearEquilibriumActive)
-bool bullObOtePass = not strictRequireOte or f_zoneIntersects(latestBullZoneTop, latestBullZoneBottom, oteLongTop, oteLongBottom)
-bool bullFvgOtePass = not strictRequireOte or f_zoneIntersects(latestBullFvgTop, latestBullFvgBottom, oteLongTop, oteLongBottom)
-bool bearObOtePass = not strictRequireOte or f_zoneIntersects(latestBearZoneTop, latestBearZoneBottom, oteShortTop, oteShortBottom)
-bool bearFvgOtePass = not strictRequireOte or f_zoneIntersects(latestBearFvgTop, latestBearFvgBottom, oteShortTop, oteShortBottom)
+bool bullObPdPass = not na(latestBullZoneTop) and not na(bullEquilibriumActive) and f_zoneMid(latestBullZoneTop, latestBullZoneBottom) < bullEquilibriumActive
+bool bullFvgPdPass = not na(latestBullFvgTop) and not na(bullEquilibriumActive) and f_zoneMid(latestBullFvgTop, latestBullFvgBottom) < bullEquilibriumActive
+bool bearObPdPass = not na(latestBearZoneTop) and not na(bearEquilibriumActive) and f_zoneMid(latestBearZoneTop, latestBearZoneBottom) > bearEquilibriumActive
+bool bearFvgPdPass = not na(latestBearFvgTop) and not na(bearEquilibriumActive) and f_zoneMid(latestBearFvgTop, latestBearFvgBottom) > bearEquilibriumActive
+bool bullObOtePass = f_zoneIntersects(latestBullZoneTop, latestBullZoneBottom, oteLongTop, oteLongBottom)
+bool bullFvgOtePass = f_zoneIntersects(latestBullFvgTop, latestBullFvgBottom, oteLongTop, oteLongBottom)
+bool bearObOtePass = f_zoneIntersects(latestBearZoneTop, latestBearZoneBottom, oteShortTop, oteShortBottom)
+bool bearFvgOtePass = f_zoneIntersects(latestBearFvgTop, latestBearFvgBottom, oteShortTop, oteShortBottom)
 bool preferBullOb = not na(latestBullEntry) and (not strictModeEnabled or (bullObPdPass and bullObOtePass))
 bool preferBullFvg = not na(latestBullFvgTop) and not na(latestBullFvgBottom) and (not strictModeEnabled or (bullFvgPdPass and bullFvgOtePass))
 bool preferBearOb = not na(latestBearEntry) and (not strictModeEnabled or (bearObPdPass and bearObOtePass))
@@ -1566,7 +1532,7 @@ else if preferBullFvg
     tradeLongTouched := latestBullFvgTouched
 
 if not na(tradeLongEntry)
-    tradeLongTarget := f_nearestAbove(tradeLongEntry, lastSwingHigh, activeEqh, prevSessionHigh, prevDayHigh, prevWeekHigh, prevMonthHigh, htfStructureHigh)
+    tradeLongTarget := f_nearestAbove(tradeLongEntry, lastSwingHigh, activeEqh, enginePrevSessionHigh, enginePrevDayHigh, enginePrevWeekHigh, enginePrevMonthHigh, htfStructureHigh)
     longTargetIsLiquidity := not na(tradeLongTarget)
     float tempLongRisk = not na(tradeLongStop) ? tradeLongEntry - tradeLongStop : na
     if na(tradeLongTarget) and not na(tempLongRisk) and tempLongRisk > 0
@@ -1604,7 +1570,7 @@ else if preferBearFvg
     tradeShortTouched := latestBearFvgTouched
 
 if not na(tradeShortEntry)
-    tradeShortTarget := f_nearestBelow(tradeShortEntry, lastSwingLow, activeEql, prevSessionLow, prevDayLow, prevWeekLow, prevMonthLow, htfStructureLow)
+    tradeShortTarget := f_nearestBelow(tradeShortEntry, lastSwingLow, activeEql, enginePrevSessionLow, enginePrevDayLow, enginePrevWeekLow, enginePrevMonthLow, htfStructureLow)
     shortTargetIsLiquidity := not na(tradeShortTarget)
     float tempShortRisk = not na(tradeShortStop) ? tradeShortStop - tradeShortEntry : na
     if na(tradeShortTarget) and not na(tempShortRisk) and tempShortRisk > 0
@@ -1621,13 +1587,13 @@ bool longChased = not tradeLongTouched and not na(tradeLongValidTop) and close >
 bool longStructureInvalidated = not na(tradeLongCreatedBar) and not na(lastBearMssBar) and lastBearMssBar > tradeLongCreatedBar
 bool longManaged = tradeLongTouched and not na(longRisk) and high >= tradeLongEntry + longRisk * setupManagedR
 bool longFresh = not tradeLongTouched and not na(longSetupAge) and longSetupAge <= setupFreshBars
-bool strictLongBiasPass = not strictModeEnabled or (activeBias == 1 and (not strictRequireHtfBias or (htfContextReady and htfBias == 1)))
+bool strictLongBiasPass = not strictModeEnabled or (activeBias == 1 and htfContextReady and htfBias == 1)
 bool strictLongSweepPass = not strictModeEnabled or bullLegHasSweep
 bool strictLongMssFresh = not na(lastBullMssBar) and (bar_index - lastBullMssBar) <= strictMssLookback
 bool strictLongMssPass = not strictModeEnabled or (bullLegHasMss and strictLongMssFresh and activeBias == 1)
-bool strictLongPdPass = not strictModeEnabled or (not strictRequirePd or (not na(tradeLongValidTop) and not na(bullEquilibriumActive) and f_zoneMid(tradeLongValidTop, tradeLongValidBottom) < bullEquilibriumActive))
-bool strictLongOtePass = not strictModeEnabled or (not strictRequireOte or f_zoneIntersects(tradeLongValidTop, tradeLongValidBottom, oteLongTop, oteLongBottom))
-bool strictLongKillzonePass = not strictModeEnabled or (not strictRequireKillzone or strictKillzoneActive)
+bool strictLongPdPass = not strictModeEnabled or (not na(tradeLongValidTop) and not na(bullEquilibriumActive) and f_zoneMid(tradeLongValidTop, tradeLongValidBottom) < bullEquilibriumActive)
+bool strictLongOtePass = not strictModeEnabled or f_zoneIntersects(tradeLongValidTop, tradeLongValidBottom, oteLongTop, oteLongBottom)
+bool strictLongKillzonePass = not strictModeEnabled or strictKillzoneActive
 bool strictLongContextPass = strictLongBiasPass and strictLongSweepPass and strictLongMssPass and strictLongPdPass and strictLongOtePass
 string strictLongMap = strictModeEnabled ? f_strictChecklist(strictLongBiasPass, strictLongSweepPass, strictLongMssPass, strictLongPdPass, strictLongOtePass, strictLongKillzonePass, false) : "Off"
 string strictLongMapCompact = strictModeEnabled ? f_strictChecklist(strictLongBiasPass, strictLongSweepPass, strictLongMssPass, strictLongPdPass, strictLongOtePass, strictLongKillzonePass, true) : "Off"
@@ -1649,13 +1615,13 @@ bool shortChased = not tradeShortTouched and not na(tradeShortValidBottom) and c
 bool shortStructureInvalidated = not na(tradeShortCreatedBar) and not na(lastBullMssBar) and lastBullMssBar > tradeShortCreatedBar
 bool shortManaged = tradeShortTouched and not na(shortRisk) and low <= tradeShortEntry - shortRisk * setupManagedR
 bool shortFresh = not tradeShortTouched and not na(shortSetupAge) and shortSetupAge <= setupFreshBars
-bool strictShortBiasPass = not strictModeEnabled or (activeBias == -1 and (not strictRequireHtfBias or (htfContextReady and htfBias == -1)))
+bool strictShortBiasPass = not strictModeEnabled or (activeBias == -1 and htfContextReady and htfBias == -1)
 bool strictShortSweepPass = not strictModeEnabled or bearLegHasSweep
 bool strictShortMssFresh = not na(lastBearMssBar) and (bar_index - lastBearMssBar) <= strictMssLookback
 bool strictShortMssPass = not strictModeEnabled or (bearLegHasMss and strictShortMssFresh and activeBias == -1)
-bool strictShortPdPass = not strictModeEnabled or (not strictRequirePd or (not na(tradeShortValidTop) and not na(bearEquilibriumActive) and f_zoneMid(tradeShortValidTop, tradeShortValidBottom) > bearEquilibriumActive))
-bool strictShortOtePass = not strictModeEnabled or (not strictRequireOte or f_zoneIntersects(tradeShortValidTop, tradeShortValidBottom, oteShortTop, oteShortBottom))
-bool strictShortKillzonePass = not strictModeEnabled or (not strictRequireKillzone or strictKillzoneActive)
+bool strictShortPdPass = not strictModeEnabled or (not na(tradeShortValidTop) and not na(bearEquilibriumActive) and f_zoneMid(tradeShortValidTop, tradeShortValidBottom) > bearEquilibriumActive)
+bool strictShortOtePass = not strictModeEnabled or f_zoneIntersects(tradeShortValidTop, tradeShortValidBottom, oteShortTop, oteShortBottom)
+bool strictShortKillzonePass = not strictModeEnabled or strictKillzoneActive
 bool strictShortContextPass = strictShortBiasPass and strictShortSweepPass and strictShortMssPass and strictShortPdPass and strictShortOtePass
 string strictShortMap = strictModeEnabled ? f_strictChecklist(strictShortBiasPass, strictShortSweepPass, strictShortMssPass, strictShortPdPass, strictShortOtePass, strictShortKillzonePass, false) : "Off"
 string strictShortMapCompact = strictModeEnabled ? f_strictChecklist(strictShortBiasPass, strictShortSweepPass, strictShortMssPass, strictShortPdPass, strictShortOtePass, strictShortKillzonePass, true) : "Off"
@@ -1892,8 +1858,8 @@ bearStop = not na(tradeShortStop) ? tradeShortStop : not na(lastSwingHigh) ? las
 //   Full / Focused: show
 //   Minimal: hide except protected level and active OTE
 //------------------------------------------------------------------------------
-longExternalDraw = longActionable and not na(tradeLongEntry) ? f_nearestAbove(tradeLongEntry, prevDayHigh, prevWeekHigh, prevMonthHigh, htfStructureHigh, na, na, na) : na
-shortExternalDraw = shortActionable and not na(tradeShortEntry) ? f_nearestBelow(tradeShortEntry, prevDayLow, prevWeekLow, prevMonthLow, htfStructureLow, na, na, na) : na
+longExternalDraw = longActionable and not na(tradeLongEntry) ? f_nearestAbove(tradeLongEntry, enginePrevDayHigh, enginePrevWeekHigh, enginePrevMonthHigh, htfStructureHigh, na, na, na) : na
+shortExternalDraw = shortActionable and not na(tradeShortEntry) ? f_nearestBelow(tradeShortEntry, enginePrevDayLow, enginePrevWeekLow, enginePrevMonthLow, htfStructureLow, na, na, na) : na
 primaryExternalDrawLevel = compactUseLong ? longExternalDraw : shortExternalDraw
 compactRrDrawDisplay := compactBalanced ? "-" : f_formatRr(compactRr) + " | " + f_formatLevel(primaryExternalDrawLevel)
 targetPrevSessionHigh = f_preferredLevelMatch(prevSessionHigh, compactBalanced, compactUseLong, tradeLongTarget, tradeShortTarget)
@@ -1980,8 +1946,8 @@ oteShortMid = not na(oteShortTop) and not na(oteShortBottom) ? f_zoneMid(oteShor
 oteLongMidLevel = not na(oteLongTopLevel) and not na(oteLongBottomLevel) ? f_zoneMid(oteLongTopLevel, oteLongBottomLevel) : na
 oteShortMidLevel = not na(oteShortTopLevel) and not na(oteShortBottomLevel) ? f_zoneMid(oteShortTopLevel, oteShortBottomLevel) : na
 
-plotPrevSessionHigh = plot(prevSessionHighLevel, "Prev Session High", color=color.new(liqHighColor, 20), linewidth=1, style=plot.style_linebr, display=overlayLineDisplay)
-plotPrevSessionLow = plot(prevSessionLowLevel, "Prev Session Low", color=color.new(liqLowColor, 20), linewidth=1, style=plot.style_linebr, display=overlayLineDisplay)
+plotPrevSessionHigh = plot(prevSessionHighLevel, "Previous Source High", color=color.new(liqHighColor, 20), linewidth=1, style=plot.style_linebr, display=overlayLineDisplay)
+plotPrevSessionLow = plot(prevSessionLowLevel, "Previous Source Low", color=color.new(liqLowColor, 20), linewidth=1, style=plot.style_linebr, display=overlayLineDisplay)
 plotPrevDayHigh = plot(prevDayHighLevel, "PDH", color=color.new(liqHighColor, 0), linewidth=1, style=plot.style_linebr, display=overlayLineDisplay)
 plotPrevDayLow = plot(prevDayLowLevel, "PDL", color=color.new(liqLowColor, 0), linewidth=1, style=plot.style_linebr, display=overlayLineDisplay)
 plotPrevWeekHigh = plot(prevWeekHighLevel, "PWH", color=color.new(liqHighColor, 30), linewidth=1, style=plot.style_linebr, display=overlayLineDisplay)
@@ -1999,8 +1965,8 @@ internalLowPlot = plot(internalLowLevel, "ICT Dealing Range Low", color=color.ne
 internalEqPlot = plot(internalEqLevel, "ICT Equilibrium", color=color.new(neutralColor, 20), linewidth=1, style=plot.style_linebr, display=overlayLineDisplay)
 
 if barstate.islast
-    prevSessionHighLabel := f_syncRightEdgeLabel(prevSessionHighLabel, prevSessionHighLevel, "Sess H", color.new(liqHighColor, 5), color.white, displayLiquidityRightLabels and showPrevSessionHighVisual)
-    prevSessionLowLabel := f_syncRightEdgeLabel(prevSessionLowLabel, prevSessionLowLevel, "Sess L", color.new(liqLowColor, 5), color.white, displayLiquidityRightLabels and showPrevSessionLowVisual)
+    prevSessionHighLabel := f_syncRightEdgeLabel(prevSessionHighLabel, prevSessionHighLevel, "Src H", color.new(liqHighColor, 5), color.white, displayLiquidityRightLabels and showPrevSessionHighVisual)
+    prevSessionLowLabel := f_syncRightEdgeLabel(prevSessionLowLabel, prevSessionLowLevel, "Src L", color.new(liqLowColor, 5), color.white, displayLiquidityRightLabels and showPrevSessionLowVisual)
     prevDayHighLabel := f_syncRightEdgeLabel(prevDayHighLabel, prevDayHighLevel, "PDH", color.new(liqHighColor, 0), color.white, displayLiquidityRightLabels and showPrevDayHighVisual)
     prevDayLowLabel := f_syncRightEdgeLabel(prevDayLowLabel, prevDayLowLevel, "PDL", color.new(liqLowColor, 0), color.white, displayLiquidityRightLabels and showPrevDayLowVisual)
     prevWeekHighLabel := f_syncRightEdgeLabel(prevWeekHighLabel, prevWeekHighLevel, "PWH", color.new(liqHighColor, 20), color.white, displayLiquidityRightLabels and showPrevWeekHighVisual)
