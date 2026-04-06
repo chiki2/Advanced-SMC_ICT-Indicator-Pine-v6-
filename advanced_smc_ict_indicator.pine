@@ -666,11 +666,23 @@ plotshape(displaySweepMarkers and buySideSweep, title="Buy-side liquidity sweep"
 
 var int lastSellSideSweepBar = na
 var int lastBuySideSweepBar = na
+var int bullSequenceSweepBar = na
+var int bullSequenceFvgBar = na
+var int bullSequenceDisplacementBar = na
+var int bearSequenceSweepBar = na
+var int bearSequenceFvgBar = na
+var int bearSequenceDisplacementBar = na
 
 if sellSideSweep
     lastSellSideSweepBar := bar_index
+    bullSequenceSweepBar := bar_index
+    bullSequenceFvgBar := na
+    bullSequenceDisplacementBar := na
 if buySideSweep
     lastBuySideSweepBar := bar_index
+    bearSequenceSweepBar := bar_index
+    bearSequenceFvgBar := na
+    bearSequenceDisplacementBar := na
 
 var int trendBias = 0
 var int lastStructureBreakBar = na
@@ -703,6 +715,9 @@ var int bullLegEndBar = na
 var bool bullLegHasSweep = false
 var bool bullLegHasDisplacement = false
 var bool bullLegHasMss = false
+var int bullLegSweepBar = na
+var int bullLegFvgBar = na
+var int bullLegDisplacementBar = na
 var float bullOteTopState = na
 var float bullOteBottomState = na
 var int bullOteCreatedBar = na
@@ -715,6 +730,9 @@ var int bearLegEndBar = na
 var bool bearLegHasSweep = false
 var bool bearLegHasDisplacement = false
 var bool bearLegHasMss = false
+var int bearLegSweepBar = na
+var int bearLegFvgBar = na
+var int bearLegDisplacementBar = na
 var float bearOteTopState = na
 var float bearOteBottomState = na
 var int bearOteCreatedBar = na
@@ -734,11 +752,17 @@ bearFvg = high < low[2] and bearDisplacementFvg and (low[2] - high) >= atr * fvg
 if bullFvg
     lastBullFvgBar := bar_index
     lastBullDisplacementBar := bar_index - 1
+    if not na(bullSequenceSweepBar) and (bar_index - bullSequenceSweepBar) <= obValidationLookback
+        bullSequenceFvgBar := bar_index
+        bullSequenceDisplacementBar := bar_index - 1
     f_addFvg(true, low, high[2])
 
 if bearFvg
     lastBearFvgBar := bar_index
     lastBearDisplacementBar := bar_index - 1
+    if not na(bearSequenceSweepBar) and (bar_index - bearSequenceSweepBar) <= obValidationLookback
+        bearSequenceFvgBar := bar_index
+        bearSequenceDisplacementBar := bar_index - 1
     f_addFvg(false, low[2], high)
 
 if array.size(fvgBoxes) > 0
@@ -783,10 +807,26 @@ if array.size(fvgBoxes) > 0
             array.remove(fvgCreatedBars, i)
             array.remove(fvgTouched, i)
 
-bullSequenceValid = not na(lastSellSideSweepBar) and not na(lastBullFvgBar) and (bar_index - lastSellSideSweepBar) <= obValidationLookback and (bar_index - lastBullFvgBar) <= obValidationLookback and lastBullFvgBar >= lastSellSideSweepBar
-bearSequenceValid = not na(lastBuySideSweepBar) and not na(lastBearFvgBar) and (bar_index - lastBuySideSweepBar) <= obValidationLookback and (bar_index - lastBearFvgBar) <= obValidationLookback and lastBearFvgBar >= lastBuySideSweepBar
-recentBullDisplacement = not na(lastBullDisplacementBar) and (bar_index - lastBullDisplacementBar) <= engineDisplacementLookback
-recentBearDisplacement = not na(lastBearDisplacementBar) and (bar_index - lastBearDisplacementBar) <= engineDisplacementLookback
+if not na(bullSequenceSweepBar) and (bar_index - bullSequenceSweepBar) > obValidationLookback
+    bullSequenceSweepBar := na
+    bullSequenceFvgBar := na
+    bullSequenceDisplacementBar := na
+else if not na(bullSequenceFvgBar) and (bar_index - bullSequenceFvgBar) > obValidationLookback
+    bullSequenceFvgBar := na
+    bullSequenceDisplacementBar := na
+
+if not na(bearSequenceSweepBar) and (bar_index - bearSequenceSweepBar) > obValidationLookback
+    bearSequenceSweepBar := na
+    bearSequenceFvgBar := na
+    bearSequenceDisplacementBar := na
+else if not na(bearSequenceFvgBar) and (bar_index - bearSequenceFvgBar) > obValidationLookback
+    bearSequenceFvgBar := na
+    bearSequenceDisplacementBar := na
+
+bullSequenceValid = not na(bullSequenceSweepBar) and not na(bullSequenceFvgBar) and (bar_index - bullSequenceSweepBar) <= obValidationLookback and (bar_index - bullSequenceFvgBar) <= obValidationLookback and bullSequenceFvgBar >= bullSequenceSweepBar
+bearSequenceValid = not na(bearSequenceSweepBar) and not na(bearSequenceFvgBar) and (bar_index - bearSequenceSweepBar) <= obValidationLookback and (bar_index - bearSequenceFvgBar) <= obValidationLookback and bearSequenceFvgBar >= bearSequenceSweepBar
+recentBullDisplacement = not na(bullSequenceDisplacementBar) and (bar_index - bullSequenceDisplacementBar) <= engineDisplacementLookback
+recentBearDisplacement = not na(bearSequenceDisplacementBar) and (bar_index - bearSequenceDisplacementBar) <= engineDisplacementLookback
 bullMssLevel = not na(protectedHigh) ? protectedHigh : lastSwingHigh
 bearMssLevel = not na(protectedLow) ? protectedLow : lastSwingLow
 bullMss = not na(bullMssLevel) and trendBias != 1 and f_breakUp(bullMssLevel) and bullSequenceValid and recentBullDisplacement
@@ -795,8 +835,8 @@ bullBos = trendBias == 1 and bullBreak
 bearBos = trendBias == -1 and bearBreak
 
 if bullMss or bullBos
-    bool resetBullLeg = bullMss or trendBias != 1
-    int bullSourceBar = resetBullLeg ? (bullSequenceValid ? lastSellSideSweepBar : na(protectedLowBar) ? lastSwingLowBar : protectedLowBar) : bullLegStartBar
+    bool resetBullLeg = bullMss
+    int bullSourceBar = resetBullLeg ? (bullSequenceValid ? bullSequenceSweepBar : na(protectedLowBar) ? lastSwingLowBar : protectedLowBar) : bullLegStartBar
     float bullEventLevel = bullMss ? bullMssLevel : lastSwingHigh
     int bullEventBar = bullMss and not na(protectedHighBar) ? protectedHighBar : lastSwingHighBar
     f_drawStructureEvent(bullEventBar, bullEventLevel, bullMss ? "MSS" : "BOS", true)
@@ -805,9 +845,17 @@ if bullMss or bullBos
     lastHighBroken := true
     if bullMss
         lastBullMssBar := bar_index
+        bullLegSweepBar := bullSequenceSweepBar
+        bullLegFvgBar := bullSequenceFvgBar
+        bullLegDisplacementBar := bullSequenceDisplacementBar
+    else if bullSequenceValid and recentBullDisplacement
+        bullLegSweepBar := bullSequenceSweepBar
+        bullLegFvgBar := bullSequenceFvgBar
+        bullLegDisplacementBar := bullSequenceDisplacementBar
     bullLegStartBar := bullSourceBar
-    bullLegLow := f_legLowSince(bullLegStartBar, legSearchBars)
-    bullLegHigh := f_legHighSince(bullLegStartBar, legSearchBars)
+    if resetBullLeg
+        bullLegLow := f_legLowSince(bullLegStartBar, bar_index + 1)
+        bullLegHigh := f_legHighSince(bullLegStartBar, bar_index + 1)
     bullLegEndBar := bar_index
     bullLegHasSweep := resetBullLeg ? bullSequenceValid : (bullLegHasSweep or bullSequenceValid)
     bullLegHasDisplacement := resetBullLeg ? recentBullDisplacement : (bullLegHasDisplacement or recentBullDisplacement)
@@ -820,8 +868,8 @@ if bullMss or bullBos
         bearLegHasMss := false
 
 if bearMss or bearBos
-    bool resetBearLeg = bearMss or trendBias != -1
-    int bearSourceBar = resetBearLeg ? (bearSequenceValid ? lastBuySideSweepBar : na(protectedHighBar) ? lastSwingHighBar : protectedHighBar) : bearLegStartBar
+    bool resetBearLeg = bearMss
+    int bearSourceBar = resetBearLeg ? (bearSequenceValid ? bearSequenceSweepBar : na(protectedHighBar) ? lastSwingHighBar : protectedHighBar) : bearLegStartBar
     float bearEventLevel = bearMss ? bearMssLevel : lastSwingLow
     int bearEventBar = bearMss and not na(protectedLowBar) ? protectedLowBar : lastSwingLowBar
     f_drawStructureEvent(bearEventBar, bearEventLevel, bearMss ? "MSS" : "BOS", false)
@@ -830,9 +878,17 @@ if bearMss or bearBos
     lastLowBroken := true
     if bearMss
         lastBearMssBar := bar_index
+        bearLegSweepBar := bearSequenceSweepBar
+        bearLegFvgBar := bearSequenceFvgBar
+        bearLegDisplacementBar := bearSequenceDisplacementBar
+    else if bearSequenceValid and recentBearDisplacement
+        bearLegSweepBar := bearSequenceSweepBar
+        bearLegFvgBar := bearSequenceFvgBar
+        bearLegDisplacementBar := bearSequenceDisplacementBar
     bearLegStartBar := bearSourceBar
-    bearLegHigh := f_legHighSince(bearLegStartBar, legSearchBars)
-    bearLegLow := f_legLowSince(bearLegStartBar, legSearchBars)
+    if resetBearLeg
+        bearLegHigh := f_legHighSince(bearLegStartBar, bar_index + 1)
+        bearLegLow := f_legLowSince(bearLegStartBar, bar_index + 1)
     bearLegEndBar := bar_index
     bearLegHasSweep := resetBearLeg ? bearSequenceValid : (bearLegHasSweep or bearSequenceValid)
     bearLegHasDisplacement := resetBearLeg ? recentBearDisplacement : (bearLegHasDisplacement or recentBearDisplacement)
@@ -844,6 +900,18 @@ if bearMss or bearBos
         bullLegHasDisplacement := false
         bullLegHasMss := false
 
+if not na(bullLegStartBar) and trendBias == 1
+    bullLegLow := na(bullLegLow) ? low : math.min(bullLegLow, low)
+    bullLegHigh := na(bullLegHigh) ? high : math.max(bullLegHigh, high)
+    bullLegEndBar := bar_index
+    protectedLow := bullLegLow
+
+if not na(bearLegStartBar) and trendBias == -1
+    bearLegHigh := na(bearLegHigh) ? high : math.max(bearLegHigh, high)
+    bearLegLow := na(bearLegLow) ? low : math.min(bearLegLow, low)
+    bearLegEndBar := bar_index
+    protectedHigh := bearLegHigh
+
 //------------------------------------------------------------------------------
 // Order block qualification from a single strict leg: sweep -> displacement/FVG -> BOS
 //------------------------------------------------------------------------------
@@ -851,16 +919,16 @@ recentSellSideSweep = not na(lastSellSideSweepBar) and (bar_index - lastSellSide
 recentBuySideSweep = not na(lastBuySideSweepBar) and (bar_index - lastBuySideSweepBar) <= obValidationLookback
 recentBullFvg = not na(lastBullFvgBar) and (bar_index - lastBullFvgBar) <= obValidationLookback
 recentBearFvg = not na(lastBearFvgBar) and (bar_index - lastBearFvgBar) <= obValidationLookback
-obBullDisplacement = not na(lastBullDisplacementBar) and (bar_index - lastBullDisplacementBar) <= 1
-obBearDisplacement = not na(lastBearDisplacementBar) and (bar_index - lastBearDisplacementBar) <= 1
+obBullDisplacement = not na(bullSequenceDisplacementBar) and (bar_index - bullSequenceDisplacementBar) <= 1
+obBearDisplacement = not na(bearSequenceDisplacementBar) and (bar_index - bearSequenceDisplacementBar) <= 1
 
 if (bullMss or bullBos) and bullSequenceValid and obBullDisplacement
-    obShift = f_findLastOpposingCandle(true, lastSellSideSweepBar, lastBullFvgBar, legSearchBars)
+    obShift = f_findLastOpposingCandle(true, bullSequenceSweepBar, bullSequenceFvgBar, legSearchBars)
     if not na(obShift)
         f_addOb(true, obShift)
 
 if (bearMss or bearBos) and bearSequenceValid and obBearDisplacement
-    obShift = f_findLastOpposingCandle(false, lastBuySideSweepBar, lastBearFvgBar, legSearchBars)
+    obShift = f_findLastOpposingCandle(false, bearSequenceSweepBar, bearSequenceFvgBar, legSearchBars)
     if not na(obShift)
         f_addOb(false, obShift)
 
@@ -975,7 +1043,7 @@ bullOteRawBottom = not na(bullDealingRangeSize) and bullDealingRangeSize > 0 ? b
 bearOteRawTop = not na(bearDealingRangeSize) and bearDealingRangeSize > 0 ? bearDealingRangeLow + bearDealingRangeSize * 0.79 : na
 bearOteRawBottom = not na(bearDealingRangeSize) and bearDealingRangeSize > 0 ? bearDealingRangeLow + bearDealingRangeSize * 0.62 : na
 
-if bullMss or bullBos
+if bullMss
     bullOteTopState := bullOteRawTop
     bullOteBottomState := bullOteRawBottom
     bullOteCreatedBar := bar_index
@@ -985,7 +1053,7 @@ if bullMss or bullBos
 if bearMss
     bullOteInvalidated := true
 
-if bearMss or bearBos
+if bearMss
     bearOteTopState := bearOteRawTop
     bearOteBottomState := bearOteRawBottom
     bearOteCreatedBar := bar_index
@@ -1225,8 +1293,8 @@ bool longBiasAligned = activeBias == 1
 bool shortBiasAligned = activeBias == -1
 bool longHtfAligned = htfBias == 1
 bool shortHtfAligned = htfBias == -1
-bool longDisplacementSeen = bullLegHasDisplacement or recentBullFvg or (not na(lastBullDisplacementBar) and bar_index - lastBullDisplacementBar <= obValidationLookback)
-bool shortDisplacementSeen = bearLegHasDisplacement or recentBearFvg or (not na(lastBearDisplacementBar) and bar_index - lastBearDisplacementBar <= obValidationLookback)
+bool longDisplacementSeen = bullLegHasDisplacement
+bool shortDisplacementSeen = bearLegHasDisplacement
 
 float longConfidence = f_setupScore(not na(tradeLongEntry), longBiasAligned, longHtfAligned, bullLegHasSweep, longDisplacementSeen, tradeLongIsOb, tradeLongIsFvg, longPriceInZone, longPriceNearZone, longRr, longFresh, longManaged, strictIctMode, strictLongContextPass, strictLongKillzonePass, longReplaced, longChased, longExpired, longInvalidated)
 float longTpProbability = f_tpProbability(longConfidence, longRr, longPriceInZone, longPriceNearZone, longManaged, strictIctMode, strictLongContextPass, strictLongKillzonePass, longChased, longExpired, longInvalidated)
