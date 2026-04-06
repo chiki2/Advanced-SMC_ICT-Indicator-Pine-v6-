@@ -77,6 +77,7 @@ showDashboard = input.bool(true, "Show context dashboard", group=groupStyle)
 showProtectedLevels = input.bool(true, "Show protected high / low", group=groupStyle)
 showKillzoneVisual = input.bool(true, "Shade killzone on chart", group=groupStyle)
 showLiquidityRightLabels = input.bool(true, "Show right-edge liquidity labels", group=groupStyle)
+zoneDisplayMode = input.string("Full", "Zone display mode", options=["Full", "Focused", "Minimal"], group=groupStyle)
 
 groupMobile = "10. Mobile / Android"
 androidCompactMode = input.bool(false, "Android compact mode", group=groupMobile)
@@ -382,6 +383,9 @@ f_biasSummary(int currentBias, bool htfReady, int higherBias) =>
 
 f_strictTimeSummary(bool strictModeEnabled, string htfSummary, string sessionSummary, bool kzActive) =>
     (strictModeEnabled ? "Mode ON | " : "Mode OFF | ") + htfSummary + " | " + sessionSummary + " | KZ " + (kzActive ? "On" : "Off")
+
+f_zoneVisibleByMode(string mode, bool isSelected, bool isBull, string preferredDirection, bool useLongPreference) =>
+    mode == "Full" ? true : mode == "Focused" ? isSelected : preferredDirection == "Wait" ? isSelected : useLongPreference ? (isBull and isSelected) : (not isBull and isSelected)
 
 f_strictChecklist(bool biasPass, bool sweepPass, bool mssPass, bool pdPass, bool otePass, bool kzPass, bool compactText) =>
     compactText ? "B" + f_boolFlag(biasPass) + " S" + f_boolFlag(sweepPass) + " M" + f_boolFlag(mssPass) + " P" + f_boolFlag(pdPass) + " O" + f_boolFlag(otePass) + " K" + f_boolFlag(kzPass) : "B:" + f_boolFlag(biasPass) + " S:" + f_boolFlag(sweepPass) + " M:" + f_boolFlag(mssPass) + " PD:" + f_boolFlag(pdPass) + " OTE:" + f_boolFlag(otePass) + " KZ:" + f_boolFlag(kzPass)
@@ -1535,6 +1539,7 @@ if array.size(fvgBoxes) > 0
             box.set_bgcolor(zoneBox, isSelected ? selectedFill : zoneTouched ? touchedFill : baseFill)
         if not na(zoneLabel)
             label.set_color(zoneLabel, isSelected ? (zoneBull ? bullColor : bearColor) : zoneTouched ? (zoneBull ? color.new(bullColor, 55) : color.new(bearColor, 55)) : (zoneBull ? color.new(bullColor, 30) : color.new(bearColor, 30)))
+            label.set_textcolor(zoneLabel, color.white)
 
 if array.size(obBoxes) > 0
     for idx = 0 to array.size(obBoxes) - 1
@@ -1563,6 +1568,7 @@ if array.size(obBoxes) > 0
             line.set_width(zoneLine, isSelected ? 2 : 1)
         if not na(zoneLabel)
             label.set_color(zoneLabel, zoneFailed ? (zoneBull ? color.new(bearColor, 20) : color.new(bullColor, 20)) : isSelected ? (zoneBull ? bullColor : bearColor) : (zoneBull ? color.new(bullColor, 0) : color.new(bearColor, 0)))
+            label.set_textcolor(zoneLabel, color.white)
 
 string preferredDirection = "Wait"
 bool longActionable = f_isActionable(longStatus)
@@ -1581,6 +1587,48 @@ if not na(longConfidence) or not na(shortConfidence)
 bool compactUseLong = preferredDirection == "Long" or (preferredDirection == "Balanced" and not na(longConfidence) and (na(shortConfidence) or longConfidence >= shortConfidence))
 if preferredDirection == "Wait" and na(longConfidence) and not na(shortConfidence)
     compactUseLong := false
+
+if zoneDisplayMode != "Full"
+    if array.size(fvgBoxes) > 0
+        for idx = 0 to array.size(fvgBoxes) - 1
+            i = array.size(fvgBoxes) - 1 - idx
+            zoneBox = array.get(fvgBoxes, i)
+            zoneLabel = array.get(fvgLabels, i)
+            zoneBull = array.get(fvgBull, i)
+            zoneCreatedBar = array.get(fvgCreatedBars, i)
+            isSelected = (zoneBull and not na(selectedBullFvgBar) and zoneCreatedBar == selectedBullFvgBar) or (not zoneBull and not na(selectedBearFvgBar) and zoneCreatedBar == selectedBearFvgBar)
+            showZone = f_zoneVisibleByMode(zoneDisplayMode, isSelected, zoneBull, preferredDirection, compactUseLong)
+            if not showZone
+                if not na(zoneBox)
+                    box.set_border_color(zoneBox, na)
+                    box.set_bgcolor(zoneBox, na)
+                if not na(zoneLabel)
+                    label.set_color(zoneLabel, na)
+                    label.set_textcolor(zoneLabel, na)
+            else if not na(zoneLabel)
+                label.set_textcolor(zoneLabel, color.white)
+
+    if array.size(obBoxes) > 0
+        for idx = 0 to array.size(obBoxes) - 1
+            i = array.size(obBoxes) - 1 - idx
+            zoneBox = array.get(obBoxes, i)
+            zoneLine = array.get(obEntryLines, i)
+            zoneLabel = array.get(obLabels, i)
+            zoneBull = array.get(obBull, i)
+            zoneCreatedBar = array.get(obCreatedBars, i)
+            isSelected = (zoneBull and not na(selectedBullObBar) and zoneCreatedBar == selectedBullObBar) or (not zoneBull and not na(selectedBearObBar) and zoneCreatedBar == selectedBearObBar)
+            showZone = f_zoneVisibleByMode(zoneDisplayMode, isSelected, zoneBull, preferredDirection, compactUseLong)
+            if not showZone
+                if not na(zoneBox)
+                    box.set_border_color(zoneBox, na)
+                    box.set_bgcolor(zoneBox, na)
+                if not na(zoneLine)
+                    line.set_color(zoneLine, na)
+                if not na(zoneLabel)
+                    label.set_color(zoneLabel, na)
+                    label.set_textcolor(zoneLabel, na)
+            else if not na(zoneLabel)
+                label.set_textcolor(zoneLabel, color.white)
 
 string compactSetup = compactUseLong ? tradeLongSetup : tradeShortSetup
 string compactStatus = compactUseLong ? longStatus : shortStatus
