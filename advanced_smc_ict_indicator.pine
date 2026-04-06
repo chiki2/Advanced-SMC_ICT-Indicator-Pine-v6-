@@ -344,6 +344,9 @@ f_syncRightEdgeLabel(label currentLabel, float level, string labelText, color la
         updatedLabel := na
     updatedLabel
 
+f_setCell(table targetTable, int col, int row, string cellText, color textClr, color bgClr) =>
+    table.cell(targetTable, col, row, cellText, text_color=textClr, bgcolor=bgClr)
+
 f_strictChecklist(bool biasPass, bool sweepPass, bool mssPass, bool pdPass, bool otePass, bool kzPass, bool compactText) =>
     compactText ? "B" + f_boolFlag(biasPass) + " S" + f_boolFlag(sweepPass) + " M" + f_boolFlag(mssPass) + " P" + f_boolFlag(pdPass) + " O" + f_boolFlag(otePass) + " K" + f_boolFlag(kzPass) : "B:" + f_boolFlag(biasPass) + " S:" + f_boolFlag(sweepPass) + " M:" + f_boolFlag(mssPass) + " PD:" + f_boolFlag(pdPass) + " OTE:" + f_boolFlag(otePass) + " KZ:" + f_boolFlag(kzPass)
 
@@ -743,9 +746,6 @@ var int bullLegEndBar = na
 var bool bullLegHasSweep = false
 var bool bullLegHasDisplacement = false
 var bool bullLegHasMss = false
-var int bullLegSweepBar = na
-var int bullLegFvgBar = na
-var int bullLegDisplacementBar = na
 var float bullOteTopState = na
 var float bullOteBottomState = na
 var int bullOteCreatedBar = na
@@ -758,9 +758,6 @@ var int bearLegEndBar = na
 var bool bearLegHasSweep = false
 var bool bearLegHasDisplacement = false
 var bool bearLegHasMss = false
-var int bearLegSweepBar = na
-var int bearLegFvgBar = na
-var int bearLegDisplacementBar = na
 var float bearOteTopState = na
 var float bearOteBottomState = na
 var int bearOteCreatedBar = na
@@ -873,13 +870,6 @@ if bullMss or bullBos
     lastHighBroken := true
     if bullMss
         lastBullMssBar := bar_index
-        bullLegSweepBar := bullSequenceSweepBar
-        bullLegFvgBar := bullSequenceFvgBar
-        bullLegDisplacementBar := bullSequenceDisplacementBar
-    else if bullSequenceValid and recentBullDisplacement
-        bullLegSweepBar := bullSequenceSweepBar
-        bullLegFvgBar := bullSequenceFvgBar
-        bullLegDisplacementBar := bullSequenceDisplacementBar
     bullLegStartBar := bullSourceBar
     if resetBullLeg
         bullLegLow := f_legLowSince(bullLegStartBar, bar_index + 1)
@@ -906,13 +896,6 @@ if bearMss or bearBos
     lastLowBroken := true
     if bearMss
         lastBearMssBar := bar_index
-        bearLegSweepBar := bearSequenceSweepBar
-        bearLegFvgBar := bearSequenceFvgBar
-        bearLegDisplacementBar := bearSequenceDisplacementBar
-    else if bearSequenceValid and recentBearDisplacement
-        bearLegSweepBar := bearSequenceSweepBar
-        bearLegFvgBar := bearSequenceFvgBar
-        bearLegDisplacementBar := bearSequenceDisplacementBar
     bearLegStartBar := bearSourceBar
     if resetBearLeg
         bearLegHigh := f_legHighSince(bearLegStartBar, bar_index + 1)
@@ -943,10 +926,6 @@ if not na(bearLegStartBar) and trendBias == -1
 //------------------------------------------------------------------------------
 // Order block qualification from a single strict leg: sweep -> displacement/FVG -> BOS
 //------------------------------------------------------------------------------
-recentSellSideSweep = not na(lastSellSideSweepBar) and (bar_index - lastSellSideSweepBar) <= obValidationLookback
-recentBuySideSweep = not na(lastBuySideSweepBar) and (bar_index - lastBuySideSweepBar) <= obValidationLookback
-recentBullFvg = not na(lastBullFvgBar) and (bar_index - lastBullFvgBar) <= obValidationLookback
-recentBearFvg = not na(lastBearFvgBar) and (bar_index - lastBearFvgBar) <= obValidationLookback
 obBullDisplacement = not na(bullSequenceDisplacementBar) and (bar_index - bullSequenceDisplacementBar) <= 1
 obBearDisplacement = not na(bearSequenceDisplacementBar) and (bar_index - bearSequenceDisplacementBar) <= 1
 
@@ -1460,97 +1439,97 @@ var table dashboardCompact = table.new(position.bottom_right, 2, 10, border_widt
 
 if barstate.islast and showDashboard and not compactDashboardMode
     table.clear(dashboardCompact, 0, 0, 1, 9)
-    table.cell(dashboard, 0, 0, "Field", text_color=color.white, bgcolor=color.new(color.black, 0))
-    table.cell(dashboard, 1, 0, "Market", text_color=color.white, bgcolor=color.new(color.black, 0))
-    table.cell(dashboard, 2, 0, "Long", text_color=color.white, bgcolor=color.new(bullColor, 5))
-    table.cell(dashboard, 3, 0, "Short", text_color=color.white, bgcolor=color.new(bearColor, 5))
+    f_setCell(dashboard, 0, 0, "Field", color.white, color.new(color.black, 0))
+    f_setCell(dashboard, 1, 0, "Market", color.white, color.new(color.black, 0))
+    f_setCell(dashboard, 2, 0, "Long", color.white, color.new(bullColor, 5))
+    f_setCell(dashboard, 3, 0, "Short", color.white, color.new(bearColor, 5))
 
-    table.cell(dashboard, 0, 1, "Current Px", text_color=color.white, bgcolor=color.new(color.black, 10))
-    table.cell(dashboard, 1, 1, f_formatLevel(close), text_color=color.white, bgcolor=color.new(color.black, 10))
-    table.cell(dashboard, 2, 1, longStatus, text_color=color.white, bgcolor=color.new(bullColor, 20))
-    table.cell(dashboard, 3, 1, shortStatus, text_color=color.white, bgcolor=color.new(bearColor, 20))
+    f_setCell(dashboard, 0, 1, "Current Px", color.white, color.new(color.black, 10))
+    f_setCell(dashboard, 1, 1, f_formatLevel(close), color.white, color.new(color.black, 10))
+    f_setCell(dashboard, 2, 1, longStatus, color.white, color.new(bullColor, 20))
+    f_setCell(dashboard, 3, 1, shortStatus, color.white, color.new(bearColor, 20))
 
-    table.cell(dashboard, 0, 2, "Bias", text_color=color.white, bgcolor=color.new(color.black, 10))
-    table.cell(dashboard, 1, 2, f_biasText(activeBias) + " / " + (showHtfBias ? (htfContextReady ? f_biasText(htfBias) : "HTF Guard") : "HTF Hidden"), text_color=color.white, bgcolor=color.new(color.black, 10))
-    table.cell(dashboard, 2, 2, htfContextReady ? f_alignmentText(true, activeBias, htfBias) : "HTF Guard", text_color=color.white, bgcolor=color.new(bullColor, 20))
-    table.cell(dashboard, 3, 2, htfContextReady ? f_alignmentText(false, activeBias, htfBias) : "HTF Guard", text_color=color.white, bgcolor=color.new(bearColor, 20))
+    f_setCell(dashboard, 0, 2, "Bias", color.white, color.new(color.black, 10))
+    f_setCell(dashboard, 1, 2, f_biasText(activeBias) + " / " + (showHtfBias ? (htfContextReady ? f_biasText(htfBias) : "HTF Guard") : "HTF Hidden"), color.white, color.new(color.black, 10))
+    f_setCell(dashboard, 2, 2, htfContextReady ? f_alignmentText(true, activeBias, htfBias) : "HTF Guard", color.white, color.new(bullColor, 20))
+    f_setCell(dashboard, 3, 2, htfContextReady ? f_alignmentText(false, activeBias, htfBias) : "HTF Guard", color.white, color.new(bearColor, 20))
 
-    table.cell(dashboard, 0, 3, "Preferred", text_color=color.white, bgcolor=color.new(color.black, 10))
-    table.cell(dashboard, 1, 3, preferredDirection, text_color=color.white, bgcolor=color.new(preferredDirection == "Long" ? bullColor : preferredDirection == "Short" ? bearColor : neutralColor, 15))
-    table.cell(dashboard, 2, 3, tradeLongSetup, text_color=color.white, bgcolor=color.new(bullColor, 20))
-    table.cell(dashboard, 3, 3, tradeShortSetup, text_color=color.white, bgcolor=color.new(bearColor, 20))
+    f_setCell(dashboard, 0, 3, "Preferred", color.white, color.new(color.black, 10))
+    f_setCell(dashboard, 1, 3, preferredDirection, color.white, color.new(preferredDirection == "Long" ? bullColor : preferredDirection == "Short" ? bearColor : neutralColor, 15))
+    f_setCell(dashboard, 2, 3, tradeLongSetup, color.white, color.new(bullColor, 20))
+    f_setCell(dashboard, 3, 3, tradeShortSetup, color.white, color.new(bearColor, 20))
 
-    table.cell(dashboard, 0, 4, "Valid Zone", text_color=color.white, bgcolor=color.new(color.black, 10))
-    table.cell(dashboard, 1, 4, "Entry Range", text_color=color.white, bgcolor=color.new(color.black, 10))
-    table.cell(dashboard, 2, 4, f_formatRange(tradeLongValidTop, tradeLongValidBottom), text_color=color.white, bgcolor=color.new(bullColor, 20))
-    table.cell(dashboard, 3, 4, f_formatRange(tradeShortValidTop, tradeShortValidBottom), text_color=color.white, bgcolor=color.new(bearColor, 20))
+    f_setCell(dashboard, 0, 4, "Valid Zone", color.white, color.new(color.black, 10))
+    f_setCell(dashboard, 1, 4, "Entry Range", color.white, color.new(color.black, 10))
+    f_setCell(dashboard, 2, 4, f_formatRange(tradeLongValidTop, tradeLongValidBottom), color.white, color.new(bullColor, 20))
+    f_setCell(dashboard, 3, 4, f_formatRange(tradeShortValidTop, tradeShortValidBottom), color.white, color.new(bearColor, 20))
 
-    table.cell(dashboard, 0, 5, "Entry", text_color=color.white, bgcolor=color.new(color.black, 10))
-    table.cell(dashboard, 1, 5, "Trigger", text_color=color.white, bgcolor=color.new(color.black, 10))
-    table.cell(dashboard, 2, 5, f_formatLevel(tradeLongEntry), text_color=color.white, bgcolor=color.new(bullColor, 20))
-    table.cell(dashboard, 3, 5, f_formatLevel(tradeShortEntry), text_color=color.white, bgcolor=color.new(bearColor, 20))
+    f_setCell(dashboard, 0, 5, "Entry", color.white, color.new(color.black, 10))
+    f_setCell(dashboard, 1, 5, "Trigger", color.white, color.new(color.black, 10))
+    f_setCell(dashboard, 2, 5, f_formatLevel(tradeLongEntry), color.white, color.new(bullColor, 20))
+    f_setCell(dashboard, 3, 5, f_formatLevel(tradeShortEntry), color.white, color.new(bearColor, 20))
 
-    table.cell(dashboard, 0, 6, "Stop Loss", text_color=color.white, bgcolor=color.new(color.black, 10))
-    table.cell(dashboard, 1, 6, "Zone / swing buffer", text_color=color.white, bgcolor=color.new(color.black, 10))
-    table.cell(dashboard, 2, 6, f_formatLevel(tradeLongStop), text_color=color.white, bgcolor=color.new(bearColor, 20))
-    table.cell(dashboard, 3, 6, f_formatLevel(tradeShortStop), text_color=color.white, bgcolor=color.new(bullColor, 20))
+    f_setCell(dashboard, 0, 6, "Stop Loss", color.white, color.new(color.black, 10))
+    f_setCell(dashboard, 1, 6, "Zone / swing buffer", color.white, color.new(color.black, 10))
+    f_setCell(dashboard, 2, 6, f_formatLevel(tradeLongStop), color.white, color.new(bearColor, 20))
+    f_setCell(dashboard, 3, 6, f_formatLevel(tradeShortStop), color.white, color.new(bullColor, 20))
 
-    table.cell(dashboard, 0, 7, "Take Profit", text_color=color.white, bgcolor=color.new(color.black, 10))
-    table.cell(dashboard, 1, 7, "Nearest liquidity", text_color=color.white, bgcolor=color.new(color.black, 10))
-    table.cell(dashboard, 2, 7, f_formatLevel(tradeLongTarget), text_color=color.white, bgcolor=color.new(liqHighColor, 20))
-    table.cell(dashboard, 3, 7, f_formatLevel(tradeShortTarget), text_color=color.white, bgcolor=color.new(liqLowColor, 20))
+    f_setCell(dashboard, 0, 7, "Take Profit", color.white, color.new(color.black, 10))
+    f_setCell(dashboard, 1, 7, "Nearest liquidity", color.white, color.new(color.black, 10))
+    f_setCell(dashboard, 2, 7, f_formatLevel(tradeLongTarget), color.white, color.new(liqHighColor, 20))
+    f_setCell(dashboard, 3, 7, f_formatLevel(tradeShortTarget), color.white, color.new(liqLowColor, 20))
 
-    table.cell(dashboard, 0, 8, "R:R", text_color=color.white, bgcolor=color.new(color.black, 10))
-    table.cell(dashboard, 1, 8, "Reward / risk", text_color=color.white, bgcolor=color.new(color.black, 10))
-    table.cell(dashboard, 2, 8, f_formatRr(longRr), text_color=color.white, bgcolor=color.new(bullColor, 20))
-    table.cell(dashboard, 3, 8, f_formatRr(shortRr), text_color=color.white, bgcolor=color.new(bearColor, 20))
+    f_setCell(dashboard, 0, 8, "R:R", color.white, color.new(color.black, 10))
+    f_setCell(dashboard, 1, 8, "Reward / risk", color.white, color.new(color.black, 10))
+    f_setCell(dashboard, 2, 8, f_formatRr(longRr), color.white, color.new(bullColor, 20))
+    f_setCell(dashboard, 3, 8, f_formatRr(shortRr), color.white, color.new(bearColor, 20))
 
-    table.cell(dashboard, 0, 9, "Confidence*", text_color=color.white, bgcolor=color.new(color.black, 10))
-    table.cell(dashboard, 1, 9, "Simple confluence", text_color=color.white, bgcolor=color.new(color.black, 10))
-    table.cell(dashboard, 2, 9, f_formatPercent(longConfidence), text_color=color.white, bgcolor=color.new(bullColor, 20))
-    table.cell(dashboard, 3, 9, f_formatPercent(shortConfidence), text_color=color.white, bgcolor=color.new(bearColor, 20))
+    f_setCell(dashboard, 0, 9, "Confidence*", color.white, color.new(color.black, 10))
+    f_setCell(dashboard, 1, 9, "Simple confluence", color.white, color.new(color.black, 10))
+    f_setCell(dashboard, 2, 9, f_formatPercent(longConfidence), color.white, color.new(bullColor, 20))
+    f_setCell(dashboard, 3, 9, f_formatPercent(shortConfidence), color.white, color.new(bearColor, 20))
 
-    table.cell(dashboard, 0, 10, "TP Prob*", text_color=color.white, bgcolor=color.new(color.black, 10))
-    table.cell(dashboard, 1, 10, "Rule-based model", text_color=color.white, bgcolor=color.new(color.black, 10))
-    table.cell(dashboard, 2, 10, f_formatPercent(longTpProbability), text_color=color.white, bgcolor=color.new(bullColor, 20))
-    table.cell(dashboard, 3, 10, f_formatPercent(shortTpProbability), text_color=color.white, bgcolor=color.new(bearColor, 20))
+    f_setCell(dashboard, 0, 10, "TP Prob*", color.white, color.new(color.black, 10))
+    f_setCell(dashboard, 1, 10, "Rule-based model", color.white, color.new(color.black, 10))
+    f_setCell(dashboard, 2, 10, f_formatPercent(longTpProbability), color.white, color.new(bullColor, 20))
+    f_setCell(dashboard, 3, 10, f_formatPercent(shortTpProbability), color.white, color.new(bearColor, 20))
 
-    table.cell(dashboard, 0, 11, "Lifecycle", text_color=color.white, bgcolor=color.new(color.black, 10))
-    table.cell(dashboard, 1, 11, "Age / touch", text_color=color.white, bgcolor=color.new(color.black, 10))
-    table.cell(dashboard, 2, 11, (na(longSetupAge) ? "-" : str.tostring(longSetupAge) + "b") + " / " + (tradeLongTouched ? "Touched" : "Untouched"), text_color=color.white, bgcolor=color.new(bullColor, 20))
-    table.cell(dashboard, 3, 11, (na(shortSetupAge) ? "-" : str.tostring(shortSetupAge) + "b") + " / " + (tradeShortTouched ? "Touched" : "Untouched"), text_color=color.white, bgcolor=color.new(bearColor, 20))
+    f_setCell(dashboard, 0, 11, "Lifecycle", color.white, color.new(color.black, 10))
+    f_setCell(dashboard, 1, 11, "Age / touch", color.white, color.new(color.black, 10))
+    f_setCell(dashboard, 2, 11, (na(longSetupAge) ? "-" : str.tostring(longSetupAge) + "b") + " / " + (tradeLongTouched ? "Touched" : "Untouched"), color.white, color.new(bullColor, 20))
+    f_setCell(dashboard, 3, 11, (na(shortSetupAge) ? "-" : str.tostring(shortSetupAge) + "b") + " / " + (tradeShortTouched ? "Touched" : "Untouched"), color.white, color.new(bearColor, 20))
 
-    table.cell(dashboard, 0, 12, "Strict / Time", text_color=color.white, bgcolor=color.new(color.black, 10))
-    table.cell(dashboard, 1, 12, (strictIctMode ? "Mode ON | " : "Mode OFF | ") + htfStateText + " | " + liquiditySessionLabel + " | KZ " + (strictKillzoneActive ? "On" : "Off"), text_color=color.white, bgcolor=color.new(strictIctMode ? color.teal : neutralColor, 15))
-    table.cell(dashboard, 2, 12, strictLongMap, text_color=color.white, bgcolor=color.new(bullColor, 20))
-    table.cell(dashboard, 3, 12, strictShortMap, text_color=color.white, bgcolor=color.new(bearColor, 20))
+    f_setCell(dashboard, 0, 12, "Strict / Time", color.white, color.new(color.black, 10))
+    f_setCell(dashboard, 1, 12, (strictIctMode ? "Mode ON | " : "Mode OFF | ") + htfStateText + " | " + liquiditySessionLabel + " | KZ " + (strictKillzoneActive ? "On" : "Off"), color.white, color.new(strictIctMode ? color.teal : neutralColor, 15))
+    f_setCell(dashboard, 2, 12, strictLongMap, color.white, color.new(bullColor, 20))
+    f_setCell(dashboard, 3, 12, strictShortMap, color.white, color.new(bearColor, 20))
 
-    table.cell(dashboard, 0, 13, "Caution", text_color=color.white, bgcolor=color.new(color.black, 10))
-    table.cell(dashboard, 1, 13, "Rule-based only, not statistical certainty", text_color=color.white, bgcolor=color.new(color.black, 10))
-    table.cell(dashboard, 2, 13, longStatus == "Strict Ready" or longStatus == "Valid now" ? "Entry active" : "Wait confirmation", text_color=color.white, bgcolor=color.new(bullColor, 20))
-    table.cell(dashboard, 3, 13, shortStatus == "Strict Ready" or shortStatus == "Valid now" ? "Entry active" : "Wait confirmation", text_color=color.white, bgcolor=color.new(bearColor, 20))
+    f_setCell(dashboard, 0, 13, "Caution", color.white, color.new(color.black, 10))
+    f_setCell(dashboard, 1, 13, "Rule-based only, not statistical certainty", color.white, color.new(color.black, 10))
+    f_setCell(dashboard, 2, 13, longStatus == "Strict Ready" or longStatus == "Valid now" ? "Entry active" : "Wait confirmation", color.white, color.new(bullColor, 20))
+    f_setCell(dashboard, 3, 13, shortStatus == "Strict Ready" or shortStatus == "Valid now" ? "Entry active" : "Wait confirmation", color.white, color.new(bearColor, 20))
 else if barstate.islast and showDashboard and compactDashboardMode
     table.clear(dashboard, 0, 0, 3, 13)
-    table.cell(dashboardCompact, 0, 0, "SMC Mobile", text_color=color.white, bgcolor=color.new(color.black, 0))
-    table.cell(dashboardCompact, 1, 0, compactDirectionText, text_color=color.white, bgcolor=compactAccent)
-    table.cell(dashboardCompact, 0, 1, "Bias", text_color=color.white, bgcolor=color.new(color.black, 10))
-    table.cell(dashboardCompact, 1, 1, f_biasShort(activeBias) + "/" + (htfContextReady ? f_biasShort(htfBias) : "Guard"), text_color=color.white, bgcolor=color.new(color.black, 10))
-    table.cell(dashboardCompact, 0, 2, "Setup", text_color=color.white, bgcolor=color.new(color.black, 10))
-    table.cell(dashboardCompact, 1, 2, compactSetup, text_color=color.white, bgcolor=compactAccent)
-    table.cell(dashboardCompact, 0, 3, "Zone", text_color=color.white, bgcolor=color.new(color.black, 10))
-    table.cell(dashboardCompact, 1, 3, f_formatRange(compactZoneTop, compactZoneBottom), text_color=color.white, bgcolor=compactAccent)
-    table.cell(dashboardCompact, 0, 4, "E / SL / TP", text_color=color.white, bgcolor=color.new(color.black, 10))
-    table.cell(dashboardCompact, 1, 4, f_formatLevel(compactEntry) + " | " + f_formatLevel(compactStop) + " | " + f_formatLevel(compactTarget), text_color=color.white, bgcolor=compactAccent)
-    table.cell(dashboardCompact, 0, 5, "Status", text_color=color.white, bgcolor=color.new(color.black, 10))
-    table.cell(dashboardCompact, 1, 5, f_statusCompact(compactStatus), text_color=color.white, bgcolor=compactAccent)
-    table.cell(dashboardCompact, 0, 6, "Conf / TP", text_color=color.white, bgcolor=color.new(color.black, 10))
-    table.cell(dashboardCompact, 1, 6, f_formatPercent(compactConfidence) + " / " + f_formatPercent(compactTpProbability), text_color=color.white, bgcolor=compactAccent)
-    table.cell(dashboardCompact, 0, 7, "R:R", text_color=color.white, bgcolor=color.new(color.black, 10))
-    table.cell(dashboardCompact, 1, 7, f_formatRr(compactRr), text_color=color.white, bgcolor=compactAccent)
-    table.cell(dashboardCompact, 0, 8, "Life", text_color=color.white, bgcolor=color.new(color.black, 10))
-    table.cell(dashboardCompact, 1, 8, (compactUseLong ? (na(longSetupAge) ? "-" : str.tostring(longSetupAge) + "b") + "/" + (tradeLongTouched ? "T" : "U") : (na(shortSetupAge) ? "-" : str.tostring(shortSetupAge) + "b") + "/" + (tradeShortTouched ? "T" : "U")), text_color=color.white, bgcolor=color.new(color.black, 10))
-    table.cell(dashboardCompact, 0, 9, "Strict", text_color=color.white, bgcolor=color.new(color.black, 10))
-    table.cell(dashboardCompact, 1, 9, (compactUseLong ? strictLongMapCompact : strictShortMapCompact) + " | " + effectiveHtfTf + " | KZ:" + (strictKillzoneActive ? "Y" : "N"), text_color=color.white, bgcolor=color.new(color.black, 10))
+    f_setCell(dashboardCompact, 0, 0, "SMC Mobile", color.white, color.new(color.black, 0))
+    f_setCell(dashboardCompact, 1, 0, compactDirectionText, color.white, compactAccent)
+    f_setCell(dashboardCompact, 0, 1, "Bias", color.white, color.new(color.black, 10))
+    f_setCell(dashboardCompact, 1, 1, f_biasShort(activeBias) + "/" + (htfContextReady ? f_biasShort(htfBias) : "Guard"), color.white, color.new(color.black, 10))
+    f_setCell(dashboardCompact, 0, 2, "Setup", color.white, color.new(color.black, 10))
+    f_setCell(dashboardCompact, 1, 2, compactSetup, color.white, compactAccent)
+    f_setCell(dashboardCompact, 0, 3, "Zone", color.white, color.new(color.black, 10))
+    f_setCell(dashboardCompact, 1, 3, f_formatRange(compactZoneTop, compactZoneBottom), color.white, compactAccent)
+    f_setCell(dashboardCompact, 0, 4, "E / SL / TP", color.white, color.new(color.black, 10))
+    f_setCell(dashboardCompact, 1, 4, f_formatLevel(compactEntry) + " | " + f_formatLevel(compactStop) + " | " + f_formatLevel(compactTarget), color.white, compactAccent)
+    f_setCell(dashboardCompact, 0, 5, "Status", color.white, color.new(color.black, 10))
+    f_setCell(dashboardCompact, 1, 5, f_statusCompact(compactStatus), color.white, compactAccent)
+    f_setCell(dashboardCompact, 0, 6, "Conf / TP", color.white, color.new(color.black, 10))
+    f_setCell(dashboardCompact, 1, 6, f_formatPercent(compactConfidence) + " / " + f_formatPercent(compactTpProbability), color.white, compactAccent)
+    f_setCell(dashboardCompact, 0, 7, "R:R", color.white, color.new(color.black, 10))
+    f_setCell(dashboardCompact, 1, 7, f_formatRr(compactRr), color.white, compactAccent)
+    f_setCell(dashboardCompact, 0, 8, "Life", color.white, color.new(color.black, 10))
+    f_setCell(dashboardCompact, 1, 8, (compactUseLong ? (na(longSetupAge) ? "-" : str.tostring(longSetupAge) + "b") + "/" + (tradeLongTouched ? "T" : "U") : (na(shortSetupAge) ? "-" : str.tostring(shortSetupAge) + "b") + "/" + (tradeShortTouched ? "T" : "U")), color.white, color.new(color.black, 10))
+    f_setCell(dashboardCompact, 0, 9, "Strict", color.white, color.new(color.black, 10))
+    f_setCell(dashboardCompact, 1, 9, (compactUseLong ? strictLongMapCompact : strictShortMapCompact) + " | " + effectiveHtfTf + " | KZ:" + (strictKillzoneActive ? "Y" : "N"), color.white, color.new(color.black, 10))
 else if barstate.islast and not showDashboard
     table.clear(dashboardCompact, 0, 0, 1, 9)
     table.clear(dashboard, 0, 0, 3, 13)
