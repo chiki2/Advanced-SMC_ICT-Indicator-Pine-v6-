@@ -8,18 +8,18 @@ groupPreset = "0. Profile"
 usagePreset = input.string("Standard", "Usage profile", options=["Standard", "Compact", "Strict Confirm"], group=groupPreset)
 
 groupStructure = "1. Structure"
-showStructureLabels = input.bool(true, "Show HH / HL / LL / LH labels", group=groupStructure)
-showBosChoch = input.bool(true, "Show BOS / MSS markers", group=groupStructure)
-showIdm = input.bool(true, "Show inducement markers", group=groupStructure)
-showTrendBackground = input.bool(true, "Tint background by current bias", group=groupStructure)
+bool showStructureLabels = input.bool(true, "Show HH / HL / LL / LH labels", group=groupStructure)
+bool showBosChoch = input.bool(true, "Show BOS / MSS markers", group=groupStructure)
+bool showIdm = input.bool(true, "Show inducement markers", group=groupStructure)
+bool showTrendBackground = input.bool(true, "Tint background by current bias", group=groupStructure)
 int swingLen = 3
 string breakMode = "Close Through"
 int engineDisplacementLookback = 10
 
 groupLiquidity = "2. Liquidity"
-showLiquidity = input.bool(true, "Show liquidity pools", group=groupLiquidity)
-showInternalRange = input.bool(true, "Show internal range liquidity", group=groupLiquidity)
-showSweeps = input.bool(true, "Show liquidity sweep markers", group=groupLiquidity)
+bool showLiquidity = input.bool(true, "Show liquidity pools", group=groupLiquidity)
+bool showInternalRange = input.bool(true, "Show internal range liquidity", group=groupLiquidity)
+bool showSweeps = input.bool(true, "Show liquidity sweep markers", group=groupLiquidity)
 string ictSessionTimezone = "America/New_York"
 string asiaSessionWindow = "2000-0000"
 string londonSessionWindow = "0100-0700"
@@ -28,7 +28,7 @@ string nyPmSessionWindow = "1300-1600"
 float equalToleranceAtr = 0.10
 
 groupZones = "3. Zones"
-showOb = input.bool(true, "Show order blocks", group=groupZones)
+bool showOb = input.bool(true, "Show order blocks", group=groupZones)
 int obSearchBars = 12
 int obValidationLookback = 8
 float obImpulseAtr = 1.00
@@ -36,24 +36,24 @@ string obZoneMode = "Open-to-Wick"
 string obEntryMode = "Midpoint"
 int maxObZones = 12
 
-showFvg = input.bool(true, "Show fair value gaps", group=groupZones)
+bool showFvg = input.bool(true, "Show fair value gaps", group=groupZones)
 float fvgMinAtr = 0.15
 int maxFvgZones = 16
-strictShowOte = input.bool(true, "Show active OTE overlay", group=groupZones)
-zoneDisplayMode = input.string("Full", "Zone display mode", options=["Full", "Focused", "Minimal"], group=groupZones)
+bool strictShowOte = input.bool(true, "Show active OTE overlay", group=groupZones)
+string zoneDisplayMode = input.string("Full", "Zone display mode", options=["Full", "Focused", "Minimal"], group=groupZones)
 
 groupContext = "4. Context"
-showHtf = input.bool(true, "Show context HTF structure", group=groupContext)
-showProtectedLevels = input.bool(true, "Show protected high / low", group=groupContext)
-showKillzoneVisual = input.bool(true, "Show trading sessions on chart", group=groupContext)
-showLiquidityRightLabels = input.bool(true, "Show right-edge liquidity labels", group=groupContext)
+bool showHtf = input.bool(true, "Show context HTF structure", group=groupContext)
+bool showProtectedLevels = input.bool(true, "Show protected high / low", group=groupContext)
+bool showKillzoneVisual = input.bool(true, "Show trading sessions on chart", group=groupContext)
+bool showLiquidityRightLabels = input.bool(true, "Show right-edge liquidity labels", group=groupContext)
 bool stopOnInvalidTf = true
 int htfSwingLen = 2
 int regimeMomentumLookbackBars = 20
 float regimeStrongAtrThreshold = 1.0
 
 groupRisk = "6. Risk"
-showRisk = input.bool(false, "Show stop cues", group=groupRisk)
+bool showRisk = input.bool(false, "Show stop cues", group=groupRisk)
 float stopAtrBuffer = 0.10
 float sessionVolStopFraction = 0.20
 float sessionVolStopCapAtr = 1.50
@@ -69,8 +69,8 @@ string strictKillzoneSession = "0200-0500,0700-1000,1300-1600"
 int strictMssLookback = 10
 
 groupDashboard = "5. Dashboard"
-showDashboard = input.bool(true, "Show context dashboard", group=groupDashboard)
-androidCompactMode = input.bool(false, "Compact dashboard mode", group=groupDashboard)
+bool showDashboard = input.bool(true, "Show context dashboard", group=groupDashboard)
+bool androidCompactMode = input.bool(false, "Compact dashboard mode", group=groupDashboard)
 bool mobileCompactDashboard = true
 bool mobileCompactLabels = true
 bool mobileHideStructureLabels = true
@@ -1542,15 +1542,15 @@ if array.size(obBoxes) > 0
 htfPivotHigh = request.security(syminfo.tickerid, effectiveHtfTf, ta.pivothigh(high, htfSwingLen, htfSwingLen), lookahead=barmerge.lookahead_off)
 htfPivotLow = request.security(syminfo.tickerid, effectiveHtfTf, ta.pivotlow(low, htfSwingLen, htfSwingLen), lookahead=barmerge.lookahead_off)
 htfClose = request.security(syminfo.tickerid, effectiveHtfTf, close, lookahead=barmerge.lookahead_off)
-narrativeClose = request.security(syminfo.tickerid, narrativeRequestTf, close, lookahead=barmerge.lookahead_off)
-narrativeMomentumRef = request.security(syminfo.tickerid, narrativeRequestTf, close[regimeMomentumLookbackBars], lookahead=barmerge.lookahead_off)
-narrativeAtr = request.security(syminfo.tickerid, narrativeRequestTf, ta.atr(14), lookahead=barmerge.lookahead_off)
+float narrativeClose = request.security(syminfo.tickerid, narrativeRequestTf, close, lookahead=barmerge.lookahead_off)
+float narrativeMomentumRef = request.security(syminfo.tickerid, narrativeRequestTf, close[regimeMomentumLookbackBars], lookahead=barmerge.lookahead_off)
+float narrativeAtr = request.security(syminfo.tickerid, narrativeRequestTf, ta.atr(14), lookahead=barmerge.lookahead_off)
 
 var float htfStructureHigh = na
 var float htfStructureLow = na
 var int htfBias = 0
-int regimeBias = narrativeHtfReady ? f_regimeBias(narrativeClose, narrativeMomentumRef) : 0
-string regimeStrength = narrativeHtfReady ? f_regimeStrengthText(regimeBias, narrativeClose, narrativeMomentumRef, narrativeAtr) : "Flat"
+int narrativeRegimeBias = narrativeHtfReady ? f_regimeBias(narrativeClose, narrativeMomentumRef) : 0
+string regimeStrength = narrativeHtfReady ? f_regimeStrengthText(narrativeRegimeBias, narrativeClose, narrativeMomentumRef, narrativeAtr) : "Flat"
 
 if htfContextReady
     if not na(htfPivotHigh)
@@ -1923,7 +1923,7 @@ bool longExpired = not tradeLongTouched and not na(longSetupAge) and longSetupAg
 bool longChased = not tradeLongTouched and not na(tradeLongValidTop) and close > tradeLongValidTop + atr * setupChaseAtr
 bool longStructureInvalidated = not na(tradeLongCreatedBar) and not na(lastBearMssBar) and lastBearMssBar > tradeLongCreatedBar
 bool longFresh = not tradeLongTouched and not na(longSetupAge) and longSetupAge <= setupFreshBars
-bool strictLongBiasPass = not strictModeEnabled or (activeBias == 1 and htfContextReady and htfBias == 1 and regimeBias != -1)
+bool strictLongBiasPass = not strictModeEnabled or (activeBias == 1 and htfContextReady and htfBias == 1 and narrativeRegimeBias != -1)
 bool strictLongSweepPass = not strictModeEnabled or bullLegHasSweep
 bool strictLongMssFresh = not na(lastBullMssBar) and (bar_index - lastBullMssBar) <= strictMssLookback
 bool strictLongMssPass = not strictModeEnabled or (bullLegHasMss and strictLongMssFresh and activeBias == 1)
@@ -1968,7 +1968,7 @@ bool shortExpired = not tradeShortTouched and not na(shortSetupAge) and shortSet
 bool shortChased = not tradeShortTouched and not na(tradeShortValidBottom) and close < tradeShortValidBottom - atr * setupChaseAtr
 bool shortStructureInvalidated = not na(tradeShortCreatedBar) and not na(lastBullMssBar) and lastBullMssBar > tradeShortCreatedBar
 bool shortFresh = not tradeShortTouched and not na(shortSetupAge) and shortSetupAge <= setupFreshBars
-bool strictShortBiasPass = not strictModeEnabled or (activeBias == -1 and htfContextReady and htfBias == -1 and regimeBias != 1)
+bool strictShortBiasPass = not strictModeEnabled or (activeBias == -1 and htfContextReady and htfBias == -1 and narrativeRegimeBias != 1)
 bool strictShortSweepPass = not strictModeEnabled or bearLegHasSweep
 bool strictShortMssFresh = not na(lastBearMssBar) and (bar_index - lastBearMssBar) <= strictMssLookback
 bool strictShortMssPass = not strictModeEnabled or (bearLegHasMss and strictShortMssFresh and activeBias == -1)
@@ -2006,8 +2006,8 @@ bool shortInvalidated = (not na(tradeShortStop) and close >= tradeShortStop) or 
 // Keep setup scoring intentionally simple to reduce overtuning.
 bool longBiasAligned = activeBias == 1
 bool shortBiasAligned = activeBias == -1
-bool longHtfAligned = htfBias == 1 and regimeBias != -1
-bool shortHtfAligned = htfBias == -1 and regimeBias != 1
+bool longHtfAligned = htfBias == 1 and narrativeRegimeBias != -1
+bool shortHtfAligned = htfBias == -1 and narrativeRegimeBias != 1
 bool longDisplacementSeen = bullLegHasDisplacement
 bool shortDisplacementSeen = bearLegHasDisplacement
 string longExecutionState = f_setupExecutionState(not na(tradeLongEntry), longInvalidated, longExpired, longChased, longCompleted, longManaged, longBaseContextPass, longConfirmationPass, longExecutionFreshPass, longDisplacementSeen, longPriceInZone, longPriceNearZone)
@@ -2385,9 +2385,9 @@ if barstate.islast and dashboardEnabled and not compactDashboardMode
     f_setCell(dashboard, 3, 1, shortExecutionState, color.white, panelBearBg)
 
     f_setCell(dashboard, 0, 2, "Bias", color.white, panelCellBg)
-    f_setCell(dashboard, 1, 2, f_biasSummary(activeBias, htfContextReady, htfBias, regimeBias, regimeStrength), color.white, panelCellBg)
-    f_setCell(dashboard, 2, 2, (htfContextReady ? f_alignmentShortText(true, activeBias, htfBias) : "G") + " / " + f_regimeSideShortText(true, regimeBias, regimeStrength), color.white, panelBullBg)
-    f_setCell(dashboard, 3, 2, (htfContextReady ? f_alignmentShortText(false, activeBias, htfBias) : "G") + " / " + f_regimeSideShortText(false, regimeBias, regimeStrength), color.white, panelBearBg)
+    f_setCell(dashboard, 1, 2, f_biasSummary(activeBias, htfContextReady, htfBias, narrativeRegimeBias, regimeStrength), color.white, panelCellBg)
+    f_setCell(dashboard, 2, 2, (htfContextReady ? f_alignmentShortText(true, activeBias, htfBias) : "G") + " / " + f_regimeSideShortText(true, narrativeRegimeBias, regimeStrength), color.white, panelBullBg)
+    f_setCell(dashboard, 3, 2, (htfContextReady ? f_alignmentShortText(false, activeBias, htfBias) : "G") + " / " + f_regimeSideShortText(false, narrativeRegimeBias, regimeStrength), color.white, panelBearBg)
 
     f_setCell(dashboard, 0, 3, "Pref", color.white, panelCellBg)
     f_setCell(dashboard, 1, 3, preferredExecutionSummary, color.white, color.new(preferredDirection == "Long" ? bullColor : preferredDirection == "Short" ? bearColor : neutralColor, 15))
@@ -2433,7 +2433,7 @@ else if barstate.islast and dashboardEnabled and compactDashboardMode
     f_setCell(dashboardCompact, 0, 0, "SMC Compact", color.white, panelHeaderBg)
     f_setCell(dashboardCompact, 1, 0, compactPreferredSummary + " | " + effectiveModeSummary, color.white, compactAccent)
     f_setCell(dashboardCompact, 0, 1, "Biases", color.white, panelCellBg)
-    f_setCell(dashboardCompact, 1, 1, f_biasShort(activeBias) + "/" + (htfContextReady ? f_biasShort(htfBias) : "Guard") + "/" + f_biasShort(regimeBias), color.white, panelCellBg)
+    f_setCell(dashboardCompact, 1, 1, f_biasShort(activeBias) + "/" + (htfContextReady ? f_biasShort(htfBias) : "Guard") + "/" + f_biasShort(narrativeRegimeBias), color.white, panelCellBg)
     f_setCell(dashboardCompact, 0, 2, "Setup", color.white, panelCellBg)
     f_setCell(dashboardCompact, 1, 2, compactSetupDisplay, color.white, compactAccent)
     f_setCell(dashboardCompact, 0, 3, "Zone", color.white, panelCellBg)
