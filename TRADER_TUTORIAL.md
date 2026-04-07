@@ -135,6 +135,8 @@ Cara membacanya:
 Prinsip:
 - jangan anggap semua box adalah entry
 - utamakan zona yang searah dengan struktur, bias, dan session context
+- dalam profile `Strict Confirm`, indikator sekarang memprioritaskan `IRL/FVG` dulu
+- jika tidak ada `IRL` yang valid, `OB` dipakai sebagai fallback POI
 
 Jika nama setup di dashboard diikuti:
 - `Q1`
@@ -253,12 +255,17 @@ Jika `Wait`, artinya chart belum memberi setup yang cukup bersih.
 ### Z / E
 
 Menunjukkan:
-- `Z` = valid zone / range entry
+- `Z` = valid `POI` / zone
 - `E` = level entry
 
 Gunanya:
 - trader bisa melihat area valid
 - lalu melihat trigger price yang sedang dipakai model
+
+Catatan:
+- `POI` = `Point of Interest`
+- dalam strict mode, `POI` yang paling disukai adalah `IRL/FVG`
+- `OB` tetap bisa dipakai jika tidak ada `IRL` yang lebih layak
 
 ### SL / TP
 
@@ -285,10 +292,15 @@ Cara baca:
 ### Draw / TP
 
 Menunjukkan:
-- `Draw` = external draw / target eksternal utama
+- `Draw` = `DOL` / target liquidity utama
 - `TP` = probabilitas model rule-based
 
 Ini membantu melihat apakah target dekat / jauh dan seberapa kuat kualitas setup.
+
+Cara baca:
+- `DOL` = `Draw on Liquidity`
+- jika ada level liquidity yang jelas di atas/bawah harga, indikator akan memakainya
+- jika tidak ada `DOL` yang layak, strict confirmation tidak akan semudah itu memberi status siap entry
 
 ### Life
 
@@ -327,6 +339,10 @@ Kolom Long/Short pada baris ini sekarang menunjukkan status konfirmasi:
 - `KZ Wait` = context sudah baik, menunggu timing killzone
 - `Ready` = konfirmasi strict sudah lengkap
 
+Dalam strict mode, ringkasan ini juga membawa jalur setup singkat:
+- `IRL > DOL` = paling dekat ke flow ICT yang dicari indikator
+- `OB > DOL` = setup masih valid, tetapi POI yang dipakai adalah order block fallback
+
 ### Next
 
 Menunjukkan:
@@ -360,7 +376,7 @@ Row penting:
 - `Zone`
 - `E / SL / TP`
 - `Exec`
-- `R / Draw`
+- `R / DOL`
 - `Life`
 - `Mode`
 - `Sessions`
@@ -373,6 +389,7 @@ Catatan penting:
 - jika compact menulis setup seperti `Bullish OB | Q2 | Ctx`, artinya ada kandidat setup yang sedang terbentuk
 - `Ctx` berarti setup itu masih `context-only`, belum actionable untuk entry
 - selama `Zone` dan `E / SL / TP` masih `-`, trader sebaiknya tetap membaca itu sebagai fase scan
+- `R / DOL` berarti `Reward / Draw on Liquidity`
 
 ## Workflow Praktis
 
@@ -385,22 +402,28 @@ Gunakan indikator dengan urutan ini:
 - sesi apa yang sedang aktif
 - previous source apa yang sedang dipakai
 
-3. Lihat `Pref`
+3. Cari `ERL` yang disapu
+- swing high / low
+- EQH / EQL
+- session high / low
+- PDH / PDL / PWH / PWL bila relevan
+
+4. Lihat `Pref`
 - apakah indikator lebih condong ke long, short, atau wait
 
-4. Lihat chart
+5. Lihat chart
 - apakah ada OB / FVG terpilih
 - apakah harga berada di premium atau discount
 - apakah ada sweep / MSS
 
-5. Lihat `Exec`
+6. Lihat `Exec`
 - `Waiting` = belum trade
 - `Confirming` = ada setup, tunggu konfirmasi strict
 - `Armed` = mulai fokus
 - `Active` = entry bisa valid
 - `Managed` = kelola trade, bukan cari entry baru
 
-6. Lihat `SL / TP` dan `RR / Cf`
+7. Lihat `SL / TP`, `RR / Cf`, dan `Draw / TP`
 - pastikan jarak stop dan target masih masuk akal
 
 ## Cara Pakai yang Sehat
