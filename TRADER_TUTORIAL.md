@@ -21,14 +21,37 @@ Indikator ini bukan mesin kepastian. Fungsinya adalah merapikan konteks supaya t
 ## Cara Mulai Cepat
 
 Untuk pemakaian paling mudah:
-- pilih preset `Intraday` untuk chart desktop
-- pilih preset `Android` jika layar kecil
+- pilih profile `Standard` untuk chart desktop
+- pilih profile `Compact` jika layar kecil
 - nyalakan `Show context dashboard`
 - nyalakan `Show trading sessions on chart`
 
 Jika ingin paling ketat ala ICT:
-- aktifkan `Strict ICT Entry mode`
+- pilih profile `Strict Confirm`
 - biarkan `Show active OTE overlay` tetap hidup
+
+Timeframe eksekusi yang didukung:
+- `M1`
+- `M5`
+- `M15`
+- `M30`
+
+Di luar timeframe itu, indikator berhenti agar tetap jujur sebagai intraday setup engine.
+
+## Struktur Panel Input
+
+Panel input sekarang dibagi ringkas menjadi:
+- `Profile`
+- `Structure`
+- `Liquidity`
+- `Zones`
+- `Context`
+- `Dashboard`
+- `Risk`
+
+Prinsipnya:
+- yang terlihat di panel adalah keputusan trader-facing
+- parameter engine internal sudah dibekukan di kode agar tidak mendorong bias dan overtuning
 
 ## Cara Membaca Chart
 
@@ -173,6 +196,7 @@ Menunjukkan execution state sisi long dan short.
 
 State yang umum:
 - `Waiting` = belum ada alasan entry
+- `Confirming` = setup ada, tetapi konfirmasi strict belum lengkap
 - `Armed` = setup mulai siap, tunggu retest / trigger
 - `Active` = entry sedang aktif / sangat dekat
 - `Managed` = trade sudah berjalan, fokus kelola
@@ -260,12 +284,13 @@ Maknanya:
 
 Semakin tua setup, biasanya semakin lemah.
 
-### Sess
+### Sess/Cfm
 
 Menunjukkan:
 - mode session otomatis
 - source session yang sedang dipakai
 - timezone basis session
+- status konfirmasi long dan short
 
 Contoh:
 - `A-ICT LDN>AS | NY TZ`
@@ -275,14 +300,18 @@ Artinya:
 - previous source yang dipakai adalah Asia
 - pembacaan sesi berbasis New York time
 
-Kolom Long/Short di baris ini menunjukkan ringkasan map arah sesi untuk masing-masing sisi.
+Kolom Long/Short pada baris ini sekarang menunjukkan status konfirmasi:
+- `Standard` = profile standard, tanpa strict confirmation
+- `Refine` = context belum cukup rapi
+- `KZ Wait` = context sudah baik, menunggu timing killzone
+- `Ready` = konfirmasi strict sudah lengkap
 
 ### Next
 
 Menunjukkan:
 - mode visual
+- pasangan timeframe execution / context / narrative
 - status OTE
-- status killzone
 - aksi berikutnya yang disarankan model
 
 Contoh:
@@ -334,6 +363,7 @@ Gunakan indikator dengan urutan ini:
 
 5. Lihat `Exec`
 - `Waiting` = belum trade
+- `Confirming` = ada setup, tunggu konfirmasi strict
 - `Armed` = mulai fokus
 - `Active` = entry bisa valid
 - `Managed` = kelola trade, bukan cari entry baru
@@ -377,16 +407,16 @@ Karena visual chart sudah disederhanakan:
 ## Rekomendasi Pemakaian
 
 Untuk desktop:
-- preset `Intraday`
+- profile `Standard`
 - dashboard full
 - session visual aktif
 
 Untuk layar kecil:
-- preset `Android`
+- profile `Compact`
 - compact dashboard
 
 Untuk trader ICT yang lebih ketat:
-- aktifkan `Strict ICT Entry mode`
+- pilih profile `Strict Confirm`
 - gunakan OTE sebagai konfirmasi tambahan, bukan alasan tunggal
 
 ## Penutup
