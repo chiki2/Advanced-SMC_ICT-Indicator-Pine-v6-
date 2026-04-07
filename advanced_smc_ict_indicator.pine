@@ -52,6 +52,8 @@ groupHtf = "5. Higher Timeframe Context"
 showHtf = input.bool(true, "Show higher timeframe structure", group=groupHtf)
 bool stopOnInvalidTf = true
 int htfSwingLen = 2
+int regimeMomentumLookbackBars = 20
+float regimeStrongAtrThreshold = 1.0
 
 groupRisk = "6. Risk Cues"
 showRisk = input.bool(false, "Show stop cues", group=groupRisk)
@@ -207,6 +209,15 @@ f_biasText(int bias) =>
 
 f_biasShort(int bias) =>
     bias == 1 ? "Bull" : bias == -1 ? "Bear" : "Range"
+
+f_regimeBias(float currentLevel, float referenceLevel) =>
+    na(currentLevel) or na(referenceLevel) ? 0 : currentLevel > referenceLevel ? 1 : currentLevel < referenceLevel ? -1 : 0
+
+f_regimeStrengthText(int regimeBias, float currentLevel, float referenceLevel, float atrLevel) =>
+    regimeBias == 0 or na(currentLevel) or na(referenceLevel) or na(atrLevel) or atrLevel <= 0 ? "Flat" : math.abs(currentLevel - referenceLevel) >= atrLevel * regimeStrongAtrThreshold ? "Strong" : "Normal"
+
+f_regimeSideText(bool isBull, int regimeBias, string regimeStrength) =>
+    regimeBias == 0 ? "Flat" : isBull ? (regimeBias == 1 ? regimeStrength : "Counter") : (regimeBias == -1 ? regimeStrength : "Counter")
 
 f_zoneMid(float zoneTop, float zoneBottom) =>
     (zoneTop + zoneBottom) * 0.5
@@ -406,8 +417,8 @@ f_compactLifecycleText(bool useLong, int longAge, bool longTouchedState, int sho
 f_entryActionText(string statusText) =>
     statusText == "Strict Ready" or statusText == "Valid now" ? "Entry active" : "Wait confirmation"
 
-f_biasSummary(int currentBias, bool htfReady, int higherBias) =>
-    f_biasText(currentBias) + " / " + (htfReady ? f_biasText(higherBias) : "HTF Guard")
+f_biasSummary(int currentBias, bool htfReady, int higherBias, int regimeBias, string regimeStrength) =>
+    f_biasText(currentBias) + " / " + (htfReady ? f_biasText(higherBias) : "HTF Guard") + " / Reg " + f_biasText(regimeBias) + " " + regimeStrength
 
 f_strictTimeSummary(bool strictModeEnabled, string htfSummary, string sessionSummary, bool kzActive) =>
     (strictModeEnabled ? "Mode ON | " : "Mode OFF | ") + htfSummary + " | " + sessionSummary + " | KZ " + (kzActive ? "On" : "Off")
@@ -1277,10 +1288,14 @@ if array.size(obBoxes) > 0
 htfPivotHigh = request.security(syminfo.tickerid, effectiveHtfTf, ta.pivothigh(high, htfSwingLen, htfSwingLen), lookahead=barmerge.lookahead_off)
 htfPivotLow = request.security(syminfo.tickerid, effectiveHtfTf, ta.pivotlow(low, htfSwingLen, htfSwingLen), lookahead=barmerge.lookahead_off)
 htfClose = request.security(syminfo.tickerid, effectiveHtfTf, close, lookahead=barmerge.lookahead_off)
+htfMomentumRef = request.security(syminfo.tickerid, effectiveHtfTf, close[regimeMomentumLookbackBars], lookahead=barmerge.lookahead_off)
+htfAtr = request.security(syminfo.tickerid, effectiveHtfTf, ta.atr(14), lookahead=barmerge.lookahead_off)
 
 var float htfStructureHigh = na
 var float htfStructureLow = na
 var int htfBias = 0
+int regimeBias = htfContextReady ? f_regimeBias(htfClose, htfMomentumRef) : 0
+string regimeStrength = htfContextReady ? f_regimeStrengthText(regimeBias, htfClose, htfMomentumRef, htfAtr) : "Flat"
 
 if htfContextReady
     if not na(htfPivotHigh)
@@ -2039,10 +2054,10 @@ if barstate.islast and dashboardEnabled and not compactDashboardMode
     f_setCell(dashboard, 2, 1, longStatus, color.white, panelBullBg)
     f_setCell(dashboard, 3, 1, shortStatus, color.white, panelBearBg)
 
-    f_setCell(dashboard, 0, 2, "Bias", color.white, panelCellBg)
-    f_setCell(dashboard, 1, 2, f_biasSummary(activeBias, htfContextReady, htfBias), color.white, panelCellBg)
-    f_setCell(dashboard, 2, 2, htfContextReady ? f_alignmentText(true, activeBias, htfBias) : "HTF Guard", color.white, panelBullBg)
-    f_setCell(dashboard, 3, 2, htfContextReady ? f_alignmentText(false, activeBias, htfBias) : "HTF Guard", color.white, panelBearBg)
+    f_setCell(dashboard, 0, 2, "Bias / Reg", color.white, panelCellBg)
+    f_setCell(dashboard, 1, 2, f_biasSummary(activeBias, htfContextReady, htfBias, regimeBias, regimeStrength), color.white, panelCellBg)
+    f_setCell(dashboard, 2, 2, (htfContextReady ? f_alignmentText(true, activeBias, htfBias) : "HTF Guard") + " / " + f_regimeSideText(true, regimeBias, regimeStrength), color.white, panelBullBg)
+    f_setCell(dashboard, 3, 2, (htfContextReady ? f_alignmentText(false, activeBias, htfBias) : "HTF Guard") + " / " + f_regimeSideText(false, regimeBias, regimeStrength), color.white, panelBearBg)
 
     f_setCell(dashboard, 0, 3, "Preferred", color.white, panelCellBg)
     f_setCell(dashboard, 1, 3, preferredDirection, color.white, color.new(preferredDirection == "Long" ? bullColor : preferredDirection == "Short" ? bearColor : neutralColor, 15))
@@ -2107,8 +2122,8 @@ else if barstate.islast and dashboardEnabled and compactDashboardMode
     table.clear(dashboard, 0, 0, 3, 14)
     f_setCell(dashboardCompact, 0, 0, "SMC Mobile", color.white, panelHeaderBg)
     f_setCell(dashboardCompact, 1, 0, compactDirectionText + " | " + effectiveZoneDisplayMode, color.white, compactAccent)
-    f_setCell(dashboardCompact, 0, 1, "Bias", color.white, panelCellBg)
-    f_setCell(dashboardCompact, 1, 1, f_biasShort(activeBias) + "/" + (htfContextReady ? f_biasShort(htfBias) : "Guard"), color.white, panelCellBg)
+    f_setCell(dashboardCompact, 0, 1, "Biases", color.white, panelCellBg)
+    f_setCell(dashboardCompact, 1, 1, f_biasShort(activeBias) + "/" + (htfContextReady ? f_biasShort(htfBias) : "Guard") + "/" + f_biasShort(regimeBias), color.white, panelCellBg)
     f_setCell(dashboardCompact, 0, 2, "Setup", color.white, panelCellBg)
     f_setCell(dashboardCompact, 1, 2, compactSetupDisplay, color.white, compactAccent)
     f_setCell(dashboardCompact, 0, 3, "Zone", color.white, panelCellBg)
