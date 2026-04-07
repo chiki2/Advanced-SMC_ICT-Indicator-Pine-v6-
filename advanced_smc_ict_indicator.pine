@@ -280,6 +280,9 @@ f_formatPercent(float value) =>
 f_formatRr(float rr) =>
     na(rr) ? "-" : rr > 10.0 ? ">10R" : str.tostring(math.round(rr * 100.0) / 100.0) + "R"
 
+f_targetModeText(bool hasActiveTarget, bool usesExternalDolTarget, bool liquidityTarget) =>
+    not hasActiveTarget ? "-" : usesExternalDolTarget ? "DOL" : liquidityTarget ? "Liq" : "2R"
+
 f_zoneResponseScore(bool touched, bool fresh, bool managed, bool priceInZone, bool invalidated, bool replaced, bool expired, bool chased) =>
     invalidated or replaced or expired or chased ? 0 : managed ? 2 : not touched and fresh ? 2 : priceInZone or touched ? 1 : 0
 
@@ -484,7 +487,8 @@ f_candidatePriority(bool hasCandidate, bool confirmPass, int createdBar, bool is
         int candidateAge = not na(createdBar) ? math.max(0, bar_index - createdBar) : 10000
         float score = confirmPass ? 100.0 : 0.0
         score += candidateAge <= freshBarsWindow ? 20.0 : 0.0
-        score += math.max(0.0, 10.0 - math.min(candidateAge, 10))
+        float recencyScale = freshBarsWindow > 0 ? 10.0 / freshBarsWindow : 0.0
+        score += math.max(0.0, 10.0 - candidateAge * recencyScale)
         score += isPreferredType ? 1.0 : 0.0
         score
 
@@ -2065,10 +2069,9 @@ int selectedBullFvgBar = tradeLongIsFvg ? tradeLongCreatedBar : na
 int selectedBearFvgBar = tradeShortIsFvg ? tradeShortCreatedBar : na
 int selectedBullObBar = tradeLongIsOb ? tradeLongCreatedBar : na
 int selectedBearObBar = tradeShortIsOb ? tradeShortCreatedBar : na
-bool anyExternalDolTarget = longUsesExternalDolTarget or shortUsesExternalDolTarget
-bool anyLiquidityTarget = (not na(tradeLongTarget) and longTargetIsLiquidity) or (not na(tradeShortTarget) and shortTargetIsLiquidity)
-bool anyFallbackTarget = (not na(tradeLongTarget) and not longTargetIsLiquidity) or (not na(tradeShortTarget) and not shortTargetIsLiquidity)
-string opTargetSummary = anyExternalDolTarget ? "External DOL" : not anyLiquidityTarget and not anyFallbackTarget ? "-" : anyLiquidityTarget and anyFallbackTarget ? "Liquidity / 2R fallback" : anyLiquidityTarget ? "Nearest liquidity" : "Fallback 2R"
+string longTargetModeSummary = f_targetModeText(not na(activeLongTarget), longUsesExternalDolTarget, longTargetIsLiquidity)
+string shortTargetModeSummary = f_targetModeText(not na(activeShortTarget), shortUsesExternalDolTarget, shortTargetIsLiquidity)
+string opTargetSummary = longTargetModeSummary == shortTargetModeSummary ? longTargetModeSummary : "L " + longTargetModeSummary + " | S " + shortTargetModeSummary
 
 if array.size(pivotStructureLabels) > 0
     for idx = 0 to array.size(pivotStructureLabels) - 1
