@@ -1,11 +1,11 @@
 //@version=6
-indicator("Advanced SMC / ICT Indicator", shorttitle="Advanced SMC/ICT", overlay=true, max_lines_count=500, max_labels_count=500, max_boxes_count=500)
+indicator("Advanced SMC / ICT Indicator", shorttitle="SMC/ICT", overlay=true, max_lines_count=500, max_labels_count=500, max_boxes_count=500)
 
 //------------------------------------------------------------------------------
 // Inputs
 //------------------------------------------------------------------------------
 groupPreset = "0. Presets"
-usagePreset = input.string("Custom", "Usage preset", options=["Custom", "Intraday", "Android", "Strict ICT"], group=groupPreset)
+usagePreset = input.string("Custom", "Usage preset (locks related options)", options=["Custom", "Intraday", "Android", "Strict ICT"], group=groupPreset)
 
 groupStructure = "1. Market Structure"
 showStructureLabels = input.bool(true, "Show HH / HL / LL / LH labels", group=groupStructure)
@@ -19,8 +19,8 @@ int engineDisplacementLookback = 10
 
 groupLiquidity = "2. Liquidity"
 showLiquidity = input.bool(true, "Show liquidity pools", group=groupLiquidity)
-showPrevSession = input.bool(true, "Show previous source high / low", group=groupLiquidity)
-showHigherPeriodLiquidity = input.bool(true, "Show previous day / week / month high / low", group=groupLiquidity)
+showPrevSession = input.bool(true, "Use previous source high / low in engine", group=groupLiquidity)
+showHigherPeriodLiquidity = input.bool(true, "Use previous day / week / month high / low in engine", group=groupLiquidity)
 showInternalRange = input.bool(true, "Show internal range liquidity", group=groupLiquidity)
 showSweeps = input.bool(true, "Show liquidity sweep markers", group=groupLiquidity)
 string liquiditySessionMode = "Auto ICT"
@@ -58,28 +58,32 @@ float regimeStrongAtrThreshold = 1.0
 groupRisk = "6. Risk Cues"
 showRisk = input.bool(false, "Show stop cues", group=groupRisk)
 float stopAtrBuffer = 0.10
+float sessionVolStopFraction = 0.20
+float sessionVolStopCapAtr = 1.50
 
 groupLifecycle = "7. Setup Lifecycle"
 int setupFreshBars = 6
 int setupExpiryBars = 25
 float setupChaseAtr = 1.50
 float setupManagedR = 1.00
+float zoneExpansionNormalAtr = 0.75
+float zoneExpansionStrongAtr = 1.50
 
 groupStrict = "8. Strict ICT Entry"
 strictIctMode = input.bool(false, "Enable Strict ICT Entry mode", group=groupStrict)
-strictShowOte = input.bool(true, "Show OTE zone overlay", group=groupStrict)
+strictShowOte = input.bool(true, "Show active OTE overlay", group=groupStrict)
 string strictKillzoneSession = "0200-0500,0700-1000,1300-1600"
 int strictMssLookback = 10
 
 groupStyle = "9. Style"
 showDashboard = input.bool(true, "Show context dashboard", group=groupStyle)
 showProtectedLevels = input.bool(true, "Show protected high / low", group=groupStyle)
-showKillzoneVisual = input.bool(true, "Shade killzone on chart", group=groupStyle)
+showKillzoneVisual = input.bool(true, "Show trading sessions on chart", group=groupStyle)
 showLiquidityRightLabels = input.bool(true, "Show right-edge liquidity labels", group=groupStyle)
 zoneDisplayMode = input.string("Full", "Zone display mode", options=["Full", "Focused", "Minimal"], group=groupStyle)
 
 groupMobile = "10. Mobile / Android"
-androidCompactMode = input.bool(false, "Android compact mode", group=groupMobile)
+androidCompactMode = input.bool(false, "Compact dashboard mode", group=groupMobile)
 bool mobileCompactDashboard = true
 bool mobileCompactLabels = true
 bool mobileHideStructureLabels = true
@@ -100,17 +104,29 @@ bearColor = color.rgb(201, 76, 76)
 neutralColor = color.rgb(128, 128, 128)
 liqHighColor = color.rgb(44, 120, 200)
 liqLowColor = color.rgb(230, 145, 56)
-panelHeaderBg = color.new(color.black, 0)
-panelCellBg = color.new(color.black, 10)
-panelBullBg = color.new(bullColor, 20)
-panelBearBg = color.new(bearColor, 20)
-fvgBullColor = color.new(color.rgb(33, 150, 120), 82)
-fvgBearColor = color.new(color.rgb(206, 81, 81), 82)
-obBullColor = color.new(color.rgb(33, 150, 120), 82)
-obBearColor = color.new(color.rgb(206, 81, 81), 82)
-bbBullColor = color.new(color.rgb(33, 100, 180), 80)
-bbBearColor = color.new(color.rgb(180, 110, 33), 80)
+panelHeaderBg = color.new(color.black, 12)
+panelCellBg = color.new(color.black, 18)
+panelBullBg = color.new(color.rgb(36, 54, 48), 26)
+panelBearBg = color.new(color.rgb(65, 44, 44), 26)
+fvgBullColor = color.new(color.rgb(33, 150, 120), 90)
+fvgBearColor = color.new(color.rgb(206, 81, 81), 90)
+obBullColor = color.new(color.rgb(33, 150, 120), 90)
+obBearColor = color.new(color.rgb(206, 81, 81), 90)
+bbBullColor = color.new(color.rgb(33, 100, 180), 88)
+bbBearColor = color.new(color.rgb(180, 110, 33), 88)
+asiaSessionFillColor = color.new(color.rgb(165, 82, 72), 86)
+asiaSessionBorderColor = color.new(color.rgb(198, 102, 91), 58)
+londonSessionFillColor = color.new(color.rgb(55, 92, 160), 86)
+londonSessionBorderColor = color.new(color.rgb(84, 126, 214), 54)
+newYorkSessionFillColor = color.new(color.rgb(170, 152, 57), 85)
+newYorkSessionBorderColor = color.new(color.rgb(208, 187, 79), 52)
+structureEventColor = color.new(color.rgb(120, 120, 120), 12)
+structureTextColor = color.new(color.rgb(110, 110, 110), 0)
+decisionPremiumFillColor = color.new(color.rgb(177, 58, 58), 92)
+decisionDiscountFillColor = color.new(color.rgb(33, 140, 96), 92)
+decisionEqColor = color.new(color.rgb(65, 126, 214), 10)
 overlayLineDisplay = display.all - display.price_scale - display.status_line
+int maxSessionVisuals = 6
 
 atr = ta.atr(14)
 bodyHigh = math.max(open, close)
@@ -123,7 +139,7 @@ presetLabel = usagePreset
 strictModeEnabled = presetStrict or strictIctMode
 compactMode = presetAndroid or androidCompactMode
 compactDashboardMode = compactMode and (presetAndroid or mobileCompactDashboard)
-dashboardEnabled = presetIntraday or presetAndroid or presetStrict ? true : showDashboard
+dashboardEnabled = showDashboard
 showHtfEffective = presetIntraday or presetStrict ? true : showHtf
 showRiskEffective = presetAndroid ? false : showRisk
 showProtectedLevelsEffective = showProtectedLevels
@@ -135,7 +151,6 @@ displayInternalRange = showInternalRange and not (compactMode and mobileHideInte
 displayEqLiquidity = showLiquidity and not (compactMode and mobileHideEqLiquidity)
 displaySweepMarkers = showLiquidity and showSweeps
 displayTrendBackground = showTrendBackground and not (compactMode and mobileHideTrendBackground)
-displayWeekMonthLiquidity = showHigherPeriodLiquidity and not (compactMode and mobileHideSecondaryLiquidity)
 displayProtectedLevels = showProtectedLevelsEffective
 displayDealingRange = displayInternalRange
 displayLiquidityRightLabels = showLiquidityRightLabelsEffective and not (compactMode and mobileHideLiquidityRightLabels)
@@ -178,25 +193,32 @@ var label[] structureEventLabels = array.new_label()
 var bool[] structureEventBull = array.new_bool()
 var label[] pivotStructureLabels = array.new_label()
 var bool[] pivotStructureIsHigh = array.new_bool()
-var label prevSessionHighLabel = na
-var label prevSessionLowLabel = na
-var label prevDayHighLabel = na
-var label prevDayLowLabel = na
-var label prevWeekHighLabel = na
-var label prevWeekLowLabel = na
-var label prevMonthHighLabel = na
-var label prevMonthLowLabel = na
-var label eqHighLabel = na
-var label eqLowLabel = na
+var box[] sessionRangeBoxes = array.new_box()
+var label[] sessionRangeLabels = array.new_label()
+var string[] sessionRangeNames = array.new_string()
+var line[] sessionRangeHighLines = array.new_line()
+var line[] sessionRangeLowLines = array.new_line()
 var label protectedHighLabel = na
 var label protectedLowLabel = na
-var label internalHighLabel = na
-var label internalLowLabel = na
-var label internalEqLabel = na
-var label oteLongLabel = na
-var label oteShortLabel = na
 var label htfHighLabel = na
 var label htfLowLabel = na
+var label longStopLabel = na
+var label shortStopLabel = na
+var box activeAsiaSessionBox = na
+var label activeAsiaSessionLabel = na
+var line activeAsiaSessionHighLine = na
+var line activeAsiaSessionLowLine = na
+var int activeAsiaSessionStartBar = na
+var box activeLondonSessionBox = na
+var label activeLondonSessionLabel = na
+var line activeLondonSessionHighLine = na
+var line activeLondonSessionLowLine = na
+var int activeLondonSessionStartBar = na
+var box activeNewYorkSessionBox = na
+var label activeNewYorkSessionLabel = na
+var line activeNewYorkSessionHighLine = na
+var line activeNewYorkSessionLowLine = na
+var int activeNewYorkSessionStartBar = na
 
 f_breakUp(float level) =>
     breakMode == "Full Body Through" ? bodyLow > level : close > level
@@ -210,6 +232,12 @@ f_biasText(int bias) =>
 f_biasShort(int bias) =>
     bias == 1 ? "Bull" : bias == -1 ? "Bear" : "Range"
 
+f_regimeStrengthShort(string regimeStrength) =>
+    regimeStrength == "Strong" ? "Str" : regimeStrength == "Normal" ? "N" : regimeStrength == "Flat" ? "F" : regimeStrength
+
+f_sessionCode(string sessionLabel) =>
+    sessionLabel == "Asia" ? "AS" : sessionLabel == "London" ? "LDN" : sessionLabel == "New York AM" ? "NYA" : sessionLabel == "New York PM" ? "NYP" : sessionLabel == "New York Composite" ? "NYC" : sessionLabel == "Inter-session" ? "INT" : sessionLabel
+
 f_regimeBias(float currentLevel, float referenceLevel) =>
     na(currentLevel) or na(referenceLevel) ? 0 : currentLevel > referenceLevel ? 1 : currentLevel < referenceLevel ? -1 : 0
 
@@ -218,6 +246,16 @@ f_regimeStrengthText(int regimeBias, float currentLevel, float referenceLevel, f
 
 f_regimeSideText(bool isBull, int regimeBias, string regimeStrength) =>
     regimeBias == 0 ? "Flat" : isBull ? (regimeBias == 1 ? regimeStrength : "Counter") : (regimeBias == -1 ? regimeStrength : "Counter")
+
+f_alignmentShortText(bool isBull, int ltfBias, int higherBias) =>
+    if isBull
+        ltfBias == 1 and higherBias == 1 ? "Str" : ltfBias == 1 or higherBias == 1 ? "Mix" : "Ctr"
+    else
+        ltfBias == -1 and higherBias == -1 ? "Str" : ltfBias == -1 or higherBias == -1 ? "Mix" : "Ctr"
+
+f_regimeSideShortText(bool isBull, int regimeBias, string regimeStrength) =>
+    string sideText = f_regimeSideText(isBull, regimeBias, regimeStrength)
+    sideText == "Counter" ? "Ctr" : sideText == "Flat" ? "Flat" : f_regimeStrengthShort(sideText)
 
 f_zoneMid(float zoneTop, float zoneBottom) =>
     (zoneTop + zoneBottom) * 0.5
@@ -264,7 +302,7 @@ f_formatPercent(float value) =>
     na(value) ? "-" : str.tostring(math.round(value)) + "%"
 
 f_formatRr(float rr) =>
-    na(rr) ? "-" : str.tostring(math.round(rr * 100.0) / 100.0) + "R"
+    na(rr) ? "-" : rr > 10.0 ? ">10R" : str.tostring(math.round(rr * 100.0) / 100.0) + "R"
 
 f_alignmentText(bool isBull, int ltfBias, int higherBias) =>
     if isBull
@@ -272,14 +310,29 @@ f_alignmentText(bool isBull, int ltfBias, int higherBias) =>
     else
         ltfBias == -1 and higherBias == -1 ? "Strong" : ltfBias == -1 or higherBias == -1 ? "Mixed" : "Counter"
 
-f_statusCompact(string statusText) =>
-    statusText == "Valid now" ? "Valid" : statusText == "Strict Ready" ? "Ready" : statusText == "Invalidated" ? "Invalid" : statusText == "Standby" ? "Standby" : statusText == "Managed" ? "Mngd" : statusText == "Replaced" ? "Newer" : statusText == "Expired" ? "Exp" : statusText == "Chased" ? "Chased" : statusText == "Filtered" ? "Filter" : statusText == "Wait KZ" ? "WaitKZ" : statusText
+f_zoneResponseScore(bool touched, bool fresh, bool managed, bool priceInZone, bool invalidated, bool replaced, bool expired, bool chased) =>
+    invalidated or replaced or expired or chased ? 0 : managed ? 2 : not touched and fresh ? 2 : priceInZone or touched ? 1 : 0
+
+f_zoneDisplacementScore(bool displacementSeen) =>
+    displacementSeen ? 2 : 0
+
+f_zoneAtrExpansionScore(float departureRange, float atrLevel) =>
+    na(departureRange) or na(atrLevel) or atrLevel <= 0 ? 0 : departureRange >= atrLevel * zoneExpansionStrongAtr ? 2 : departureRange >= atrLevel * zoneExpansionNormalAtr ? 1 : 0
+
+f_zoneQualityTier(bool hasSetup, int responseScore, int displacementScore, int atrExpansionScore) =>
+    not hasSetup ? "-" : responseScore + displacementScore + atrExpansionScore >= 5 ? "Q3" : responseScore + displacementScore + atrExpansionScore >= 3 ? "Q2" : "Q1"
+
+f_setupQualityText(string setupText, string qualityTier, bool hasSetup) =>
+    hasSetup ? setupText + " | " + qualityTier : setupText
 
 f_zoneTouched(float zoneTop, float zoneBottom) =>
     not na(zoneTop) and not na(zoneBottom) and high >= zoneBottom and low <= zoneTop
 
 f_zoneIntersects(float zoneTop, float zoneBottom, float refTop, float refBottom) =>
     not na(zoneTop) and not na(zoneBottom) and not na(refTop) and not na(refBottom) and math.max(zoneBottom, refBottom) <= math.min(zoneTop, refTop)
+
+f_zoneFreshNearEvent(int zoneCreatedBar, int eventBar, int lookbackBars) =>
+    not na(zoneCreatedBar) and not na(eventBar) and lookbackBars >= 0 and math.abs(zoneCreatedBar - eventBar) <= lookbackBars
 
 f_boolFlag(bool cond) =>
     cond ? "Y" : "N"
@@ -405,8 +458,23 @@ f_syncRightEdgeLabel(label currentLabel, float level, string labelText, color la
         updatedLabel := na
     updatedLabel
 
+f_sessionVisualLabel(string sessionName) =>
+    compactMode and mobileCompactLabels ? (sessionName == "New York" ? "NY" : f_sessionCode(sessionName)) : sessionName
+
+f_sessionFillColor(string sessionName) =>
+    sessionName == "Asia" ? asiaSessionFillColor : sessionName == "London" ? londonSessionFillColor : newYorkSessionFillColor
+
+f_sessionBorderColor(string sessionName) =>
+    sessionName == "Asia" ? asiaSessionBorderColor : sessionName == "London" ? londonSessionBorderColor : newYorkSessionBorderColor
+
+f_sessionTextColor(string sessionName) =>
+    color.new(f_sessionBorderColor(sessionName), compactMode ? 32 : 46)
+
+f_sessionLineColor(string sessionName, bool isHigh) =>
+    color.new(f_sessionBorderColor(sessionName), isHigh ? 8 : 18)
+
 f_setCell(table targetTable, int col, int row, string cellText, color textClr, color bgClr) =>
-    table.cell(targetTable, col, row, cellText, text_color=textClr, bgcolor=bgClr)
+    table.cell(targetTable, col, row, cellText, text_color=textClr, bgcolor=bgClr, text_size=compactDashboardMode ? size.small : size.normal)
 
 f_lifecycleText(int setupAge, bool touched) =>
     (na(setupAge) ? "-" : str.tostring(setupAge) + "b") + " / " + (touched ? "Touched" : "Untouched")
@@ -415,13 +483,10 @@ f_compactLifecycleText(bool useLong, int longAge, bool longTouchedState, int sho
     useLong ? (na(longAge) ? "-" : str.tostring(longAge) + "b") + "/" + (longTouchedState ? "T" : "U") : (na(shortAge) ? "-" : str.tostring(shortAge) + "b") + "/" + (shortTouchedState ? "T" : "U")
 
 f_entryActionText(string statusText) =>
-    statusText == "Strict Ready" or statusText == "Valid now" ? "Entry active" : "Wait confirmation"
+    statusText == "Active" or statusText == "Strict Ready" or statusText == "Valid now" ? "Entry active" : statusText == "Armed" ? "Monitor retest" : statusText == "Managed" ? "Manage trade" : statusText == "Completed" ? "Wait next setup" : statusText == "Expired" or statusText == "Invalidated" ? "Stand down" : "Wait confirmation"
 
 f_biasSummary(int currentBias, bool htfReady, int higherBias, int regimeBias, string regimeStrength) =>
-    f_biasText(currentBias) + " / " + (htfReady ? f_biasText(higherBias) : "HTF Guard") + " / Reg " + f_biasText(regimeBias) + " " + regimeStrength
-
-f_strictTimeSummary(bool strictModeEnabled, string htfSummary, string sessionSummary, bool kzActive) =>
-    (strictModeEnabled ? "Mode ON | " : "Mode OFF | ") + htfSummary + " | " + sessionSummary + " | KZ " + (kzActive ? "On" : "Off")
+    f_biasShort(currentBias) + "/" + (htfReady ? f_biasShort(higherBias) : "G") + "/R" + f_biasShort(regimeBias) + " " + f_regimeStrengthShort(regimeStrength)
 
 f_zoneVisibleByMode(string mode, bool isSelected, bool isBull, string preferredDirection, bool useLongPreference) =>
     mode == "Full" ? true : mode == "Focused" or preferredDirection == "Balanced" ? isSelected : preferredDirection == "Wait" ? isSelected : useLongPreference ? (isBull and isSelected) : (not isBull and isSelected)
@@ -435,35 +500,89 @@ f_contextVisualByMode(string mode) =>
 f_strictChecklist(bool biasPass, bool sweepPass, bool mssPass, bool pdPass, bool otePass, bool kzPass, bool compactText) =>
     compactText ? "B" + f_boolFlag(biasPass) + " S" + f_boolFlag(sweepPass) + " M" + f_boolFlag(mssPass) + " P" + f_boolFlag(pdPass) + " O" + f_boolFlag(otePass) + " K" + f_boolFlag(kzPass) : "B:" + f_boolFlag(biasPass) + " S:" + f_boolFlag(sweepPass) + " M:" + f_boolFlag(mssPass) + " PD:" + f_boolFlag(pdPass) + " OTE:" + f_boolFlag(otePass) + " KZ:" + f_boolFlag(kzPass)
 
-f_setupStatus(bool hasSetup, bool stopHit, bool structureInvalidated, bool replaced, bool expired, bool chased, bool managed, bool strictModeEnabled, bool strictContextPass, bool strictKillzonePass, bool priceInZone, bool priceNearZone, bool fresh) =>
-    string status = "No setup"
-    if hasSetup
-        if stopHit or structureInvalidated
-            status := "Invalidated"
-        else if replaced
-            status := "Replaced"
-        else if expired
-            status := "Expired"
-        else if chased
-            status := "Chased"
-        else if managed
-            status := "Managed"
-        else if strictModeEnabled and not strictContextPass
-            status := "Filtered"
-        else if strictModeEnabled and not strictKillzonePass
-            status := "Wait KZ"
-        else if strictModeEnabled and (priceInZone or priceNearZone)
-            status := "Strict Ready"
-        else if priceInZone or priceNearZone
-            status := "Valid now"
-        else if fresh
-            status := "Fresh"
-        else
-            status := "Standby"
-    status
+f_setupExecutionState(bool hasSetup, bool invalidated, bool expired, bool chased, bool completed, bool managed, bool contextPass, bool timingPass, bool mssFresh, bool displacementSeen, bool priceInZone, bool priceNearZone) =>
+    not hasSetup ? "Waiting" : invalidated ? "Invalidated" : expired or chased ? "Expired" : completed ? "Completed" : managed ? "Managed" : contextPass and timingPass and mssFresh and displacementSeen ? (priceInZone or priceNearZone ? "Active" : "Armed") : "Waiting"
 
-f_isActionable(string statusText) =>
-    statusText != "No setup" and statusText != "Invalidated" and statusText != "Expired" and statusText != "Chased" and statusText != "Filtered"
+f_executionStateCompact(string stateText) =>
+    stateText == "Invalidated" ? "Invalid" : stateText == "Expired" ? "Exp" : stateText == "Managed" ? "Mngd" : stateText == "Completed" ? "Done" : stateText
+
+f_executionRiskVisible(string stateText) =>
+    stateText == "Armed" or stateText == "Active" or stateText == "Managed"
+
+f_hybridStopDistance(float structuralDistance, float sessionVolRange, float atrLevel) =>
+    float result = structuralDistance
+    if not na(structuralDistance) and structuralDistance > 0 and not na(sessionVolRange) and sessionVolRange > 0 and not na(atrLevel) and atrLevel > 0
+        float sessionVolFloor = sessionVolRange * sessionVolStopFraction
+        float sessionVolCap = structuralDistance + atrLevel * sessionVolStopCapAtr
+        result := math.max(structuralDistance, math.min(sessionVolFloor, sessionVolCap))
+    result
+
+f_trimSessionVisuals() =>
+    while array.size(sessionRangeBoxes) > maxSessionVisuals
+        oldBox = array.shift(sessionRangeBoxes)
+        oldLabel = array.shift(sessionRangeLabels)
+        array.shift(sessionRangeNames)
+        oldHighLine = array.shift(sessionRangeHighLines)
+        oldLowLine = array.shift(sessionRangeLowLines)
+        if not na(oldBox)
+            box.delete(oldBox)
+        if not na(oldLabel)
+            label.delete(oldLabel)
+        if not na(oldHighLine)
+            line.delete(oldHighLine)
+        if not na(oldLowLine)
+            line.delete(oldLowLine)
+
+f_addSessionVisual(string sessionName, int leftBar, float sessionHigh, float sessionLow) =>
+    int safeLeftBar = f_safeBarIndexX(leftBar)
+    color fillColor = f_sessionFillColor(sessionName)
+    color borderColor = f_sessionBorderColor(sessionName)
+    box newBox = box.new(left=safeLeftBar, top=sessionHigh, right=bar_index, bottom=sessionLow, xloc=xloc.bar_index, bgcolor=fillColor, border_color=borderColor)
+    label newLabel = label.new(x=f_safeBarIndexX(int(math.floor((safeLeftBar + bar_index) * 0.5))), y=f_zoneMid(sessionHigh, sessionLow), xloc=xloc.bar_index, text=f_sessionVisualLabel(sessionName), style=label.style_none, color=color.new(color.black, 100), textcolor=f_sessionTextColor(sessionName), size=compactMode ? size.small : size.normal)
+    line newHighLine = line.new(x1=safeLeftBar, y1=sessionHigh, x2=bar_index, y2=sessionHigh, xloc=xloc.bar_index, color=f_sessionLineColor(sessionName, true), width=1, style=line.style_dotted)
+    line newLowLine = line.new(x1=safeLeftBar, y1=sessionLow, x2=bar_index, y2=sessionLow, xloc=xloc.bar_index, color=f_sessionLineColor(sessionName, false), width=1, style=line.style_dotted)
+    array.push(sessionRangeBoxes, newBox)
+    array.push(sessionRangeLabels, newLabel)
+    array.push(sessionRangeNames, sessionName)
+    array.push(sessionRangeHighLines, newHighLine)
+    array.push(sessionRangeLowLines, newLowLine)
+    f_trimSessionVisuals()
+    [newBox, newLabel, newHighLine, newLowLine]
+
+f_syncSessionVisual(box currentBox, label currentLabel, line currentHighLine, line currentLowLine, int leftBar, float sessionHigh, float sessionLow, string sessionName) =>
+    if not na(currentBox) and not na(sessionHigh) and not na(sessionLow)
+        int safeBoxLeftBar = f_safeBarIndexX(leftBar)
+        box.set_left(currentBox, safeBoxLeftBar)
+        box.set_right(currentBox, bar_index)
+        box.set_top(currentBox, sessionHigh)
+        box.set_bottom(currentBox, sessionLow)
+    if not na(currentHighLine) and not na(sessionHigh)
+        int safeHighLineLeftBar = f_safeBarIndexX(leftBar)
+        line.set_xy1(currentHighLine, safeHighLineLeftBar, sessionHigh)
+        line.set_xy2(currentHighLine, bar_index, sessionHigh)
+    if not na(currentLowLine) and not na(sessionLow)
+        int safeLowLineLeftBar = f_safeBarIndexX(leftBar)
+        line.set_xy1(currentLowLine, safeLowLineLeftBar, sessionLow)
+        line.set_xy2(currentLowLine, bar_index, sessionLow)
+    if not na(currentLabel) and not na(sessionHigh) and not na(sessionLow)
+        label.set_x(currentLabel, f_safeBarIndexX(int(math.floor((leftBar + bar_index) * 0.5))))
+        label.set_y(currentLabel, f_zoneMid(sessionHigh, sessionLow))
+        label.set_text(currentLabel, f_sessionVisualLabel(sessionName))
+        label.set_style(currentLabel, label.style_none)
+        label.set_color(currentLabel, color.new(color.black, 100))
+        label.set_size(currentLabel, compactMode ? size.small : size.normal)
+
+f_executionStateBadge(string stateText, bool compactText) =>
+    stateText == "Active" ? (compactText ? "ACT" : "Active") : stateText == "Armed" ? (compactText ? "ARM" : "Armed") : stateText == "Managed" ? (compactText ? "MNG" : "Managed") : stateText == "Completed" ? (compactText ? "CMP" : "Completed") : ""
+
+f_executionSelectedFillAlpha(string stateText) =>
+    stateText == "Active" ? 62 : stateText == "Armed" ? 70 : stateText == "Managed" ? 84 : stateText == "Completed" ? 88 : 78
+
+f_executionSelectedLineWidth(string stateText) =>
+    stateText == "Active" ? 3 : stateText == "Armed" ? 2 : 1
+
+f_preferredExecutionText(string preferredDirection, string longExecutionState, string shortExecutionState, bool compactText) =>
+    preferredDirection == "Long" ? "Long | " + (compactText ? f_executionStateCompact(longExecutionState) : longExecutionState) : preferredDirection == "Short" ? "Short | " + (compactText ? f_executionStateCompact(shortExecutionState) : shortExecutionState) : preferredDirection == "Balanced" ? (compactText ? "Bal | L " + f_executionStateCompact(longExecutionState) + " / S " + f_executionStateCompact(shortExecutionState) : "Balanced | L " + longExecutionState + " / S " + shortExecutionState) : compactText ? "Wait | Scan" : "Wait | Scan"
 
 f_setupScore(bool hasSetup, bool biasAligned, bool htfAligned, bool sweepSeen, bool displacementSeen, bool hasOb, bool hasFvg, bool priceInZone, bool priceNearZone, float rr, bool fresh, bool managed, bool strictModeEnabled, bool strictContextPass, bool strictKillzonePass, bool replaced, bool chased, bool expired, bool invalidated) =>
     float score = na
@@ -574,19 +693,19 @@ f_trimPivotLabels() =>
 
 f_addPivotLabel(int pivotBar, float pivotPrice, string pivotText, bool isHigh) =>
     if displayStructureLabels
-        pivotLabel = label.new(x=pivotBar, y=pivotPrice, xloc=xloc.bar_index, text=pivotText, style=isHigh ? label.style_label_down : label.style_label_up, color=color.new(isHigh ? liqHighColor : liqLowColor, 0), textcolor=color.white, size=size.tiny)
+        pivotLabel = label.new(x=pivotBar, y=pivotPrice, xloc=xloc.bar_index, text=pivotText, style=label.style_none, color=color.new(color.black, 100), textcolor=color.new(isHigh ? liqHighColor : liqLowColor, 12), size=size.tiny)
         array.push(pivotStructureLabels, pivotLabel)
         array.push(pivotStructureIsHigh, isHigh)
         f_trimPivotLabels()
 
 f_drawStructureEvent(int fromBar, float level, string eventText, bool isBull) =>
     if showBosChoch and not na(fromBar)
-        eventColor = isBull ? bullColor : bearColor
+        eventLineStyle = eventText == "MSS" ? line.style_dashed : line.style_dotted
         fromShift = math.max(bar_index - fromBar, 0)
         if fromShift <= 5000
             fromTime = time[fromShift]
-            eventLine = line.new(x1=fromTime, y1=level, x2=time, y2=level, xloc=xloc.bar_time, color=eventColor, width=2)
-            eventLabel = label.new(x=time, y=level, text=eventText, xloc=xloc.bar_time, style=isBull ? label.style_label_down : label.style_label_up, color=eventColor, textcolor=color.white, size=size.small)
+            eventLine = line.new(x1=fromTime, y1=level, x2=time, y2=level, xloc=xloc.bar_time, color=structureEventColor, width=eventText == "MSS" ? 2 : 1, style=eventLineStyle)
+            eventLabel = label.new(x=time, y=level, text=eventText, xloc=xloc.bar_time, style=label.style_none, color=color.new(color.black, 100), textcolor=structureTextColor, size=size.tiny)
             array.push(structureEventLines, eventLine)
             array.push(structureEventLabels, eventLabel)
             array.push(structureEventBull, isBull)
@@ -747,6 +866,9 @@ nyAmSessionEnded = not inNyAmSession and inNyAmSession[1]
 inNyPmSession = f_inSessionWindow(nyPmSessionWindow)
 newNyPmSession = inNyPmSession and not inNyPmSession[1]
 nyPmSessionEnded = not inNyPmSession and inNyPmSession[1]
+inNewYorkSessionVisual = inNyAmSession or inNyPmSession
+newNewYorkSessionVisual = inNewYorkSessionVisual and not inNewYorkSessionVisual[1]
+newYorkSessionVisualEnded = not inNewYorkSessionVisual and inNewYorkSessionVisual[1]
 
 var float asiaSessionHigh = na
 var float asiaSessionLow = na
@@ -766,6 +888,8 @@ var float lastNyPmHigh = na
 var float lastNyPmLow = na
 var float prevSessionHigh = na
 var float prevSessionLow = na
+var float newYorkSessionVisualHigh = na
+var float newYorkSessionVisualLow = na
 
 [asiaSessionHighNext, asiaSessionLowNext, lastAsiaHighNext, lastAsiaLowNext] = f_updateSessionRange(inAsiaSession, newAsiaSession, asiaSessionEnded, asiaSessionHigh, asiaSessionLow, lastAsiaHigh, lastAsiaLow)
 [londonSessionHighNext, londonSessionLowNext, lastLondonHighNext, lastLondonLowNext] = f_updateSessionRange(inLondonSession, newLondonSession, londonSessionEnded, londonSessionHigh, londonSessionLow, lastLondonHigh, lastLondonLow)
@@ -788,12 +912,105 @@ nyPmSessionLow := nyPmSessionLowNext
 lastNyPmHigh := lastNyPmHighNext
 lastNyPmLow := lastNyPmLowNext
 
+if newNewYorkSessionVisual
+    newYorkSessionVisualHigh := high
+    newYorkSessionVisualLow := low
+else if inNewYorkSessionVisual
+    newYorkSessionVisualHigh := na(newYorkSessionVisualHigh) ? high : math.max(newYorkSessionVisualHigh, high)
+    newYorkSessionVisualLow := na(newYorkSessionVisualLow) ? low : math.min(newYorkSessionVisualLow, low)
+
 float lastNyCompositeHigh = f_mergeSessionHigh(lastNyAmHigh, lastNyPmHigh)
 float lastNyCompositeLow = f_mergeSessionLow(lastNyAmLow, lastNyPmLow)
 string currentSessionBlock = inAsiaSession ? "Asia" : inLondonSession ? "London" : inNyAmSession ? "New York AM" : inNyPmSession ? "New York PM" : "Inter-session"
 string liquiditySessionLabel = inLondonSession ? "Asia" : inNyAmSession ? "London" : inNyPmSession ? "New York AM" : "New York Composite"
 prevSessionHigh := inLondonSession ? lastAsiaHigh : inNyAmSession ? lastLondonHigh : inNyPmSession ? lastNyAmHigh : lastNyCompositeHigh
 prevSessionLow := inLondonSession ? lastAsiaLow : inNyAmSession ? lastLondonLow : inNyPmSession ? lastNyAmLow : lastNyCompositeLow
+float prevVolSourceHigh = inLondonSession ? lastAsiaHigh : inNyAmSession ? lastLondonHigh : inNyPmSession ? lastLondonHigh : lastNyCompositeHigh
+float prevVolSourceLow = inLondonSession ? lastAsiaLow : inNyAmSession ? lastLondonLow : inNyPmSession ? lastLondonLow : lastNyCompositeLow
+float prevSessionVolRange = not na(prevVolSourceHigh) and not na(prevVolSourceLow) ? prevVolSourceHigh - prevVolSourceLow : na
+
+//------------------------------------------------------------------------------
+// Session range visuals
+//------------------------------------------------------------------------------
+bool sessionVisualsEnabled = displayKillzoneVisual and timeframe.isintraday
+
+if newAsiaSession
+    activeAsiaSessionStartBar := bar_index
+    [newAsiaSessionBox, newAsiaSessionLabel, newAsiaSessionHighLine, newAsiaSessionLowLine] = f_addSessionVisual("Asia", activeAsiaSessionStartBar, asiaSessionHigh, asiaSessionLow)
+    activeAsiaSessionBox := newAsiaSessionBox
+    activeAsiaSessionLabel := newAsiaSessionLabel
+    activeAsiaSessionHighLine := newAsiaSessionHighLine
+    activeAsiaSessionLowLine := newAsiaSessionLowLine
+
+if inAsiaSession
+    f_syncSessionVisual(activeAsiaSessionBox, activeAsiaSessionLabel, activeAsiaSessionHighLine, activeAsiaSessionLowLine, activeAsiaSessionStartBar, asiaSessionHigh, asiaSessionLow, "Asia")
+else if asiaSessionEnded
+    activeAsiaSessionBox := na
+    activeAsiaSessionLabel := na
+    activeAsiaSessionHighLine := na
+    activeAsiaSessionLowLine := na
+    activeAsiaSessionStartBar := na
+
+if newLondonSession
+    activeLondonSessionStartBar := bar_index
+    [newLondonSessionBox, newLondonSessionLabel, newLondonSessionHighLine, newLondonSessionLowLine] = f_addSessionVisual("London", activeLondonSessionStartBar, londonSessionHigh, londonSessionLow)
+    activeLondonSessionBox := newLondonSessionBox
+    activeLondonSessionLabel := newLondonSessionLabel
+    activeLondonSessionHighLine := newLondonSessionHighLine
+    activeLondonSessionLowLine := newLondonSessionLowLine
+
+if inLondonSession
+    f_syncSessionVisual(activeLondonSessionBox, activeLondonSessionLabel, activeLondonSessionHighLine, activeLondonSessionLowLine, activeLondonSessionStartBar, londonSessionHigh, londonSessionLow, "London")
+else if londonSessionEnded
+    activeLondonSessionBox := na
+    activeLondonSessionLabel := na
+    activeLondonSessionHighLine := na
+    activeLondonSessionLowLine := na
+    activeLondonSessionStartBar := na
+
+if newNewYorkSessionVisual
+    activeNewYorkSessionStartBar := bar_index
+    [newNewYorkSessionBox, newNewYorkSessionLabel, newNewYorkSessionHighLine, newNewYorkSessionLowLine] = f_addSessionVisual("New York", activeNewYorkSessionStartBar, newYorkSessionVisualHigh, newYorkSessionVisualLow)
+    activeNewYorkSessionBox := newNewYorkSessionBox
+    activeNewYorkSessionLabel := newNewYorkSessionLabel
+    activeNewYorkSessionHighLine := newNewYorkSessionHighLine
+    activeNewYorkSessionLowLine := newNewYorkSessionLowLine
+
+if inNewYorkSessionVisual
+    f_syncSessionVisual(activeNewYorkSessionBox, activeNewYorkSessionLabel, activeNewYorkSessionHighLine, activeNewYorkSessionLowLine, activeNewYorkSessionStartBar, newYorkSessionVisualHigh, newYorkSessionVisualLow, "New York")
+else if newYorkSessionVisualEnded
+    activeNewYorkSessionBox := na
+    activeNewYorkSessionLabel := na
+    activeNewYorkSessionHighLine := na
+    activeNewYorkSessionLowLine := na
+    activeNewYorkSessionStartBar := na
+
+if array.size(sessionRangeBoxes) > 0
+    for i = 0 to array.size(sessionRangeBoxes) - 1
+        sessionBox = array.get(sessionRangeBoxes, i)
+        sessionLabel = array.get(sessionRangeLabels, i)
+        sessionName = array.get(sessionRangeNames, i)
+        sessionHighLine = array.get(sessionRangeHighLines, i)
+        sessionLowLine = array.get(sessionRangeLowLines, i)
+        fillColor = sessionVisualsEnabled ? f_sessionFillColor(sessionName) : color.new(color.black, 100)
+        borderColor = sessionVisualsEnabled ? f_sessionBorderColor(sessionName) : color.new(color.black, 100)
+        textColor = sessionVisualsEnabled ? f_sessionTextColor(sessionName) : color.new(color.white, 100)
+        highLineColor = sessionVisualsEnabled ? f_sessionLineColor(sessionName, true) : color.new(color.black, 100)
+        lowLineColor = sessionVisualsEnabled ? f_sessionLineColor(sessionName, false) : color.new(color.black, 100)
+        if not na(sessionBox)
+            box.set_bgcolor(sessionBox, fillColor)
+            box.set_border_color(sessionBox, borderColor)
+        if not na(sessionHighLine)
+            line.set_x2(sessionHighLine, bar_index)
+            line.set_color(sessionHighLine, highLineColor)
+        if not na(sessionLowLine)
+            line.set_x2(sessionLowLine, bar_index)
+            line.set_color(sessionLowLine, lowLineColor)
+        if not na(sessionLabel)
+            label.set_text(sessionLabel, f_sessionVisualLabel(sessionName))
+            label.set_textcolor(sessionLabel, textColor)
+            label.set_color(sessionLabel, color.new(color.black, 100))
+            label.set_size(sessionLabel, compactMode ? size.small : size.normal)
 
 prevDayHigh = request.security(syminfo.tickerid, "D", high[1], lookahead=barmerge.lookahead_off)
 prevDayLow = request.security(syminfo.tickerid, "D", low[1], lookahead=barmerge.lookahead_off)
@@ -1313,9 +1530,9 @@ else
 
 activeBias = not na(lastStructureBreakBar) and (bar_index - lastStructureBreakBar) > consolidationBars ? 0 : trendBias
 strictKillzoneActive = timeframe.isintraday and not na(time(timeframe.period, strictKillzoneSession, ictSessionTimezone))
-liquiditySessionSummary = liquiditySessionMode + " | Now " + currentSessionBlock + " -> Prev " + liquiditySessionLabel
-killzoneSummary = "KZ LDN/NY AM/NY PM | " + (strictKillzoneActive ? "On" : "Off")
-timezoneSummary = "TZ NY (DST)"
+liquiditySessionSummary = "A-ICT " + f_sessionCode(currentSessionBlock) + ">" + f_sessionCode(liquiditySessionLabel)
+killzoneSummary = "KZ:" + (strictKillzoneActive ? "Y" : "N")
+timezoneSummary = "NY TZ"
 bullDealingRangeHigh = bullLegHigh
 bullDealingRangeLow = bullLegLow
 bearDealingRangeHigh = bearLegHigh
@@ -1522,10 +1739,10 @@ bool bullObPdPass = not na(latestBullZoneTop) and not na(bullEquilibriumActive) 
 bool bullFvgPdPass = not na(latestBullFvgTop) and not na(bullEquilibriumActive) and f_zoneMid(latestBullFvgTop, latestBullFvgBottom) < bullEquilibriumActive
 bool bearObPdPass = not na(latestBearZoneTop) and not na(bearEquilibriumActive) and f_zoneMid(latestBearZoneTop, latestBearZoneBottom) > bearEquilibriumActive
 bool bearFvgPdPass = not na(latestBearFvgTop) and not na(bearEquilibriumActive) and f_zoneMid(latestBearFvgTop, latestBearFvgBottom) > bearEquilibriumActive
-bool bullObOtePass = f_zoneIntersects(latestBullZoneTop, latestBullZoneBottom, oteLongTop, oteLongBottom)
-bool bullFvgOtePass = f_zoneIntersects(latestBullFvgTop, latestBullFvgBottom, oteLongTop, oteLongBottom)
-bool bearObOtePass = f_zoneIntersects(latestBearZoneTop, latestBearZoneBottom, oteShortTop, oteShortBottom)
-bool bearFvgOtePass = f_zoneIntersects(latestBearFvgTop, latestBearFvgBottom, oteShortTop, oteShortBottom)
+bool bullObOtePass = f_zoneIntersects(latestBullZoneTop, latestBullZoneBottom, oteLongTop, oteLongBottom) and f_zoneFreshNearEvent(latestBullZoneCreatedBar, bullOteCreatedBar, strictMssLookback)
+bool bullFvgOtePass = f_zoneIntersects(latestBullFvgTop, latestBullFvgBottom, oteLongTop, oteLongBottom) and f_zoneFreshNearEvent(latestBullFvgCreatedBar, bullOteCreatedBar, strictMssLookback)
+bool bearObOtePass = f_zoneIntersects(latestBearZoneTop, latestBearZoneBottom, oteShortTop, oteShortBottom) and f_zoneFreshNearEvent(latestBearZoneCreatedBar, bearOteCreatedBar, strictMssLookback)
+bool bearFvgOtePass = f_zoneIntersects(latestBearFvgTop, latestBearFvgBottom, oteShortTop, oteShortBottom) and f_zoneFreshNearEvent(latestBearFvgCreatedBar, bearOteCreatedBar, strictMssLookback)
 bool preferBullOb = not na(latestBullEntry) and (not strictModeEnabled or (bullObPdPass and bullObOtePass))
 bool preferBullFvg = not na(latestBullFvgTop) and not na(latestBullFvgBottom) and (not strictModeEnabled or (bullFvgPdPass and bullFvgOtePass))
 bool preferBearOb = not na(latestBearEntry) and (not strictModeEnabled or (bearObPdPass and bearObOtePass))
@@ -1545,7 +1762,10 @@ bool tradeLongTouched = false
 
 if preferBullOb
     tradeLongEntry := latestBullEntry
-    tradeLongStop := latestBullZoneBottom - atr * stopAtrBuffer
+    float structuralLongStop = latestBullZoneBottom - atr * stopAtrBuffer
+    float structuralLongDistance = not na(latestBullEntry) and not na(structuralLongStop) ? latestBullEntry - structuralLongStop : na
+    float hybridLongDistance = f_hybridStopDistance(structuralLongDistance, prevSessionVolRange, atr)
+    tradeLongStop := not na(latestBullEntry) and not na(hybridLongDistance) ? latestBullEntry - hybridLongDistance : structuralLongStop
     tradeLongSetup := latestBullZoneIsBreaker ? "Bullish Breaker" : "Bullish OB"
     tradeLongValidTop := latestBullZoneTop
     tradeLongValidBottom := latestBullZoneBottom
@@ -1554,7 +1774,10 @@ if preferBullOb
     tradeLongTouched := latestBullZoneTouched
 else if preferBullFvg
     tradeLongEntry := f_zoneMid(latestBullFvgTop, latestBullFvgBottom)
-    tradeLongStop := latestBullFvgBottom - atr * stopAtrBuffer
+    float structuralLongStop = latestBullFvgBottom - atr * stopAtrBuffer
+    float structuralLongDistance = not na(tradeLongEntry) and not na(structuralLongStop) ? tradeLongEntry - structuralLongStop : na
+    float hybridLongDistance = f_hybridStopDistance(structuralLongDistance, prevSessionVolRange, atr)
+    tradeLongStop := not na(tradeLongEntry) and not na(hybridLongDistance) ? tradeLongEntry - hybridLongDistance : structuralLongStop
     tradeLongSetup := "Bullish FVG"
     tradeLongValidTop := latestBullFvgTop
     tradeLongValidBottom := latestBullFvgBottom
@@ -1583,7 +1806,10 @@ bool tradeShortTouched = false
 
 if preferBearOb
     tradeShortEntry := latestBearEntry
-    tradeShortStop := latestBearZoneTop + atr * stopAtrBuffer
+    float structuralShortStop = latestBearZoneTop + atr * stopAtrBuffer
+    float structuralShortDistance = not na(latestBearEntry) and not na(structuralShortStop) ? structuralShortStop - latestBearEntry : na
+    float hybridShortDistance = f_hybridStopDistance(structuralShortDistance, prevSessionVolRange, atr)
+    tradeShortStop := not na(latestBearEntry) and not na(hybridShortDistance) ? latestBearEntry + hybridShortDistance : structuralShortStop
     tradeShortSetup := latestBearZoneIsBreaker ? "Bearish Breaker" : "Bearish OB"
     tradeShortValidTop := latestBearZoneTop
     tradeShortValidBottom := latestBearZoneBottom
@@ -1592,7 +1818,10 @@ if preferBearOb
     tradeShortTouched := latestBearZoneTouched
 else if preferBearFvg
     tradeShortEntry := f_zoneMid(latestBearFvgTop, latestBearFvgBottom)
-    tradeShortStop := latestBearFvgTop + atr * stopAtrBuffer
+    float structuralShortStop = latestBearFvgTop + atr * stopAtrBuffer
+    float structuralShortDistance = not na(tradeShortEntry) and not na(structuralShortStop) ? structuralShortStop - tradeShortEntry : na
+    float hybridShortDistance = f_hybridStopDistance(structuralShortDistance, prevSessionVolRange, atr)
+    tradeShortStop := not na(tradeShortEntry) and not na(hybridShortDistance) ? tradeShortEntry + hybridShortDistance : structuralShortStop
     tradeShortSetup := "Bearish FVG"
     tradeShortValidTop := latestBearFvgTop
     tradeShortValidBottom := latestBearFvgBottom
@@ -1617,23 +1846,22 @@ bool longExpired = not tradeLongTouched and not na(longSetupAge) and longSetupAg
 bool longChased = not tradeLongTouched and not na(tradeLongValidTop) and close > tradeLongValidTop + atr * setupChaseAtr
 bool longStructureInvalidated = not na(tradeLongCreatedBar) and not na(lastBearMssBar) and lastBearMssBar > tradeLongCreatedBar
 bool longManaged = tradeLongTouched and not na(longRisk) and high >= tradeLongEntry + longRisk * setupManagedR
+bool longCompleted = tradeLongTouched and ((not na(tradeLongTarget) and high >= tradeLongTarget) or (longManaged and not na(longSetupAge) and longSetupAge > setupExpiryBars))
 bool longFresh = not tradeLongTouched and not na(longSetupAge) and longSetupAge <= setupFreshBars
 bool strictLongBiasPass = not strictModeEnabled or (activeBias == 1 and htfContextReady and htfBias == 1)
 bool strictLongSweepPass = not strictModeEnabled or bullLegHasSweep
 bool strictLongMssFresh = not na(lastBullMssBar) and (bar_index - lastBullMssBar) <= strictMssLookback
 bool strictLongMssPass = not strictModeEnabled or (bullLegHasMss and strictLongMssFresh and activeBias == 1)
 bool strictLongPdPass = not strictModeEnabled or (not na(tradeLongValidTop) and not na(bullEquilibriumActive) and f_zoneMid(tradeLongValidTop, tradeLongValidBottom) < bullEquilibriumActive)
-bool strictLongOtePass = not strictModeEnabled or f_zoneIntersects(tradeLongValidTop, tradeLongValidBottom, oteLongTop, oteLongBottom)
+bool strictLongOtePass = not strictModeEnabled or (f_zoneIntersects(tradeLongValidTop, tradeLongValidBottom, oteLongTop, oteLongBottom) and f_zoneFreshNearEvent(tradeLongCreatedBar, bullOteCreatedBar, strictMssLookback))
 bool strictLongKillzonePass = not strictModeEnabled or strictKillzoneActive
 bool strictLongContextPass = strictLongBiasPass and strictLongSweepPass and strictLongMssPass and strictLongPdPass and strictLongOtePass
-string strictLongMap = strictModeEnabled ? f_strictChecklist(strictLongBiasPass, strictLongSweepPass, strictLongMssPass, strictLongPdPass, strictLongOtePass, strictLongKillzonePass, false) : "Off"
-string strictLongMapCompact = strictModeEnabled ? f_strictChecklist(strictLongBiasPass, strictLongSweepPass, strictLongMssPass, strictLongPdPass, strictLongOtePass, strictLongKillzonePass, true) : "Off"
+string strictLongMap = strictModeEnabled ? f_strictChecklist(strictLongBiasPass, strictLongSweepPass, strictLongMssPass, strictLongPdPass, strictLongOtePass, strictLongKillzonePass, true) : "Off"
 var string lastLongSetupTag = ""
 string currentLongSetupTag = not na(tradeLongCreatedBar) ? tradeLongSetup + "|" + str.tostring(tradeLongCreatedBar) : ""
 bool longReplaced = currentLongSetupTag != "" and lastLongSetupTag != "" and currentLongSetupTag != lastLongSetupTag
 lastLongSetupTag := currentLongSetupTag
 bool longInvalidated = (not na(tradeLongStop) and close <= tradeLongStop) or longStructureInvalidated
-string longStatus = f_setupStatus(not na(tradeLongEntry), not na(tradeLongStop) and close <= tradeLongStop, longStructureInvalidated, longReplaced, longExpired, longChased, longManaged, strictModeEnabled, strictLongContextPass, strictLongKillzonePass, longPriceInZone, longPriceNearZone, longFresh)
 
 float shortRisk = not na(tradeShortEntry) and not na(tradeShortStop) ? tradeShortStop - tradeShortEntry : na
 float shortReward = not na(tradeShortEntry) and not na(tradeShortTarget) ? tradeShortEntry - tradeShortTarget : na
@@ -1645,23 +1873,22 @@ bool shortExpired = not tradeShortTouched and not na(shortSetupAge) and shortSet
 bool shortChased = not tradeShortTouched and not na(tradeShortValidBottom) and close < tradeShortValidBottom - atr * setupChaseAtr
 bool shortStructureInvalidated = not na(tradeShortCreatedBar) and not na(lastBullMssBar) and lastBullMssBar > tradeShortCreatedBar
 bool shortManaged = tradeShortTouched and not na(shortRisk) and low <= tradeShortEntry - shortRisk * setupManagedR
+bool shortCompleted = tradeShortTouched and ((not na(tradeShortTarget) and low <= tradeShortTarget) or (shortManaged and not na(shortSetupAge) and shortSetupAge > setupExpiryBars))
 bool shortFresh = not tradeShortTouched and not na(shortSetupAge) and shortSetupAge <= setupFreshBars
 bool strictShortBiasPass = not strictModeEnabled or (activeBias == -1 and htfContextReady and htfBias == -1)
 bool strictShortSweepPass = not strictModeEnabled or bearLegHasSweep
 bool strictShortMssFresh = not na(lastBearMssBar) and (bar_index - lastBearMssBar) <= strictMssLookback
 bool strictShortMssPass = not strictModeEnabled or (bearLegHasMss and strictShortMssFresh and activeBias == -1)
 bool strictShortPdPass = not strictModeEnabled or (not na(tradeShortValidTop) and not na(bearEquilibriumActive) and f_zoneMid(tradeShortValidTop, tradeShortValidBottom) > bearEquilibriumActive)
-bool strictShortOtePass = not strictModeEnabled or f_zoneIntersects(tradeShortValidTop, tradeShortValidBottom, oteShortTop, oteShortBottom)
+bool strictShortOtePass = not strictModeEnabled or (f_zoneIntersects(tradeShortValidTop, tradeShortValidBottom, oteShortTop, oteShortBottom) and f_zoneFreshNearEvent(tradeShortCreatedBar, bearOteCreatedBar, strictMssLookback))
 bool strictShortKillzonePass = not strictModeEnabled or strictKillzoneActive
 bool strictShortContextPass = strictShortBiasPass and strictShortSweepPass and strictShortMssPass and strictShortPdPass and strictShortOtePass
-string strictShortMap = strictModeEnabled ? f_strictChecklist(strictShortBiasPass, strictShortSweepPass, strictShortMssPass, strictShortPdPass, strictShortOtePass, strictShortKillzonePass, false) : "Off"
-string strictShortMapCompact = strictModeEnabled ? f_strictChecklist(strictShortBiasPass, strictShortSweepPass, strictShortMssPass, strictShortPdPass, strictShortOtePass, strictShortKillzonePass, true) : "Off"
+string strictShortMap = strictModeEnabled ? f_strictChecklist(strictShortBiasPass, strictShortSweepPass, strictShortMssPass, strictShortPdPass, strictShortOtePass, strictShortKillzonePass, true) : "Off"
 var string lastShortSetupTag = ""
 string currentShortSetupTag = not na(tradeShortCreatedBar) ? tradeShortSetup + "|" + str.tostring(tradeShortCreatedBar) : ""
 bool shortReplaced = currentShortSetupTag != "" and lastShortSetupTag != "" and currentShortSetupTag != lastShortSetupTag
 lastShortSetupTag := currentShortSetupTag
 bool shortInvalidated = (not na(tradeShortStop) and close >= tradeShortStop) or shortStructureInvalidated
-string shortStatus = f_setupStatus(not na(tradeShortEntry), not na(tradeShortStop) and close >= tradeShortStop, shortStructureInvalidated, shortReplaced, shortExpired, shortChased, shortManaged, strictModeEnabled, strictShortContextPass, strictShortKillzonePass, shortPriceInZone, shortPriceNearZone, shortFresh)
 
 // Keep setup scoring intentionally simple to reduce overtuning.
 bool longBiasAligned = activeBias == 1
@@ -1670,6 +1897,23 @@ bool longHtfAligned = htfBias == 1
 bool shortHtfAligned = htfBias == -1
 bool longDisplacementSeen = bullLegHasDisplacement
 bool shortDisplacementSeen = bearLegHasDisplacement
+bool longExecutionContextPass = strictModeEnabled ? strictLongContextPass : activeBias == 1 and bullLegHasSweep and bullLegHasMss
+bool shortExecutionContextPass = strictModeEnabled ? strictShortContextPass : activeBias == -1 and bearLegHasSweep and bearLegHasMss
+bool executionTimingPass = not timeframe.isintraday or strictKillzoneActive
+string longExecutionState = f_setupExecutionState(not na(tradeLongEntry), longInvalidated, longExpired, longChased, longCompleted, longManaged, longExecutionContextPass, executionTimingPass, strictLongMssFresh, longDisplacementSeen, longPriceInZone, longPriceNearZone)
+string shortExecutionState = f_setupExecutionState(not na(tradeShortEntry), shortInvalidated, shortExpired, shortChased, shortCompleted, shortManaged, shortExecutionContextPass, executionTimingPass, strictShortMssFresh, shortDisplacementSeen, shortPriceInZone, shortPriceNearZone)
+float longDepartureRange = not na(bullRangeHighActive) and not na(bullRangeLowActive) ? bullRangeHighActive - bullRangeLowActive : na
+float shortDepartureRange = not na(bearRangeHighActive) and not na(bearRangeLowActive) ? bearRangeHighActive - bearRangeLowActive : na
+int longResponseScore = f_zoneResponseScore(tradeLongTouched, longFresh, longManaged, longPriceInZone, longInvalidated, longReplaced, longExpired, longChased)
+int shortResponseScore = f_zoneResponseScore(tradeShortTouched, shortFresh, shortManaged, shortPriceInZone, shortInvalidated, shortReplaced, shortExpired, shortChased)
+int longDisplacementScore = f_zoneDisplacementScore(longDisplacementSeen)
+int shortDisplacementScore = f_zoneDisplacementScore(shortDisplacementSeen)
+int longAtrExpansionScore = f_zoneAtrExpansionScore(longDepartureRange, atr)
+int shortAtrExpansionScore = f_zoneAtrExpansionScore(shortDepartureRange, atr)
+string longQualityTier = f_zoneQualityTier(not na(tradeLongEntry), longResponseScore, longDisplacementScore, longAtrExpansionScore)
+string shortQualityTier = f_zoneQualityTier(not na(tradeShortEntry), shortResponseScore, shortDisplacementScore, shortAtrExpansionScore)
+string longSetupDisplay = f_setupQualityText(tradeLongSetup, longQualityTier, not na(tradeLongEntry))
+string shortSetupDisplay = f_setupQualityText(tradeShortSetup, shortQualityTier, not na(tradeShortEntry))
 
 float longConfidence = f_setupScore(not na(tradeLongEntry), longBiasAligned, longHtfAligned, bullLegHasSweep, longDisplacementSeen, tradeLongIsOb, tradeLongIsFvg, longPriceInZone, longPriceNearZone, longRr, longFresh, longManaged, strictModeEnabled, strictLongContextPass, strictLongKillzonePass, longReplaced, longChased, longExpired, longInvalidated)
 float longTpProbability = f_tpProbability(longConfidence, longRr, longPriceInZone, longPriceNearZone, longManaged, strictModeEnabled, strictLongContextPass, strictLongKillzonePass, longChased, longExpired, longInvalidated)
@@ -1691,21 +1935,21 @@ if array.size(pivotStructureLabels) > 0
         pivotLabel = array.get(pivotStructureLabels, i)
         pivotIsHigh = array.get(pivotStructureIsHigh, i)
         if not na(pivotLabel)
-            label.set_color(pivotLabel, displayStructureLabels ? color.new(pivotIsHigh ? liqHighColor : liqLowColor, 0) : na)
-            label.set_textcolor(pivotLabel, displayStructureLabels ? color.white : na)
+            label.set_color(pivotLabel, color.new(color.black, 100))
+            label.set_textcolor(pivotLabel, displayStructureLabels ? color.new(pivotIsHigh ? liqHighColor : liqLowColor, 12) : na)
+            label.set_style(pivotLabel, label.style_none)
 
 if array.size(structureEventLines) > 0
     for idx = 0 to array.size(structureEventLines) - 1
         i = array.size(structureEventLines) - 1 - idx
         eventLine = array.get(structureEventLines, i)
         eventLabel = array.get(structureEventLabels, i)
-        eventIsBull = array.get(structureEventBull, i)
-        eventColor = eventIsBull ? bullColor : bearColor
         if not na(eventLine)
-            line.set_color(eventLine, showBosChoch ? eventColor : na)
+            line.set_color(eventLine, showBosChoch ? structureEventColor : na)
         if not na(eventLabel)
-            label.set_color(eventLabel, showBosChoch ? eventColor : na)
-            label.set_textcolor(eventLabel, showBosChoch ? color.white : na)
+            label.set_color(eventLabel, color.new(color.black, 100))
+            label.set_textcolor(eventLabel, showBosChoch ? structureTextColor : na)
+            label.set_style(eventLabel, label.style_none)
 
 if array.size(fvgBoxes) > 0
     for idx = 0 to array.size(fvgBoxes) - 1
@@ -1726,19 +1970,24 @@ if array.size(fvgBoxes) > 0
                 label.set_textcolor(zoneLabel, na)
         else
             if not na(zoneBox)
+                string selectedExecutionState = zoneBull ? longExecutionState : shortExecutionState
                 baseBorder = zoneBull ? color.new(bullColor, 30) : color.new(bearColor, 30)
                 baseFill = zoneBull ? fvgBullColor : fvgBearColor
                 touchedBorder = zoneBull ? color.new(bullColor, 55) : color.new(bearColor, 55)
                 touchedFill = zoneBull ? color.new(bullColor, 90) : color.new(bearColor, 90)
-                selectedBorder = zoneBull ? color.new(bullColor, 0) : color.new(bearColor, 0)
-                selectedFill = zoneBull ? color.new(bullColor, 78) : color.new(bearColor, 78)
+                selectedBorder = zoneBull ? color.new(bullColor, selectedExecutionState == "Managed" ? 18 : 0) : color.new(bearColor, selectedExecutionState == "Managed" ? 18 : 0)
+                selectedFill = zoneBull ? color.new(bullColor, f_executionSelectedFillAlpha(selectedExecutionState)) : color.new(bearColor, f_executionSelectedFillAlpha(selectedExecutionState))
                 box.set_border_color(zoneBox, isSelected ? selectedBorder : zoneTouched ? touchedBorder : baseBorder)
                 box.set_bgcolor(zoneBox, isSelected ? selectedFill : zoneTouched ? touchedFill : baseFill)
             if not na(zoneLabel)
+                string selectedExecutionState = zoneBull ? longExecutionState : shortExecutionState
+                string selectedBadge = f_executionStateBadge(selectedExecutionState, compactMode and mobileCompactLabels)
+                string baseLabel = f_fvgLabelText(zoneBull)
                 if isSelected
                     label.set_x(zoneLabel, bar_index)
-                label.set_color(zoneLabel, isSelected ? (zoneBull ? bullColor : bearColor) : zoneTouched ? (zoneBull ? color.new(bullColor, 55) : color.new(bearColor, 55)) : (zoneBull ? color.new(bullColor, 30) : color.new(bearColor, 30)))
-                label.set_textcolor(zoneLabel, color.white)
+                label.set_text(zoneLabel, isSelected ? (selectedBadge != "" ? baseLabel + " | " + selectedBadge : baseLabel) : "")
+                label.set_color(zoneLabel, color.new(color.black, 100))
+                label.set_textcolor(zoneLabel, isSelected ? color.white : color.new(color.white, 100))
 
 if array.size(obBoxes) > 0
     for idx = 0 to array.size(obBoxes) - 1
@@ -1751,7 +2000,6 @@ if array.size(obBoxes) > 0
         zoneBreaker = array.get(obBreaker, i)
         zoneFailed = array.get(obFailed, i)
         zoneCreatedBar = array.get(obCreatedBars, i)
-        zoneLeftBar = array.get(obLeftBars, i)
         isSelected = (zoneBull and not zoneBreaker and not na(selectedBullObBar) and zoneCreatedBar == selectedBullObBar) or (not zoneBull and not zoneBreaker and not na(selectedBearObBar) and zoneCreatedBar == selectedBearObBar) or (zoneBull and zoneBreaker and not na(selectedBullObBar) and zoneCreatedBar == selectedBullObBar) or (not zoneBull and zoneBreaker and not na(selectedBearObBar) and zoneCreatedBar == selectedBearObBar)
         if not showOb
             if not na(zoneBox)
@@ -1764,40 +2012,43 @@ if array.size(obBoxes) > 0
                 label.set_textcolor(zoneLabel, na)
         else
             if not na(zoneBox)
+                string selectedExecutionState = zoneBull ? longExecutionState : shortExecutionState
                 normalFill = zoneBreaker ? (zoneBull ? bbBullColor : bbBearColor) : (zoneBull ? obBullColor : obBearColor)
                 normalBorder = zoneBull ? bullColor : bearColor
-                selectedFill = zoneBreaker ? (zoneBull ? color.new(bullColor, 68) : color.new(bearColor, 68)) : (zoneBull ? color.new(bullColor, 72) : color.new(bearColor, 72))
-                selectedBorder = zoneBull ? color.new(bullColor, 0) : color.new(bearColor, 0)
+                selectedFill = zoneBreaker ? (zoneBull ? color.new(bullColor, f_executionSelectedFillAlpha(selectedExecutionState)) : color.new(bearColor, f_executionSelectedFillAlpha(selectedExecutionState))) : (zoneBull ? color.new(bullColor, f_executionSelectedFillAlpha(selectedExecutionState)) : color.new(bearColor, f_executionSelectedFillAlpha(selectedExecutionState)))
+                selectedBorder = zoneBull ? color.new(bullColor, selectedExecutionState == "Managed" ? 18 : 0) : color.new(bearColor, selectedExecutionState == "Managed" ? 18 : 0)
                 failedFill = zoneBull ? color.new(bearColor, 90) : color.new(bullColor, 90)
                 failedBorder = zoneBull ? color.new(bearColor, 35) : color.new(bullColor, 35)
                 box.set_bgcolor(zoneBox, zoneFailed ? failedFill : isSelected ? selectedFill : normalFill)
                 box.set_border_color(zoneBox, zoneFailed ? failedBorder : isSelected ? selectedBorder : color.new(normalBorder, 0))
             if not na(zoneLine)
+                string selectedExecutionState = zoneBull ? longExecutionState : shortExecutionState
                 lineColor = zoneFailed ? (zoneBull ? color.new(bearColor, 20) : color.new(bullColor, 20)) : (zoneBull ? bullColor : bearColor)
                 line.set_color(zoneLine, lineColor)
                 line.set_style(zoneLine, zoneBreaker or zoneFailed ? line.style_dotted : line.style_dashed)
-                line.set_width(zoneLine, isSelected ? 2 : 1)
+                line.set_width(zoneLine, isSelected ? f_executionSelectedLineWidth(selectedExecutionState) : 1)
             if not na(zoneLabel)
+                string selectedExecutionState = zoneBull ? longExecutionState : shortExecutionState
+                string baseLabel = zoneFailed ? (compactMode and mobileCompactLabels ? "OB?" : "Failed OB") : f_obLabelText(zoneBull, zoneBreaker)
+                string selectedBadge = zoneFailed ? "" : f_executionStateBadge(selectedExecutionState, compactMode and mobileCompactLabels)
                 if isSelected
                     label.set_x(zoneLabel, bar_index)
-                label.set_color(zoneLabel, zoneFailed ? (zoneBull ? color.new(bearColor, 20) : color.new(bullColor, 20)) : isSelected ? (zoneBull ? bullColor : bearColor) : (zoneBull ? color.new(bullColor, 0) : color.new(bearColor, 0)))
-                label.set_textcolor(zoneLabel, color.white)
+                label.set_text(zoneLabel, isSelected ? (selectedBadge != "" ? baseLabel + " | " + selectedBadge : baseLabel) : "")
+                label.set_color(zoneLabel, color.new(color.black, 100))
+                label.set_textcolor(zoneLabel, isSelected ? color.white : color.new(color.white, 100))
 
 string preferredDirection = "Wait"
-bool longActionable = f_isActionable(longStatus)
-bool shortActionable = f_isActionable(shortStatus)
-if strictModeEnabled
-    longActionable := longActionable and strictLongContextPass and strictLongKillzonePass
-    shortActionable := shortActionable and strictShortContextPass and strictShortKillzonePass
+bool longPreferredReady = f_executionRiskVisible(longExecutionState)
+bool shortPreferredReady = f_executionRiskVisible(shortExecutionState)
 if not na(longConfidence) or not na(shortConfidence)
     if na(shortConfidence) or (not na(longConfidence) and longConfidence > shortConfidence + 3.0)
-        preferredDirection := longActionable ? "Long" : "Wait"
+        preferredDirection := longPreferredReady ? "Long" : "Wait"
     else if na(longConfidence) or shortConfidence > longConfidence + 3.0
-        preferredDirection := shortActionable ? "Short" : "Wait"
+        preferredDirection := shortPreferredReady ? "Short" : "Wait"
     else
-        preferredDirection := "Balanced"
+        preferredDirection := longPreferredReady and shortPreferredReady ? "Balanced" : longPreferredReady ? "Long" : shortPreferredReady ? "Short" : "Wait"
 
-bool compactUseLong = preferredDirection == "Long" or (preferredDirection == "Balanced" and not na(longConfidence) and (na(shortConfidence) or longConfidence >= shortConfidence))
+bool compactUseLong = preferredDirection == "Long" or ((preferredDirection == "Balanced" or preferredDirection == "Wait") and not na(longConfidence) and (na(shortConfidence) or longConfidence >= shortConfidence))
 if preferredDirection == "Wait" and na(longConfidence) and not na(shortConfidence)
     compactUseLong := false
 
@@ -1843,8 +2094,8 @@ if effectiveZoneDisplayMode != "Full"
             else if not na(zoneLabel)
                 label.set_textcolor(zoneLabel, color.white)
 
-string compactSetup = compactUseLong ? tradeLongSetup : tradeShortSetup
-string compactStatus = compactUseLong ? longStatus : shortStatus
+string compactSetup = compactUseLong ? longSetupDisplay : shortSetupDisplay
+string compactExecutionState = compactUseLong ? longExecutionState : shortExecutionState
 float compactZoneTop = compactUseLong ? tradeLongValidTop : tradeShortValidTop
 float compactZoneBottom = compactUseLong ? tradeLongValidBottom : tradeShortValidBottom
 float compactEntry = compactUseLong ? tradeLongEntry : tradeShortEntry
@@ -1854,16 +2105,27 @@ float compactRr = compactUseLong ? longRr : shortRr
 float compactConfidence = compactUseLong ? longConfidence : shortConfidence
 float compactTpProbability = compactUseLong ? longTpProbability : shortTpProbability
 bool compactBalanced = preferredDirection == "Balanced"
-color compactAccent = compactBalanced ? color.new(neutralColor, 12) : compactUseLong ? color.new(bullColor, 12) : color.new(bearColor, 12)
-string compactDirectionText = compactBalanced ? "Balanced" : preferredDirection == "Wait" ? "Wait" : compactUseLong ? "Long" : "Short"
-string compactSetupDisplay = compactBalanced ? "Both active" : compactSetup
-string compactZoneDisplay = compactBalanced ? "-" : f_formatRange(compactZoneTop, compactZoneBottom)
-string compactEntryTriplet = compactBalanced ? "-" : f_formatLevel(compactEntry) + " | " + f_formatLevel(compactStop) + " | " + f_formatLevel(compactTarget)
-string compactStatusDisplay = compactBalanced ? "Mixed" : f_statusCompact(compactStatus)
-string compactConfTpLabel = compactBalanced ? "Conf L/S" : "Conf / TP"
-string compactConfTpDisplay = compactBalanced ? "L " + f_formatPercent(longConfidence) + " / S " + f_formatPercent(shortConfidence) : f_formatPercent(compactConfidence) + " / " + f_formatPercent(compactTpProbability)
-string compactLifecycleDisplay = compactBalanced ? "Mixed" : f_compactLifecycleText(compactUseLong, longSetupAge, tradeLongTouched, shortSetupAge, tradeShortTouched)
+bool compactWaiting = preferredDirection == "Wait"
+bool compactNeutral = compactBalanced or compactWaiting
+color compactAccent = compactNeutral ? color.new(neutralColor, 12) : compactUseLong ? color.new(bullColor, 12) : color.new(bearColor, 12)
+string compactSetupDisplay = compactBalanced ? "Both active" : compactWaiting ? "Scan both" : compactSetup
+string compactZoneDisplay = compactNeutral ? "-" : f_formatRange(compactZoneTop, compactZoneBottom)
+string compactEntryTriplet = compactNeutral ? "-" : f_formatLevel(compactEntry) + " | " + f_formatLevel(compactStop) + " | " + f_formatLevel(compactTarget)
+string compactStatusDisplay = compactBalanced ? "Mixed" : compactWaiting ? "Scan" : f_executionStateCompact(compactExecutionState)
+string compactConfTpLabel = compactNeutral ? "Conf L/S" : "Conf / TP"
+string compactConfTpDisplay = compactNeutral ? "L " + f_formatPercent(longConfidence) + " / S " + f_formatPercent(shortConfidence) : f_formatPercent(compactConfidence) + " / " + f_formatPercent(compactTpProbability)
+string compactLifecycleDisplay = compactBalanced ? "Mixed" : compactWaiting ? "Scan" : f_compactLifecycleText(compactUseLong, longSetupAge, tradeLongTouched, shortSetupAge, tradeShortTouched)
 string compactRrDrawDisplay = "-"
+string preferredExecutionSummary = f_preferredExecutionText(preferredDirection, longExecutionState, shortExecutionState, false)
+string compactPreferredSummary = f_preferredExecutionText(preferredDirection, longExecutionState, shortExecutionState, true)
+string longZoneEntrySummary = f_formatRange(tradeLongValidTop, tradeLongValidBottom) + " | " + f_formatLevel(tradeLongEntry)
+string shortZoneEntrySummary = f_formatRange(tradeShortValidTop, tradeShortValidBottom) + " | " + f_formatLevel(tradeShortEntry)
+string longRiskTargetSummary = f_formatLevel(tradeLongStop) + " | " + f_formatLevel(tradeLongTarget)
+string shortRiskTargetSummary = f_formatLevel(tradeShortStop) + " | " + f_formatLevel(tradeShortTarget)
+string longRrConfSummary = f_formatRr(longRr) + " | " + f_formatPercent(longConfidence)
+string shortRrConfSummary = f_formatRr(shortRr) + " | " + f_formatPercent(shortConfidence)
+string longSessionSideSummary = "L " + strictLongMap
+string shortSessionSideSummary = "S " + strictShortMap
 
 bullStop = not na(tradeLongStop) ? tradeLongStop : not na(lastSwingLow) ? lastSwingLow - atr * stopAtrBuffer : na
 bearStop = not na(tradeShortStop) ? tradeShortStop : not na(lastSwingHigh) ? lastSwingHigh + atr * stopAtrBuffer : na
@@ -1882,77 +2144,43 @@ bearStop = not na(tradeShortStop) ? tradeShortStop : not na(lastSwingHigh) ? las
 // Retired FVG / deleted OB / swept EQH-EQL:
 //   Engine: remove / deactivate
 //   Visual: never show
-// Liquidity targets (session/day/week/month/EQH/EQL):
-//   Full: show all active references
-//   Focused / Minimal: show nearest selected target + one primary external draw
+// Liquidity targets:
+//   Session/calendar liquidity stays engine-only
+//   Chart uses session range boxes + extended H/L lines instead
 // Context ranges:
 //   Full / Focused: show
 //   Minimal: hide except protected level and active OTE
 //------------------------------------------------------------------------------
-longExternalDraw = longActionable and not na(tradeLongEntry) ? f_nearestAbove(tradeLongEntry, enginePrevDayHigh, enginePrevWeekHigh, enginePrevMonthHigh, htfStructureHigh, na, na, na) : na
-shortExternalDraw = shortActionable and not na(tradeShortEntry) ? f_nearestBelow(tradeShortEntry, enginePrevDayLow, enginePrevWeekLow, enginePrevMonthLow, htfStructureLow, na, na, na) : na
+longExternalDraw = longPreferredReady and not na(tradeLongEntry) ? f_nearestAbove(tradeLongEntry, enginePrevDayHigh, enginePrevWeekHigh, enginePrevMonthHigh, htfStructureHigh, na, na, na) : na
+shortExternalDraw = shortPreferredReady and not na(tradeShortEntry) ? f_nearestBelow(tradeShortEntry, enginePrevDayLow, enginePrevWeekLow, enginePrevMonthLow, htfStructureLow, na, na, na) : na
 primaryExternalDrawLevel = compactUseLong ? longExternalDraw : shortExternalDraw
-compactRrDrawDisplay := compactBalanced ? "-" : f_formatRr(compactRr) + " | " + f_formatLevel(primaryExternalDrawLevel)
-targetPrevSessionHigh = f_preferredLevelMatch(prevSessionHigh, compactBalanced, compactUseLong, tradeLongTarget, tradeShortTarget)
-targetPrevSessionLow = f_preferredLevelMatch(prevSessionLow, compactBalanced, compactUseLong, tradeLongTarget, tradeShortTarget)
-targetPrevDayHigh = f_preferredLevelMatch(prevDayHigh, compactBalanced, compactUseLong, tradeLongTarget, tradeShortTarget)
-targetPrevDayLow = f_preferredLevelMatch(prevDayLow, compactBalanced, compactUseLong, tradeLongTarget, tradeShortTarget)
-targetPrevWeekHigh = f_preferredLevelMatch(prevWeekHigh, compactBalanced, compactUseLong, tradeLongTarget, tradeShortTarget)
-targetPrevWeekLow = f_preferredLevelMatch(prevWeekLow, compactBalanced, compactUseLong, tradeLongTarget, tradeShortTarget)
-targetPrevMonthHigh = f_preferredLevelMatch(prevMonthHigh, compactBalanced, compactUseLong, tradeLongTarget, tradeShortTarget)
-targetPrevMonthLow = f_preferredLevelMatch(prevMonthLow, compactBalanced, compactUseLong, tradeLongTarget, tradeShortTarget)
+compactRrDrawDisplay := compactNeutral ? "-" : f_formatRr(compactRr) + " | " + f_formatLevel(primaryExternalDrawLevel)
+string longDrawTpSummary = f_formatLevel(longExternalDraw) + " | " + f_formatPercent(longTpProbability)
+string shortDrawTpSummary = f_formatLevel(shortExternalDraw) + " | " + f_formatPercent(shortTpProbability)
 targetEqHigh = f_preferredLevelMatch(activeEqh, compactBalanced, compactUseLong, tradeLongTarget, tradeShortTarget)
 targetEqLow = f_preferredLevelMatch(activeEql, compactBalanced, compactUseLong, tradeLongTarget, tradeShortTarget)
-drawPrevDayHigh = f_preferredLevelMatch(prevDayHigh, compactBalanced, compactUseLong, longExternalDraw, shortExternalDraw)
-drawPrevDayLow = f_preferredLevelMatch(prevDayLow, compactBalanced, compactUseLong, longExternalDraw, shortExternalDraw)
-drawPrevWeekHigh = f_preferredLevelMatch(prevWeekHigh, compactBalanced, compactUseLong, longExternalDraw, shortExternalDraw)
-drawPrevWeekLow = f_preferredLevelMatch(prevWeekLow, compactBalanced, compactUseLong, longExternalDraw, shortExternalDraw)
-drawPrevMonthHigh = f_preferredLevelMatch(prevMonthHigh, compactBalanced, compactUseLong, longExternalDraw, shortExternalDraw)
-drawPrevMonthLow = f_preferredLevelMatch(prevMonthLow, compactBalanced, compactUseLong, longExternalDraw, shortExternalDraw)
 drawHtfHigh = f_preferredLevelMatch(htfStructureHigh, compactBalanced, compactUseLong, longExternalDraw, shortExternalDraw)
 drawHtfLow = f_preferredLevelMatch(htfStructureLow, compactBalanced, compactUseLong, longExternalDraw, shortExternalDraw)
 
-showPrevSessionHighVisual = showLiquidity and showPrevSession and f_targetVisualByMode(effectiveZoneDisplayMode, targetPrevSessionHigh)
-showPrevSessionLowVisual = showLiquidity and showPrevSession and f_targetVisualByMode(effectiveZoneDisplayMode, targetPrevSessionLow)
-showPrevDayHighVisual = showLiquidity and showHigherPeriodLiquidity and f_targetVisualByMode(effectiveZoneDisplayMode, targetPrevDayHigh or drawPrevDayHigh)
-showPrevDayLowVisual = showLiquidity and showHigherPeriodLiquidity and f_targetVisualByMode(effectiveZoneDisplayMode, targetPrevDayLow or drawPrevDayLow)
-showPrevWeekHighVisual = showLiquidity and displayWeekMonthLiquidity and f_targetVisualByMode(effectiveZoneDisplayMode, targetPrevWeekHigh or drawPrevWeekHigh)
-showPrevWeekLowVisual = showLiquidity and displayWeekMonthLiquidity and f_targetVisualByMode(effectiveZoneDisplayMode, targetPrevWeekLow or drawPrevWeekLow)
-showPrevMonthHighVisual = showLiquidity and displayWeekMonthLiquidity and f_targetVisualByMode(effectiveZoneDisplayMode, targetPrevMonthHigh or drawPrevMonthHigh)
-showPrevMonthLowVisual = showLiquidity and displayWeekMonthLiquidity and f_targetVisualByMode(effectiveZoneDisplayMode, targetPrevMonthLow or drawPrevMonthLow)
 showEqHighVisual = showLiquidity and displayEqLiquidity and f_targetVisualByMode(effectiveZoneDisplayMode, targetEqHigh)
 showEqLowVisual = showLiquidity and displayEqLiquidity and f_targetVisualByMode(effectiveZoneDisplayMode, targetEqLow)
 showProtectedHighVisual = displayProtectedLevels
 showProtectedLowVisual = displayProtectedLevels
 showRangeVisual = showLiquidity and displayDealingRange and f_contextVisualByMode(effectiveZoneDisplayMode)
 showOteVisual = showOteEffective
+oteActiveSummary = not na(oteLongTop) ? "OTE:L" : not na(oteShortTop) ? "OTE:S" : "OTE:-"
 showHtfHighVisual = displayHtfLines and htfContextReady and f_targetVisualByMode(effectiveZoneDisplayMode, drawHtfHigh)
 showHtfLowVisual = displayHtfLines and htfContextReady and f_targetVisualByMode(effectiveZoneDisplayMode, drawHtfLow)
+showLongRiskVisual = displayRiskLines and f_executionRiskVisible(longExecutionState)
+showShortRiskVisual = displayRiskLines and f_executionRiskVisible(shortExecutionState)
 
 if effectiveZoneDisplayMode != "Full"
-    showPrevMonthHighVisual := f_uniqueLevelVisual(showPrevMonthHighVisual, prevMonthHigh, showHtfHighVisual, htfStructureHigh, false, na, false, na, false, na, false, na)
-    showPrevWeekHighVisual := f_uniqueLevelVisual(showPrevWeekHighVisual, prevWeekHigh, showHtfHighVisual, htfStructureHigh, showPrevMonthHighVisual, prevMonthHigh, false, na, false, na, false, na)
-    showPrevDayHighVisual := f_uniqueLevelVisual(showPrevDayHighVisual, prevDayHigh, showHtfHighVisual, htfStructureHigh, showPrevMonthHighVisual, prevMonthHigh, showPrevWeekHighVisual, prevWeekHigh, false, na, false, na)
-    showPrevSessionHighVisual := f_uniqueLevelVisual(showPrevSessionHighVisual, prevSessionHigh, showHtfHighVisual, htfStructureHigh, showPrevMonthHighVisual, prevMonthHigh, showPrevWeekHighVisual, prevWeekHigh, showPrevDayHighVisual, prevDayHigh, false, na)
-    showEqHighVisual := f_uniqueLevelVisual(showEqHighVisual, activeEqh, showHtfHighVisual, htfStructureHigh, showPrevMonthHighVisual, prevMonthHigh, showPrevWeekHighVisual, prevWeekHigh, showPrevDayHighVisual, prevDayHigh, showPrevSessionHighVisual, prevSessionHigh)
-
-    showPrevMonthLowVisual := f_uniqueLevelVisual(showPrevMonthLowVisual, prevMonthLow, showHtfLowVisual, htfStructureLow, false, na, false, na, false, na, false, na)
-    showPrevWeekLowVisual := f_uniqueLevelVisual(showPrevWeekLowVisual, prevWeekLow, showHtfLowVisual, htfStructureLow, showPrevMonthLowVisual, prevMonthLow, false, na, false, na, false, na)
-    showPrevDayLowVisual := f_uniqueLevelVisual(showPrevDayLowVisual, prevDayLow, showHtfLowVisual, htfStructureLow, showPrevMonthLowVisual, prevMonthLow, showPrevWeekLowVisual, prevWeekLow, false, na, false, na)
-    showPrevSessionLowVisual := f_uniqueLevelVisual(showPrevSessionLowVisual, prevSessionLow, showHtfLowVisual, htfStructureLow, showPrevMonthLowVisual, prevMonthLow, showPrevWeekLowVisual, prevWeekLow, showPrevDayLowVisual, prevDayLow, false, na)
-    showEqLowVisual := f_uniqueLevelVisual(showEqLowVisual, activeEql, showHtfLowVisual, htfStructureLow, showPrevMonthLowVisual, prevMonthLow, showPrevWeekLowVisual, prevWeekLow, showPrevDayLowVisual, prevDayLow, showPrevSessionLowVisual, prevSessionLow)
+    showEqHighVisual := f_uniqueLevelVisual(showEqHighVisual, activeEqh, showHtfHighVisual, htfStructureHigh, false, na, false, na, false, na, false, na)
+    showEqLowVisual := f_uniqueLevelVisual(showEqLowVisual, activeEql, showHtfLowVisual, htfStructureLow, false, na, false, na, false, na, false, na)
 
 //------------------------------------------------------------------------------
 // Plots
 //------------------------------------------------------------------------------
-prevSessionHighLevel = f_horizontalLevel(prevSessionHigh, showPrevSessionHighVisual)
-prevSessionLowLevel = f_horizontalLevel(prevSessionLow, showPrevSessionLowVisual)
-prevDayHighLevel = f_horizontalLevel(prevDayHigh, showPrevDayHighVisual)
-prevDayLowLevel = f_horizontalLevel(prevDayLow, showPrevDayLowVisual)
-prevWeekHighLevel = f_horizontalLevel(prevWeekHigh, showPrevWeekHighVisual)
-prevWeekLowLevel = f_horizontalLevel(prevWeekLow, showPrevWeekLowVisual)
-prevMonthHighLevel = f_horizontalLevel(prevMonthHigh, showPrevMonthHighVisual)
-prevMonthLowLevel = f_horizontalLevel(prevMonthLow, showPrevMonthLowVisual)
 eqHighLevel = f_horizontalLevel(activeEqh, showEqHighVisual)
 eqLowLevel = f_horizontalLevel(activeEql, showEqLowVisual)
 protectedHighLevel = f_horizontalLevel(activeProtectedHigh, showProtectedHighVisual)
@@ -1962,12 +2190,12 @@ internalLowLevel = f_horizontalLevel(activeRangeLow, showRangeVisual)
 internalEqLevel = f_horizontalLevel(activeRangeEquilibrium, showRangeVisual)
 htfStructureHighLevel = f_horizontalLevel(htfStructureHigh, showHtfHighVisual)
 htfStructureLowLevel = f_horizontalLevel(htfStructureLow, showHtfLowVisual)
-riskLongEntryLevel = f_horizontalLevel(tradeLongEntry, displayRiskLines)
-riskShortEntryLevel = f_horizontalLevel(tradeShortEntry, displayRiskLines)
-riskBullStopLevel = f_horizontalLevel(bullStop, displayRiskLines)
-riskBearStopLevel = f_horizontalLevel(bearStop, displayRiskLines)
-riskLongTargetLevel = f_horizontalLevel(tradeLongTarget, displayRiskLines)
-riskShortTargetLevel = f_horizontalLevel(tradeShortTarget, displayRiskLines)
+riskLongEntryLevel = f_horizontalLevel(tradeLongEntry, showLongRiskVisual)
+riskShortEntryLevel = f_horizontalLevel(tradeShortEntry, showShortRiskVisual)
+riskBullStopLevel = f_horizontalLevel(bullStop, showLongRiskVisual)
+riskBearStopLevel = f_horizontalLevel(bearStop, showShortRiskVisual)
+riskLongTargetLevel = f_horizontalLevel(tradeLongTarget, showLongRiskVisual)
+riskShortTargetLevel = f_horizontalLevel(tradeShortTarget, showShortRiskVisual)
 oteLongTopLevel = f_horizontalLevel(oteLongTop, showOteVisual)
 oteLongBottomLevel = f_horizontalLevel(oteLongBottom, showOteVisual)
 oteShortTopLevel = f_horizontalLevel(oteShortTop, showOteVisual)
@@ -1977,44 +2205,25 @@ oteShortMid = not na(oteShortTop) and not na(oteShortBottom) ? f_zoneMid(oteShor
 oteLongMidLevel = not na(oteLongTopLevel) and not na(oteLongBottomLevel) ? f_zoneMid(oteLongTopLevel, oteLongBottomLevel) : na
 oteShortMidLevel = not na(oteShortTopLevel) and not na(oteShortBottomLevel) ? f_zoneMid(oteShortTopLevel, oteShortBottomLevel) : na
 
-plotPrevSessionHigh = plot(prevSessionHighLevel, "Previous Source High", color=color.new(liqHighColor, 20), linewidth=1, style=plot.style_linebr, display=overlayLineDisplay)
-plotPrevSessionLow = plot(prevSessionLowLevel, "Previous Source Low", color=color.new(liqLowColor, 20), linewidth=1, style=plot.style_linebr, display=overlayLineDisplay)
-plotPrevDayHigh = plot(prevDayHighLevel, "PDH", color=color.new(liqHighColor, 0), linewidth=1, style=plot.style_linebr, display=overlayLineDisplay)
-plotPrevDayLow = plot(prevDayLowLevel, "PDL", color=color.new(liqLowColor, 0), linewidth=1, style=plot.style_linebr, display=overlayLineDisplay)
-plotPrevWeekHigh = plot(prevWeekHighLevel, "PWH", color=color.new(liqHighColor, 30), linewidth=1, style=plot.style_linebr, display=overlayLineDisplay)
-plotPrevWeekLow = plot(prevWeekLowLevel, "PWL", color=color.new(liqLowColor, 30), linewidth=1, style=plot.style_linebr, display=overlayLineDisplay)
-plotPrevMonthHigh = plot(prevMonthHighLevel, "PMH", color=color.new(liqHighColor, 55), linewidth=1, style=plot.style_linebr, display=overlayLineDisplay)
-plotPrevMonthLow = plot(prevMonthLowLevel, "PML", color=color.new(liqLowColor, 55), linewidth=1, style=plot.style_linebr, display=overlayLineDisplay)
 plotEqHigh = plot(eqHighLevel, "EQH Liquidity", color=color.new(liqHighColor, 12), linewidth=1, style=plot.style_linebr, display=overlayLineDisplay)
 plotEqLow = plot(eqLowLevel, "EQL Liquidity", color=color.new(liqLowColor, 12), linewidth=1, style=plot.style_linebr, display=overlayLineDisplay)
 
 protectedHighPlot = plot(protectedHighLevel, "Protected High", color=color.new(liqHighColor, 8), linewidth=2, style=plot.style_linebr, display=overlayLineDisplay)
 protectedLowPlot = plot(protectedLowLevel, "Protected Low", color=color.new(liqLowColor, 8), linewidth=2, style=plot.style_linebr, display=overlayLineDisplay)
 
-internalHighPlot = plot(internalHighLevel, "ICT Dealing Range High", color=color.new(color.silver, 20), linewidth=1, style=plot.style_linebr, display=overlayLineDisplay)
-internalLowPlot = plot(internalLowLevel, "ICT Dealing Range Low", color=color.new(color.silver, 20), linewidth=1, style=plot.style_linebr, display=overlayLineDisplay)
-internalEqPlot = plot(internalEqLevel, "ICT Equilibrium", color=color.new(neutralColor, 20), linewidth=1, style=plot.style_linebr, display=overlayLineDisplay)
+internalHighPlot = plot(internalHighLevel, "ICT Dealing Range High", color=color.new(color.silver, 35), linewidth=1, style=plot.style_linebr, display=overlayLineDisplay)
+internalLowPlot = plot(internalLowLevel, "ICT Dealing Range Low", color=color.new(color.silver, 35), linewidth=1, style=plot.style_linebr, display=overlayLineDisplay)
+internalEqPlot = plot(internalEqLevel, "ICT Equilibrium", color=decisionEqColor, linewidth=2, style=plot.style_linebr, display=overlayLineDisplay)
+fill(internalHighPlot, internalEqPlot, color=showRangeVisual ? decisionPremiumFillColor : na)
+fill(internalEqPlot, internalLowPlot, color=showRangeVisual ? decisionDiscountFillColor : na)
 
 if barstate.islast
-    prevSessionHighLabel := f_syncRightEdgeLabel(prevSessionHighLabel, prevSessionHighLevel, "Src H", color.new(liqHighColor, 5), color.white, displayLiquidityRightLabels and showPrevSessionHighVisual)
-    prevSessionLowLabel := f_syncRightEdgeLabel(prevSessionLowLabel, prevSessionLowLevel, "Src L", color.new(liqLowColor, 5), color.white, displayLiquidityRightLabels and showPrevSessionLowVisual)
-    prevDayHighLabel := f_syncRightEdgeLabel(prevDayHighLabel, prevDayHighLevel, "PDH", color.new(liqHighColor, 0), color.white, displayLiquidityRightLabels and showPrevDayHighVisual)
-    prevDayLowLabel := f_syncRightEdgeLabel(prevDayLowLabel, prevDayLowLevel, "PDL", color.new(liqLowColor, 0), color.white, displayLiquidityRightLabels and showPrevDayLowVisual)
-    prevWeekHighLabel := f_syncRightEdgeLabel(prevWeekHighLabel, prevWeekHighLevel, "PWH", color.new(liqHighColor, 20), color.white, displayLiquidityRightLabels and showPrevWeekHighVisual)
-    prevWeekLowLabel := f_syncRightEdgeLabel(prevWeekLowLabel, prevWeekLowLevel, "PWL", color.new(liqLowColor, 20), color.white, displayLiquidityRightLabels and showPrevWeekLowVisual)
-    prevMonthHighLabel := f_syncRightEdgeLabel(prevMonthHighLabel, prevMonthHighLevel, "PMH", color.new(liqHighColor, 35), color.white, displayLiquidityRightLabels and showPrevMonthHighVisual)
-    prevMonthLowLabel := f_syncRightEdgeLabel(prevMonthLowLabel, prevMonthLowLevel, "PML", color.new(liqLowColor, 35), color.white, displayLiquidityRightLabels and showPrevMonthLowVisual)
-    eqHighLabel := f_syncRightEdgeLabel(eqHighLabel, eqHighLevel, "EQH", color.new(liqHighColor, 12), color.white, displayLiquidityRightLabels and showEqHighVisual)
-    eqLowLabel := f_syncRightEdgeLabel(eqLowLabel, eqLowLevel, "EQL", color.new(liqLowColor, 12), color.white, displayLiquidityRightLabels and showEqLowVisual)
     protectedHighLabel := f_syncRightEdgeLabel(protectedHighLabel, protectedHighLevel, "Prot H", color.new(liqHighColor, 8), color.white, displayLiquidityRightLabels and showProtectedHighVisual)
     protectedLowLabel := f_syncRightEdgeLabel(protectedLowLabel, protectedLowLevel, "Prot L", color.new(liqLowColor, 8), color.white, displayLiquidityRightLabels and showProtectedLowVisual)
-    internalHighLabel := f_syncRightEdgeLabel(internalHighLabel, internalHighLevel, "Range H", color.new(color.silver, 10), color.black, displayLiquidityRightLabels and showRangeVisual)
-    internalLowLabel := f_syncRightEdgeLabel(internalLowLabel, internalLowLevel, "Range L", color.new(color.silver, 10), color.black, displayLiquidityRightLabels and showRangeVisual)
-    internalEqLabel := f_syncRightEdgeLabel(internalEqLabel, internalEqLevel, "EQ", color.new(neutralColor, 10), color.white, displayLiquidityRightLabels and showRangeVisual)
-    oteLongLabel := f_syncRightEdgeLabel(oteLongLabel, oteLongMidLevel, "OTE L", color.new(bullColor, 20), color.white, displayLiquidityRightLabels and showOteVisual)
-    oteShortLabel := f_syncRightEdgeLabel(oteShortLabel, oteShortMidLevel, "OTE S", color.new(bearColor, 20), color.white, displayLiquidityRightLabels and showOteVisual)
     htfHighLabel := f_syncRightEdgeLabel(htfHighLabel, htfStructureHighLevel, "HTF H", color.new(color.fuchsia, 15), color.white, displayLiquidityRightLabels and showHtfHighVisual)
     htfLowLabel := f_syncRightEdgeLabel(htfLowLabel, htfStructureLowLevel, "HTF L", color.new(color.fuchsia, 15), color.white, displayLiquidityRightLabels and showHtfLowVisual)
+    longStopLabel := f_syncRightEdgeLabel(longStopLabel, riskBullStopLevel, "SL L", color.new(bearColor, 0), color.white, showLongRiskVisual and not na(riskBullStopLevel))
+    shortStopLabel := f_syncRightEdgeLabel(shortStopLabel, riskBearStopLevel, "SL S", color.new(bullColor, 0), color.white, showShortRiskVisual and not na(riskBearStopLevel))
 
 oteLongTopPlot = plot(oteLongTopLevel, "OTE Long Top", color=color.new(bullColor, 40), linewidth=1, style=plot.style_linebr, display=overlayLineDisplay)
 oteLongBottomPlot = plot(oteLongBottomLevel, "OTE Long Bottom", color=color.new(bullColor, 40), linewidth=1, style=plot.style_linebr, display=overlayLineDisplay)
@@ -2033,13 +2242,13 @@ plot(riskBearStopLevel, "Bearish Stop Cue", color=color.new(bullColor, 0), linew
 plot(riskLongTargetLevel, "Bullish TP Cue", color=color.new(liqHighColor, 0), linewidth=1, style=plot.style_linebr, display=overlayLineDisplay)
 plot(riskShortTargetLevel, "Bearish TP Cue", color=color.new(liqLowColor, 0), linewidth=1, style=plot.style_linebr, display=overlayLineDisplay)
 
-chartBackdrop = displayKillzoneVisual and strictKillzoneActive ? color.new(color.rgb(217, 172, 61), 88) : displayTrendBackground ? color.new(activeBias == 1 ? bullColor : activeBias == -1 ? bearColor : neutralColor, 93) : na
+chartBackdrop = not sessionVisualsEnabled and displayKillzoneVisual and strictKillzoneActive ? color.new(color.rgb(217, 172, 61), 88) : displayTrendBackground ? color.new(activeBias == 1 ? bullColor : activeBias == -1 ? bearColor : neutralColor, 93) : na
 bgcolor(chartBackdrop)
 
 //------------------------------------------------------------------------------
 // Dashboard
 //------------------------------------------------------------------------------
-var table dashboard = table.new(position.top_right, 4, 15, border_width=1)
+var table dashboard = table.new(position.top_right, 4, 11, border_width=1)
 var table dashboardCompact = table.new(position.bottom_right, 2, 11, border_width=1)
 
 if barstate.islast and dashboardEnabled and not compactDashboardMode
@@ -2049,79 +2258,59 @@ if barstate.islast and dashboardEnabled and not compactDashboardMode
     f_setCell(dashboard, 2, 0, "Long", color.white, color.new(bullColor, 5))
     f_setCell(dashboard, 3, 0, "Short", color.white, color.new(bearColor, 5))
 
-    f_setCell(dashboard, 0, 1, "Current Px", color.white, panelCellBg)
-    f_setCell(dashboard, 1, 1, f_formatLevel(close), color.white, panelCellBg)
-    f_setCell(dashboard, 2, 1, longStatus, color.white, panelBullBg)
-    f_setCell(dashboard, 3, 1, shortStatus, color.white, panelBearBg)
+    f_setCell(dashboard, 0, 1, "Exec", color.white, panelCellBg)
+    f_setCell(dashboard, 1, 1, "Px " + f_formatLevel(close), color.white, panelCellBg)
+    f_setCell(dashboard, 2, 1, longExecutionState, color.white, panelBullBg)
+    f_setCell(dashboard, 3, 1, shortExecutionState, color.white, panelBearBg)
 
-    f_setCell(dashboard, 0, 2, "Bias / Reg", color.white, panelCellBg)
+    f_setCell(dashboard, 0, 2, "Bias", color.white, panelCellBg)
     f_setCell(dashboard, 1, 2, f_biasSummary(activeBias, htfContextReady, htfBias, regimeBias, regimeStrength), color.white, panelCellBg)
-    f_setCell(dashboard, 2, 2, (htfContextReady ? f_alignmentText(true, activeBias, htfBias) : "HTF Guard") + " / " + f_regimeSideText(true, regimeBias, regimeStrength), color.white, panelBullBg)
-    f_setCell(dashboard, 3, 2, (htfContextReady ? f_alignmentText(false, activeBias, htfBias) : "HTF Guard") + " / " + f_regimeSideText(false, regimeBias, regimeStrength), color.white, panelBearBg)
+    f_setCell(dashboard, 2, 2, (htfContextReady ? f_alignmentShortText(true, activeBias, htfBias) : "G") + " / " + f_regimeSideShortText(true, regimeBias, regimeStrength), color.white, panelBullBg)
+    f_setCell(dashboard, 3, 2, (htfContextReady ? f_alignmentShortText(false, activeBias, htfBias) : "G") + " / " + f_regimeSideShortText(false, regimeBias, regimeStrength), color.white, panelBearBg)
 
-    f_setCell(dashboard, 0, 3, "Preferred", color.white, panelCellBg)
-    f_setCell(dashboard, 1, 3, preferredDirection, color.white, color.new(preferredDirection == "Long" ? bullColor : preferredDirection == "Short" ? bearColor : neutralColor, 15))
-    f_setCell(dashboard, 2, 3, tradeLongSetup, color.white, panelBullBg)
-    f_setCell(dashboard, 3, 3, tradeShortSetup, color.white, panelBearBg)
+    f_setCell(dashboard, 0, 3, "Pref", color.white, panelCellBg)
+    f_setCell(dashboard, 1, 3, preferredExecutionSummary, color.white, color.new(preferredDirection == "Long" ? bullColor : preferredDirection == "Short" ? bearColor : neutralColor, 15))
+    f_setCell(dashboard, 2, 3, longSetupDisplay, color.white, panelBullBg)
+    f_setCell(dashboard, 3, 3, shortSetupDisplay, color.white, panelBearBg)
 
-    f_setCell(dashboard, 0, 4, "Valid Zone", color.white, panelCellBg)
-    f_setCell(dashboard, 1, 4, "Entry Range", color.white, panelCellBg)
-    f_setCell(dashboard, 2, 4, f_formatRange(tradeLongValidTop, tradeLongValidBottom), color.white, panelBullBg)
-    f_setCell(dashboard, 3, 4, f_formatRange(tradeShortValidTop, tradeShortValidBottom), color.white, panelBearBg)
+    f_setCell(dashboard, 0, 4, "Z / E", color.white, panelCellBg)
+    f_setCell(dashboard, 1, 4, "Range | trig", color.white, panelCellBg)
+    f_setCell(dashboard, 2, 4, longZoneEntrySummary, color.white, panelBullBg)
+    f_setCell(dashboard, 3, 4, shortZoneEntrySummary, color.white, panelBearBg)
 
-    f_setCell(dashboard, 0, 5, "Entry", color.white, panelCellBg)
-    f_setCell(dashboard, 1, 5, "Trigger", color.white, panelCellBg)
-    f_setCell(dashboard, 2, 5, f_formatLevel(tradeLongEntry), color.white, panelBullBg)
-    f_setCell(dashboard, 3, 5, f_formatLevel(tradeShortEntry), color.white, panelBearBg)
+    f_setCell(dashboard, 0, 5, "SL / TP", color.white, panelCellBg)
+    f_setCell(dashboard, 1, 5, opTargetSummary, color.white, panelCellBg)
+    f_setCell(dashboard, 2, 5, longRiskTargetSummary, color.white, panelBullBg)
+    f_setCell(dashboard, 3, 5, shortRiskTargetSummary, color.white, panelBearBg)
 
-    f_setCell(dashboard, 0, 6, "Stop Loss", color.white, panelCellBg)
-    f_setCell(dashboard, 1, 6, "Zone / swing buffer", color.white, panelCellBg)
-    f_setCell(dashboard, 2, 6, f_formatLevel(tradeLongStop), color.white, panelBearBg)
-    f_setCell(dashboard, 3, 6, f_formatLevel(tradeShortStop), color.white, panelBullBg)
+    f_setCell(dashboard, 0, 6, "RR / Cf", color.white, panelCellBg)
+    f_setCell(dashboard, 1, 6, "RR | conf", color.white, panelCellBg)
+    f_setCell(dashboard, 2, 6, longRrConfSummary, color.white, panelBullBg)
+    f_setCell(dashboard, 3, 6, shortRrConfSummary, color.white, panelBearBg)
 
-    f_setCell(dashboard, 0, 7, "Op Target", color.white, panelCellBg)
-    f_setCell(dashboard, 1, 7, opTargetSummary, color.white, panelCellBg)
-    f_setCell(dashboard, 2, 7, f_formatLevel(tradeLongTarget), color.white, color.new(liqHighColor, 20))
-    f_setCell(dashboard, 3, 7, f_formatLevel(tradeShortTarget), color.white, color.new(liqLowColor, 20))
+    f_setCell(dashboard, 0, 7, "Draw / TP", color.white, panelCellBg)
+    f_setCell(dashboard, 1, 7, "Ext | TP", color.white, panelCellBg)
+    f_setCell(dashboard, 2, 7, longDrawTpSummary, color.white, panelBullBg)
+    f_setCell(dashboard, 3, 7, shortDrawTpSummary, color.white, panelBearBg)
 
-    f_setCell(dashboard, 0, 8, "Ext Draw", color.white, panelCellBg)
-    f_setCell(dashboard, 1, 8, "Primary external", color.white, panelCellBg)
-    f_setCell(dashboard, 2, 8, f_formatLevel(longExternalDraw), color.white, color.new(color.fuchsia, 20))
-    f_setCell(dashboard, 3, 8, f_formatLevel(shortExternalDraw), color.white, color.new(color.fuchsia, 20))
+    f_setCell(dashboard, 0, 8, "Life", color.white, panelCellBg)
+    f_setCell(dashboard, 1, 8, "Age / touch", color.white, panelCellBg)
+    f_setCell(dashboard, 2, 8, f_lifecycleText(longSetupAge, tradeLongTouched), color.white, panelBullBg)
+    f_setCell(dashboard, 3, 8, f_lifecycleText(shortSetupAge, tradeShortTouched), color.white, panelBearBg)
 
-    f_setCell(dashboard, 0, 9, "R:R", color.white, panelCellBg)
-    f_setCell(dashboard, 1, 9, "Reward / risk", color.white, panelCellBg)
-    f_setCell(dashboard, 2, 9, f_formatRr(longRr), color.white, panelBullBg)
-    f_setCell(dashboard, 3, 9, f_formatRr(shortRr), color.white, panelBearBg)
+    f_setCell(dashboard, 0, 9, "Sess", color.white, panelCellBg)
+    f_setCell(dashboard, 1, 9, liquiditySessionSummary + " | " + timezoneSummary, color.white, color.new(strictModeEnabled ? color.teal : neutralColor, 15))
+    f_setCell(dashboard, 2, 9, longSessionSideSummary, color.white, panelBullBg)
+    f_setCell(dashboard, 3, 9, shortSessionSideSummary, color.white, panelBearBg)
 
-    f_setCell(dashboard, 0, 10, "Confidence*", color.white, panelCellBg)
-    f_setCell(dashboard, 1, 10, "Simple confluence", color.white, panelCellBg)
-    f_setCell(dashboard, 2, 10, f_formatPercent(longConfidence), color.white, panelBullBg)
-    f_setCell(dashboard, 3, 10, f_formatPercent(shortConfidence), color.white, panelBearBg)
-
-    f_setCell(dashboard, 0, 11, "TP Prob*", color.white, panelCellBg)
-    f_setCell(dashboard, 1, 11, "Rule-based model", color.white, panelCellBg)
-    f_setCell(dashboard, 2, 11, f_formatPercent(longTpProbability), color.white, panelBullBg)
-    f_setCell(dashboard, 3, 11, f_formatPercent(shortTpProbability), color.white, panelBearBg)
-
-    f_setCell(dashboard, 0, 12, "Lifecycle", color.white, panelCellBg)
-    f_setCell(dashboard, 1, 12, "Age / touch", color.white, panelCellBg)
-    f_setCell(dashboard, 2, 12, f_lifecycleText(longSetupAge, tradeLongTouched), color.white, panelBullBg)
-    f_setCell(dashboard, 3, 12, f_lifecycleText(shortSetupAge, tradeShortTouched), color.white, panelBearBg)
-
-    f_setCell(dashboard, 0, 13, "Sessions / Time", color.white, panelCellBg)
-    f_setCell(dashboard, 1, 13, "Preset " + presetLabel + " | Mode " + effectiveZoneDisplayMode + " | " + timezoneSummary, color.white, color.new(strictModeEnabled ? color.teal : neutralColor, 15))
-    f_setCell(dashboard, 2, 13, liquiditySessionSummary + " | " + strictLongMap, color.white, panelBullBg)
-    f_setCell(dashboard, 3, 13, killzoneSummary + " | " + strictShortMap, color.white, panelBearBg)
-
-    f_setCell(dashboard, 0, 14, "Caution", color.white, panelCellBg)
-    f_setCell(dashboard, 1, 14, "Rule-based only, not statistical certainty", color.white, panelCellBg)
-    f_setCell(dashboard, 2, 14, f_entryActionText(longStatus), color.white, panelBullBg)
-    f_setCell(dashboard, 3, 14, f_entryActionText(shortStatus), color.white, panelBearBg)
+    f_setCell(dashboard, 0, 10, "Next", color.white, panelCellBg)
+    f_setCell(dashboard, 1, 10, effectiveZoneDisplayMode + " | " + oteActiveSummary + " | " + killzoneSummary, color.white, panelCellBg)
+    f_setCell(dashboard, 2, 10, f_entryActionText(longExecutionState), color.white, panelBullBg)
+    f_setCell(dashboard, 3, 10, f_entryActionText(shortExecutionState), color.white, panelBearBg)
 else if barstate.islast and dashboardEnabled and compactDashboardMode
-    table.clear(dashboard, 0, 0, 3, 14)
-    f_setCell(dashboardCompact, 0, 0, "SMC Mobile", color.white, panelHeaderBg)
-    f_setCell(dashboardCompact, 1, 0, compactDirectionText + " | " + effectiveZoneDisplayMode, color.white, compactAccent)
+    table.clear(dashboard, 0, 0, 3, 10)
+    f_setCell(dashboardCompact, 0, 0, "SMC Compact", color.white, panelHeaderBg)
+    f_setCell(dashboardCompact, 1, 0, compactPreferredSummary + " | " + effectiveZoneDisplayMode, color.white, compactAccent)
     f_setCell(dashboardCompact, 0, 1, "Biases", color.white, panelCellBg)
     f_setCell(dashboardCompact, 1, 1, f_biasShort(activeBias) + "/" + (htfContextReady ? f_biasShort(htfBias) : "Guard") + "/" + f_biasShort(regimeBias), color.white, panelCellBg)
     f_setCell(dashboardCompact, 0, 2, "Setup", color.white, panelCellBg)
@@ -2130,7 +2319,7 @@ else if barstate.islast and dashboardEnabled and compactDashboardMode
     f_setCell(dashboardCompact, 1, 3, compactZoneDisplay, color.white, compactAccent)
     f_setCell(dashboardCompact, 0, 4, "E / SL / TP", color.white, panelCellBg)
     f_setCell(dashboardCompact, 1, 4, compactEntryTriplet, color.white, compactAccent)
-    f_setCell(dashboardCompact, 0, 5, "Status", color.white, panelCellBg)
+    f_setCell(dashboardCompact, 0, 5, "Exec", color.white, panelCellBg)
     f_setCell(dashboardCompact, 1, 5, compactStatusDisplay, color.white, compactAccent)
     f_setCell(dashboardCompact, 0, 6, compactConfTpLabel, color.white, panelCellBg)
     f_setCell(dashboardCompact, 1, 6, compactConfTpDisplay, color.white, compactAccent)
@@ -2139,9 +2328,9 @@ else if barstate.islast and dashboardEnabled and compactDashboardMode
     f_setCell(dashboardCompact, 0, 8, "Life", color.white, panelCellBg)
     f_setCell(dashboardCompact, 1, 8, compactLifecycleDisplay, color.white, panelCellBg)
     f_setCell(dashboardCompact, 0, 9, "Mode", color.white, panelCellBg)
-    f_setCell(dashboardCompact, 1, 9, presetLabel + " | " + effectiveZoneDisplayMode, color.white, panelCellBg)
+    f_setCell(dashboardCompact, 1, 9, presetLabel + " | " + effectiveZoneDisplayMode + " | " + oteActiveSummary + " | " + killzoneSummary, color.white, panelCellBg)
     f_setCell(dashboardCompact, 0, 10, "Sessions", color.white, panelCellBg)
-    f_setCell(dashboardCompact, 1, 10, liquiditySessionSummary + " | KZ:" + (strictKillzoneActive ? "Y" : "N"), color.white, panelCellBg)
+    f_setCell(dashboardCompact, 1, 10, liquiditySessionSummary + " | " + timezoneSummary, color.white, panelCellBg)
 else if barstate.islast and not dashboardEnabled
     table.clear(dashboardCompact, 0, 0, 1, 10)
-    table.clear(dashboard, 0, 0, 3, 14)
+    table.clear(dashboard, 0, 0, 3, 10)
