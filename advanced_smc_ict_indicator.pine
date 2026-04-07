@@ -9,7 +9,7 @@ usagePreset = input.string("Standard", "Usage profile", options=["Standard", "Co
 
 groupStructure = "1. Structure"
 bool showStructureLabels = input.bool(true, "Show HH / HL / LL / LH labels", group=groupStructure)
-bool showBosChoch = input.bool(true, "Show BOS / MSS markers", group=groupStructure)
+bool showBosMss = input.bool(true, "Show BOS / MSS markers", group=groupStructure)
 bool showIdm = input.bool(true, "Show inducement markers", group=groupStructure)
 bool showTrendBackground = input.bool(true, "Tint background by current bias", group=groupStructure)
 int swingLen = 3
@@ -125,23 +125,17 @@ strictModeEnabled = profileStrict
 compactMode = profileCompact or androidCompactMode
 compactDashboardMode = compactMode and mobileCompactDashboard
 dashboardEnabled = showDashboard
-showHtfEffective = showHtf
-showRiskEffective = showRisk
-showProtectedLevelsEffective = showProtectedLevels
-showLiquidityRightLabelsEffective = showLiquidityRightLabels
-showKillzoneVisualEffective = showKillzoneVisual
-showOteEffective = strictShowOte
 displayStructureLabels = showStructureLabels and not (compactMode and mobileHideStructureLabels)
 displayInternalRange = showInternalRange and not (compactMode and mobileHideInternalRange)
 displayEqLiquidity = showLiquidity and not (compactMode and mobileHideEqLiquidity)
 displaySweepMarkers = showLiquidity and showSweeps
 displayTrendBackground = showTrendBackground and not (compactMode and mobileHideTrendBackground)
-displayProtectedLevels = showProtectedLevelsEffective
+displayProtectedLevels = showProtectedLevels
 displayDealingRange = displayInternalRange
-displayLiquidityRightLabels = showLiquidityRightLabelsEffective and not (compactMode and mobileHideLiquidityRightLabels)
-displayHtfLines = showHtfEffective and not (compactMode and mobileHideHtfLines)
-displayRiskLines = showRiskEffective and not (compactMode and mobileHideRiskLines)
-displayKillzoneVisual = showKillzoneVisualEffective and not (compactMode and mobileHideKillzoneVisual)
+displayLiquidityRightLabels = showLiquidityRightLabels and not (compactMode and mobileHideLiquidityRightLabels)
+displayHtfLines = showHtf and not (compactMode and mobileHideHtfLines)
+displayRiskLines = showRisk and not (compactMode and mobileHideRiskLines)
+displayKillzoneVisual = showKillzoneVisual and not (compactMode and mobileHideKillzoneVisual)
 effectiveZoneDisplayMode = profileCompact ? "Minimal" : profileStrict ? "Focused" : zoneDisplayMode
 maxStructureEventObjects = 80
 maxPivotLabelObjects = 160
@@ -285,6 +279,9 @@ f_formatPercent(float value) =>
 
 f_formatRr(float rr) =>
     na(rr) ? "-" : rr > 10.0 ? ">10R" : str.tostring(math.round(rr * 100.0) / 100.0) + "R"
+
+f_targetModeText(bool hasActiveTarget, bool usesExternalDolTarget, bool liquidityTarget) =>
+    not hasActiveTarget ? "-" : usesExternalDolTarget ? "DOL" : liquidityTarget ? "Liq" : "2R"
 
 f_zoneResponseScore(bool touched, bool fresh, bool managed, bool priceInZone, bool invalidated, bool replaced, bool expired, bool chased) =>
     invalidated or replaced or expired or chased ? 0 : managed ? 2 : not touched and fresh ? 2 : priceInZone or touched ? 1 : 0
@@ -485,13 +482,25 @@ f_confirmationStateText(bool strictEnabled, bool contextPass, bool killzonePass,
     else
         compactText ? "Ref" : "Refine"
 
-f_setupPathText(bool hasSetup, bool isFvg, bool isOb, float dolLevel, bool compactText) =>
+f_setupPathText(bool hasSetup, bool isFvg, bool isOb, bool usesDolTarget, bool compactText) =>
     if not hasSetup
         "-"
     else
         string poiText = isFvg ? "FVG" : isOb ? "OB" : "POI"
-        string dolText = not na(dolLevel) ? (compactText ? ">D" : " > DOL") : ""
+        string dolText = usesDolTarget ? (compactText ? ">D" : " > DOL") : ""
         poiText + dolText
+
+f_candidatePriority(bool hasCandidate, bool confirmPass, int createdBar, bool isPreferredType, int freshBarsWindow) =>
+    if not hasCandidate
+        -1000.0
+    else
+        int candidateAge = not na(createdBar) ? math.max(0, bar_index - createdBar) : 10000
+        float score = confirmPass ? 100.0 : 0.0
+        score += candidateAge <= freshBarsWindow ? 20.0 : 0.0
+        float recencyScale = freshBarsWindow > 0 ? 10.0 / freshBarsWindow : 0.0
+        score += math.max(0.0, 10.0 - candidateAge * recencyScale)
+        score += isPreferredType ? 1.0 : 0.0
+        score
 
 f_setupExecutionState(bool hasSetup, bool invalidated, bool expired, bool chased, bool completed, bool managed, bool baseContextPass, bool confirmationPass, bool mssFresh, bool displacementSeen, bool priceInZone, bool priceNearZone) =>
     not hasSetup ? "Waiting" : completed ? "Completed" : managed ? "Managed" : invalidated ? "Invalidated" : expired or chased ? "Expired" : not baseContextPass ? "Waiting" : not confirmationPass ? "Confirming" : mssFresh and displacementSeen ? (priceInZone or priceNearZone ? "Active" : "Armed") : "Waiting"
@@ -505,8 +514,12 @@ f_executionRiskVisible(string stateText) =>
 f_entryActionText(string statusText) =>
     statusText == "Active" ? "Entry active" : statusText == "Armed" ? "Monitor retest" : statusText == "Confirming" ? "Wait confirm" : statusText == "Managed" ? "Manage trade" : statusText == "Completed" ? "Wait next setup" : statusText == "Expired" or statusText == "Invalidated" ? "Stand down" : "Wait confirmation"
 
-f_dashboardRetired(string executionState, int setupAge, bool touched) =>
-    executionState == "Invalidated" or executionState == "Completed" or executionState == "Expired" or (touched and not na(setupAge) and setupAge > setupExpiryBars and not f_executionRiskVisible(executionState) and executionState != "Confirming")
+f_dashboardRetired(string executionState, int setupAge, bool touched, int expiryBarsWindow) =>
+    executionState == "Invalidated" or executionState == "Completed" or executionState == "Expired" or (touched and not na(setupAge) and setupAge > expiryBarsWindow and not f_executionRiskVisible(executionState) and executionState != "Confirming")
+
+f_timeNormalizedBars(int baseBars, int baselineTfSeconds, int currentTfSeconds, int minBars) =>
+    float baselineDurationSeconds = float(baseBars) * baselineTfSeconds
+    int(math.max(minBars, math.round(baselineDurationSeconds / currentTfSeconds)))
 
 f_dashboardDetail(string valueText, bool retired) =>
     retired ? "-" : valueText
@@ -645,6 +658,10 @@ f_tpProbability(float confidence, float rr, bool priceInZone, bool priceNearZone
 
 chartTfLabel = timeframe.main_period
 chartTfSeconds = timeframe.in_seconds()
+normalizationBaselineTfSeconds = timeframe.in_seconds("5")
+freshBarsEffective = f_timeNormalizedBars(setupFreshBars, normalizationBaselineTfSeconds, chartTfSeconds, 2)
+expiryBarsEffective = f_timeNormalizedBars(setupExpiryBars, normalizationBaselineTfSeconds, chartTfSeconds, 4)
+strictMssLookbackEffective = f_timeNormalizedBars(strictMssLookback, normalizationBaselineTfSeconds, chartTfSeconds, 2)
 contextHtfTf = f_ictContextHtf(chartTfSeconds)
 narrativeHtfTf = f_ictNarrativeHtf(chartTfSeconds)
 executionTfValid = contextHtfTf != "" and narrativeHtfTf != ""
@@ -723,7 +740,7 @@ f_addPivotLabel(int pivotBar, float pivotPrice, string pivotText, bool isHigh) =
         f_trimPivotLabels()
 
 f_drawStructureEvent(int fromBar, float level, string eventText, bool isBull) =>
-    if showBosChoch and not na(fromBar)
+    if showBosMss and not na(fromBar)
         eventLineStyle = eventText == "MSS" ? line.style_dashed : line.style_dotted
         fromShift = math.max(bar_index - fromBar, 0)
         if fromShift <= 5000
@@ -1791,10 +1808,10 @@ bool bullObPdPass = not na(latestBullZoneTop) and not na(bullEquilibriumActive) 
 bool bullFvgPdPass = not na(latestBullFvgTop) and not na(bullEquilibriumActive) and f_zoneMid(latestBullFvgTop, latestBullFvgBottom) < bullEquilibriumActive
 bool bearObPdPass = not na(latestBearZoneTop) and not na(bearEquilibriumActive) and f_zoneMid(latestBearZoneTop, latestBearZoneBottom) > bearEquilibriumActive
 bool bearFvgPdPass = not na(latestBearFvgTop) and not na(bearEquilibriumActive) and f_zoneMid(latestBearFvgTop, latestBearFvgBottom) > bearEquilibriumActive
-bool bullObOtePass = f_zoneIntersects(latestBullZoneTop, latestBullZoneBottom, oteLongTop, oteLongBottom) and f_zoneFreshNearEvent(latestBullZoneCreatedBar, bullOteCreatedBar, strictMssLookback)
-bool bullFvgOtePass = f_zoneIntersects(latestBullFvgTop, latestBullFvgBottom, oteLongTop, oteLongBottom) and f_zoneFreshNearEvent(latestBullFvgCreatedBar, bullOteCreatedBar, strictMssLookback)
-bool bearObOtePass = f_zoneIntersects(latestBearZoneTop, latestBearZoneBottom, oteShortTop, oteShortBottom) and f_zoneFreshNearEvent(latestBearZoneCreatedBar, bearOteCreatedBar, strictMssLookback)
-bool bearFvgOtePass = f_zoneIntersects(latestBearFvgTop, latestBearFvgBottom, oteShortTop, oteShortBottom) and f_zoneFreshNearEvent(latestBearFvgCreatedBar, bearOteCreatedBar, strictMssLookback)
+bool bullObOtePass = f_zoneIntersects(latestBullZoneTop, latestBullZoneBottom, oteLongTop, oteLongBottom) and f_zoneFreshNearEvent(latestBullZoneCreatedBar, bullOteCreatedBar, strictMssLookbackEffective)
+bool bullFvgOtePass = f_zoneIntersects(latestBullFvgTop, latestBullFvgBottom, oteLongTop, oteLongBottom) and f_zoneFreshNearEvent(latestBullFvgCreatedBar, bullOteCreatedBar, strictMssLookbackEffective)
+bool bearObOtePass = f_zoneIntersects(latestBearZoneTop, latestBearZoneBottom, oteShortTop, oteShortBottom) and f_zoneFreshNearEvent(latestBearZoneCreatedBar, bearOteCreatedBar, strictMssLookbackEffective)
+bool bearFvgOtePass = f_zoneIntersects(latestBearFvgTop, latestBearFvgBottom, oteShortTop, oteShortBottom) and f_zoneFreshNearEvent(latestBearFvgCreatedBar, bearOteCreatedBar, strictMssLookbackEffective)
 bool hasBullOb = not na(latestBullEntry)
 bool hasBullFvg = not na(latestBullFvgTop) and not na(latestBullFvgBottom)
 bool hasBearOb = not na(latestBearEntry)
@@ -1826,11 +1843,20 @@ if strictModeEnabled
         preferBearFvg := hasBearFvg
         preferBearOb := not preferBearFvg and hasBearOb
 else
-    // Keep non-strict behavior aligned with the ICT flow as well: FVG first, OB fallback.
-    preferBullFvg := hasBullFvg
-    preferBullOb := not preferBullFvg and hasBullOb
-    preferBearFvg := hasBearFvg
-    preferBearOb := not preferBearFvg and hasBearOb
+    // In standard mode, rank candidates simply: confirm pass > freshness/recency > FVG tie-break.
+    float bullFvgPriority = f_candidatePriority(hasBullFvg, bullFvgZoneConfirmPass, latestBullFvgCreatedBar, true, freshBarsEffective)
+    float bullObPriority = f_candidatePriority(hasBullOb, bullObZoneConfirmPass, latestBullZoneCreatedBar, false, freshBarsEffective)
+    if bullFvgPriority >= bullObPriority and hasBullFvg
+        preferBullFvg := true
+    else if hasBullOb
+        preferBullOb := true
+
+    float bearFvgPriority = f_candidatePriority(hasBearFvg, bearFvgZoneConfirmPass, latestBearFvgCreatedBar, true, freshBarsEffective)
+    float bearObPriority = f_candidatePriority(hasBearOb, bearObZoneConfirmPass, latestBearZoneCreatedBar, false, freshBarsEffective)
+    if bearFvgPriority >= bearObPriority and hasBearFvg
+        preferBearFvg := true
+    else if hasBearOb
+        preferBearOb := true
 
 float tradeLongEntry = na
 float tradeLongStop = na
@@ -1924,32 +1950,40 @@ float longDolExternal = not na(tradeLongEntry) ? f_nearestAbove(tradeLongEntry, 
 float shortDolExternal = not na(tradeShortEntry) ? f_nearestBelow(tradeShortEntry, enginePrevDayLow, enginePrevWeekLow, enginePrevMonthLow, htfStructureLow, na, na, na) : na
 bool longHasExternalDol = not na(longDolExternal)
 bool shortHasExternalDol = not na(shortDolExternal)
-float longDolLevel = not na(longDolExternal) ? longDolExternal : longTargetIsLiquidity ? tradeLongTarget : na
-float shortDolLevel = not na(shortDolExternal) ? shortDolExternal : shortTargetIsLiquidity ? tradeShortTarget : na
+float longDolDistance = not na(tradeLongEntry) and not na(longDolExternal) ? longDolExternal - tradeLongEntry : na
+float shortDolDistance = not na(tradeShortEntry) and not na(shortDolExternal) ? tradeShortEntry - shortDolExternal : na
+float longBaseRiskDistance = not na(tradeLongEntry) and not na(tradeLongStop) ? tradeLongEntry - tradeLongStop : na
+float shortBaseRiskDistance = not na(tradeShortEntry) and not na(tradeShortStop) ? tradeShortStop - tradeShortEntry : na
+bool longQualifiedExternalDol = longHasExternalDol and not na(longBaseRiskDistance) and longBaseRiskDistance > 0 and not na(longDolDistance) and longDolDistance >= longBaseRiskDistance
+bool shortQualifiedExternalDol = shortHasExternalDol and not na(shortBaseRiskDistance) and shortBaseRiskDistance > 0 and not na(shortDolDistance) and shortDolDistance >= shortBaseRiskDistance
+bool longUsesExternalDolTarget = strictModeEnabled and longQualifiedExternalDol
+bool shortUsesExternalDolTarget = strictModeEnabled and shortQualifiedExternalDol
+float activeLongTarget = longUsesExternalDolTarget ? longDolExternal : tradeLongTarget
+float activeShortTarget = shortUsesExternalDolTarget ? shortDolExternal : tradeShortTarget
 
 float longRisk = not na(tradeLongEntry) and not na(tradeLongStop) ? tradeLongEntry - tradeLongStop : na
-float longReward = not na(tradeLongEntry) and not na(tradeLongTarget) ? tradeLongTarget - tradeLongEntry : na
+float longReward = not na(tradeLongEntry) and not na(activeLongTarget) ? activeLongTarget - tradeLongEntry : na
 float longRr = not na(longRisk) and longRisk > 0 and not na(longReward) ? longReward / longRisk : na
 bool longPriceInZone = not na(tradeLongValidBottom) and close >= tradeLongValidBottom and close <= tradeLongValidTop
 bool longPriceNearZone = not na(tradeLongEntry) and math.abs(close - tradeLongEntry) <= atr * 0.25
 int longSetupAge = not na(tradeLongCreatedBar) ? bar_index - tradeLongCreatedBar : na
-bool longExpired = not tradeLongTouched and not na(longSetupAge) and longSetupAge > setupExpiryBars
+bool longExpiredUntouched = not tradeLongTouched and not na(longSetupAge) and longSetupAge > expiryBarsEffective
 bool longChased = not tradeLongTouched and not na(tradeLongValidTop) and close > tradeLongValidTop + atr * setupChaseAtr
 bool longStructureInvalidated = not na(tradeLongCreatedBar) and not na(lastBearMssBar) and lastBearMssBar > tradeLongCreatedBar
-bool longFresh = not tradeLongTouched and not na(longSetupAge) and longSetupAge <= setupFreshBars
+bool longFresh = not tradeLongTouched and not na(longSetupAge) and longSetupAge <= freshBarsEffective
 bool strictLongBiasPass = not strictModeEnabled or (activeBias == 1 and htfContextReady and htfBias == 1 and narrativeRegimeBias != -1)
 bool strictLongSweepPass = not strictModeEnabled or bullLegHasSweep
-bool strictLongMssFresh = not na(lastBullMssBar) and (bar_index - lastBullMssBar) <= strictMssLookback
+bool strictLongMssFresh = not na(lastBullMssBar) and (bar_index - lastBullMssBar) <= strictMssLookbackEffective
 bool strictLongMssPass = not strictModeEnabled or (bullLegHasMss and strictLongMssFresh and activeBias == 1)
 bool strictLongPdPass = not strictModeEnabled or (not na(tradeLongValidTop) and not na(bullEquilibriumActive) and f_zoneMid(tradeLongValidTop, tradeLongValidBottom) < bullEquilibriumActive)
-bool strictLongOtePass = not strictModeEnabled or (f_zoneIntersects(tradeLongValidTop, tradeLongValidBottom, oteLongTop, oteLongBottom) and f_zoneFreshNearEvent(tradeLongCreatedBar, bullOteCreatedBar, strictMssLookback))
-bool strictLongDolPass = not strictModeEnabled or longHasExternalDol
+bool strictLongOtePass = not strictModeEnabled or (f_zoneIntersects(tradeLongValidTop, tradeLongValidBottom, oteLongTop, oteLongBottom) and f_zoneFreshNearEvent(tradeLongCreatedBar, bullOteCreatedBar, strictMssLookbackEffective))
+bool strictLongDolPass = not strictModeEnabled or longQualifiedExternalDol
 bool strictLongKillzonePass = not strictModeEnabled or strictKillzoneActive
 bool strictLongContextPass = strictLongBiasPass and strictLongSweepPass and strictLongMssPass and strictLongPdPass and strictLongOtePass and strictLongDolPass
 bool longBaseContextPass = activeBias == 1 and bullLegHasSweep and bullLegHasMss
 bool longConfirmationPass = not strictModeEnabled or (strictLongContextPass and strictLongKillzonePass)
 bool longExecutionFreshPass = strictModeEnabled ? strictLongMssFresh : bullLegHasMss
-string longConfirmationSummary = not na(tradeLongEntry) ? f_confirmationStateText(strictModeEnabled, strictLongContextPass, strictLongKillzonePass, false) + " | " + f_setupPathText(true, tradeLongIsFvg, tradeLongIsOb, longDolExternal, false) : "-"
+string longConfirmationSummary = not na(tradeLongEntry) ? f_confirmationStateText(strictModeEnabled, strictLongContextPass, strictLongKillzonePass, false) + " | " + f_setupPathText(true, tradeLongIsFvg, tradeLongIsOb, longUsesExternalDolTarget, false) : "-"
 var string lastLongSetupTag = ""
 var bool longManagedLatched = false
 var bool longCompletedLatched = false
@@ -1964,37 +1998,42 @@ else if currentLongSetupTag != lastLongSetupTag
 bool longManagedHit = tradeLongTouched and not na(longRisk) and high >= tradeLongEntry + longRisk * setupManagedR
 if longManagedHit
     longManagedLatched := true
-bool longManaged = currentLongSetupTag != "" and longManagedLatched
-bool longCompletedHit = tradeLongTouched and ((not na(tradeLongTarget) and high >= tradeLongTarget) or (longManaged and not na(longSetupAge) and longSetupAge > setupExpiryBars))
-if longCompletedHit
+bool longManagedLatchedState = currentLongSetupTag != "" and longManagedLatched
+bool longTpHit = tradeLongTouched and not na(activeLongTarget) and high >= activeLongTarget
+if longTpHit
     longCompletedLatched := true
 bool longCompleted = currentLongSetupTag != "" and longCompletedLatched
 lastLongSetupTag := currentLongSetupTag
 bool longInvalidated = (not na(tradeLongStop) and close <= tradeLongStop) or longStructureInvalidated
+bool longManagedStale = longManagedLatchedState and not longCompleted and not na(longSetupAge) and longSetupAge > expiryBarsEffective
+bool longManaged = longManagedLatchedState and not longManagedStale
+bool longTouchedStale = tradeLongTouched and not longManagedLatchedState and not longCompleted and not na(longSetupAge) and longSetupAge > expiryBarsEffective
+bool longExpired = longExpiredUntouched or longTouchedStale
+longExpired := longExpired or longManagedStale
 
 float shortRisk = not na(tradeShortEntry) and not na(tradeShortStop) ? tradeShortStop - tradeShortEntry : na
-float shortReward = not na(tradeShortEntry) and not na(tradeShortTarget) ? tradeShortEntry - tradeShortTarget : na
+float shortReward = not na(tradeShortEntry) and not na(activeShortTarget) ? tradeShortEntry - activeShortTarget : na
 float shortRr = not na(shortRisk) and shortRisk > 0 and not na(shortReward) ? shortReward / shortRisk : na
 bool shortPriceInZone = not na(tradeShortValidBottom) and close >= tradeShortValidBottom and close <= tradeShortValidTop
 bool shortPriceNearZone = not na(tradeShortEntry) and math.abs(close - tradeShortEntry) <= atr * 0.25
 int shortSetupAge = not na(tradeShortCreatedBar) ? bar_index - tradeShortCreatedBar : na
-bool shortExpired = not tradeShortTouched and not na(shortSetupAge) and shortSetupAge > setupExpiryBars
+bool shortExpiredUntouched = not tradeShortTouched and not na(shortSetupAge) and shortSetupAge > expiryBarsEffective
 bool shortChased = not tradeShortTouched and not na(tradeShortValidBottom) and close < tradeShortValidBottom - atr * setupChaseAtr
 bool shortStructureInvalidated = not na(tradeShortCreatedBar) and not na(lastBullMssBar) and lastBullMssBar > tradeShortCreatedBar
-bool shortFresh = not tradeShortTouched and not na(shortSetupAge) and shortSetupAge <= setupFreshBars
+bool shortFresh = not tradeShortTouched and not na(shortSetupAge) and shortSetupAge <= freshBarsEffective
 bool strictShortBiasPass = not strictModeEnabled or (activeBias == -1 and htfContextReady and htfBias == -1 and narrativeRegimeBias != 1)
 bool strictShortSweepPass = not strictModeEnabled or bearLegHasSweep
-bool strictShortMssFresh = not na(lastBearMssBar) and (bar_index - lastBearMssBar) <= strictMssLookback
+bool strictShortMssFresh = not na(lastBearMssBar) and (bar_index - lastBearMssBar) <= strictMssLookbackEffective
 bool strictShortMssPass = not strictModeEnabled or (bearLegHasMss and strictShortMssFresh and activeBias == -1)
 bool strictShortPdPass = not strictModeEnabled or (not na(tradeShortValidTop) and not na(bearEquilibriumActive) and f_zoneMid(tradeShortValidTop, tradeShortValidBottom) > bearEquilibriumActive)
-bool strictShortOtePass = not strictModeEnabled or (f_zoneIntersects(tradeShortValidTop, tradeShortValidBottom, oteShortTop, oteShortBottom) and f_zoneFreshNearEvent(tradeShortCreatedBar, bearOteCreatedBar, strictMssLookback))
-bool strictShortDolPass = not strictModeEnabled or shortHasExternalDol
+bool strictShortOtePass = not strictModeEnabled or (f_zoneIntersects(tradeShortValidTop, tradeShortValidBottom, oteShortTop, oteShortBottom) and f_zoneFreshNearEvent(tradeShortCreatedBar, bearOteCreatedBar, strictMssLookbackEffective))
+bool strictShortDolPass = not strictModeEnabled or shortQualifiedExternalDol
 bool strictShortKillzonePass = not strictModeEnabled or strictKillzoneActive
 bool strictShortContextPass = strictShortBiasPass and strictShortSweepPass and strictShortMssPass and strictShortPdPass and strictShortOtePass and strictShortDolPass
 bool shortBaseContextPass = activeBias == -1 and bearLegHasSweep and bearLegHasMss
 bool shortConfirmationPass = not strictModeEnabled or (strictShortContextPass and strictShortKillzonePass)
 bool shortExecutionFreshPass = strictModeEnabled ? strictShortMssFresh : bearLegHasMss
-string shortConfirmationSummary = not na(tradeShortEntry) ? f_confirmationStateText(strictModeEnabled, strictShortContextPass, strictShortKillzonePass, false) + " | " + f_setupPathText(true, tradeShortIsFvg, tradeShortIsOb, shortDolExternal, false) : "-"
+string shortConfirmationSummary = not na(tradeShortEntry) ? f_confirmationStateText(strictModeEnabled, strictShortContextPass, strictShortKillzonePass, false) + " | " + f_setupPathText(true, tradeShortIsFvg, tradeShortIsOb, shortUsesExternalDolTarget, false) : "-"
 var string lastShortSetupTag = ""
 var bool shortManagedLatched = false
 var bool shortCompletedLatched = false
@@ -2009,13 +2048,18 @@ else if currentShortSetupTag != lastShortSetupTag
 bool shortManagedHit = tradeShortTouched and not na(shortRisk) and low <= tradeShortEntry - shortRisk * setupManagedR
 if shortManagedHit
     shortManagedLatched := true
-bool shortManaged = currentShortSetupTag != "" and shortManagedLatched
-bool shortCompletedHit = tradeShortTouched and ((not na(tradeShortTarget) and low <= tradeShortTarget) or (shortManaged and not na(shortSetupAge) and shortSetupAge > setupExpiryBars))
-if shortCompletedHit
+bool shortManagedLatchedState = currentShortSetupTag != "" and shortManagedLatched
+bool shortTpHit = tradeShortTouched and not na(activeShortTarget) and low <= activeShortTarget
+if shortTpHit
     shortCompletedLatched := true
 bool shortCompleted = currentShortSetupTag != "" and shortCompletedLatched
 lastShortSetupTag := currentShortSetupTag
 bool shortInvalidated = (not na(tradeShortStop) and close >= tradeShortStop) or shortStructureInvalidated
+bool shortManagedStale = shortManagedLatchedState and not shortCompleted and not na(shortSetupAge) and shortSetupAge > expiryBarsEffective
+bool shortManaged = currentShortSetupTag != "" and shortManagedLatched and not shortManagedStale
+bool shortTouchedStale = tradeShortTouched and not shortManagedLatchedState and not shortCompleted and not na(shortSetupAge) and shortSetupAge > expiryBarsEffective
+bool shortExpired = shortExpiredUntouched or shortTouchedStale
+shortExpired := shortExpired or shortManagedStale
 
 // Keep setup scoring intentionally simple to reduce overtuning.
 bool longBiasAligned = activeBias == 1
@@ -2049,9 +2093,9 @@ int selectedBullFvgBar = tradeLongIsFvg ? tradeLongCreatedBar : na
 int selectedBearFvgBar = tradeShortIsFvg ? tradeShortCreatedBar : na
 int selectedBullObBar = tradeLongIsOb ? tradeLongCreatedBar : na
 int selectedBearObBar = tradeShortIsOb ? tradeShortCreatedBar : na
-bool anyLiquidityTarget = (not na(tradeLongTarget) and longTargetIsLiquidity) or (not na(tradeShortTarget) and shortTargetIsLiquidity)
-bool anyFallbackTarget = (not na(tradeLongTarget) and not longTargetIsLiquidity) or (not na(tradeShortTarget) and not shortTargetIsLiquidity)
-string opTargetSummary = not anyLiquidityTarget and not anyFallbackTarget ? "-" : anyLiquidityTarget and anyFallbackTarget ? "Liquidity / 2R fallback" : anyLiquidityTarget ? "Nearest liquidity" : "Fallback 2R"
+string longTargetModeSummary = f_targetModeText(not na(activeLongTarget), longUsesExternalDolTarget, longTargetIsLiquidity)
+string shortTargetModeSummary = f_targetModeText(not na(activeShortTarget), shortUsesExternalDolTarget, shortTargetIsLiquidity)
+string opTargetSummary = longTargetModeSummary == shortTargetModeSummary ? longTargetModeSummary : longTargetModeSummary == "-" ? shortTargetModeSummary : shortTargetModeSummary == "-" ? longTargetModeSummary : "Mixed"
 
 if array.size(pivotStructureLabels) > 0
     for idx = 0 to array.size(pivotStructureLabels) - 1
@@ -2069,10 +2113,10 @@ if array.size(structureEventLines) > 0
         eventLine = array.get(structureEventLines, i)
         eventLabel = array.get(structureEventLabels, i)
         if not na(eventLine)
-            line.set_color(eventLine, showBosChoch ? structureEventColor : na)
+            line.set_color(eventLine, showBosMss ? structureEventColor : na)
         if not na(eventLabel)
             label.set_color(eventLabel, color.new(color.black, 100))
-            label.set_textcolor(eventLabel, showBosChoch ? structureTextColor : na)
+            label.set_textcolor(eventLabel, showBosMss ? structureTextColor : na)
             label.set_style(eventLabel, label.style_none)
 
 if array.size(fvgBoxes) > 0
@@ -2224,7 +2268,7 @@ float compactZoneTop = compactUseLong ? tradeLongValidTop : tradeShortValidTop
 float compactZoneBottom = compactUseLong ? tradeLongValidBottom : tradeShortValidBottom
 float compactEntry = compactUseLong ? tradeLongEntry : tradeShortEntry
 float compactStop = compactUseLong ? tradeLongStop : tradeShortStop
-float compactTarget = compactUseLong ? tradeLongTarget : tradeShortTarget
+float compactTarget = compactUseLong ? activeLongTarget : activeShortTarget
 float compactRr = compactUseLong ? longRr : shortRr
 float compactConfidence = compactUseLong ? longConfidence : shortConfidence
 float compactTpProbability = compactUseLong ? longTpProbability : shortTpProbability
@@ -2233,8 +2277,8 @@ bool compactWaiting = preferredDirection == "Wait"
 bool compactNeutral = compactBalanced or compactWaiting
 bool compactActionable = longPreferredReady or shortPreferredReady
 bool compactContextOnly = compactNeutral and not compactActionable
-bool longDashboardRetired = f_dashboardRetired(longExecutionState, longSetupAge, tradeLongTouched)
-bool shortDashboardRetired = f_dashboardRetired(shortExecutionState, shortSetupAge, tradeShortTouched)
+bool longDashboardRetired = f_dashboardRetired(longExecutionState, longSetupAge, tradeLongTouched, expiryBarsEffective)
+bool shortDashboardRetired = f_dashboardRetired(shortExecutionState, shortSetupAge, tradeShortTouched, expiryBarsEffective)
 color compactAccent = compactNeutral ? color.new(neutralColor, 12) : compactUseLong ? color.new(bullColor, 12) : color.new(bearColor, 12)
 bool compactCandidateHasSetup = not na(compactEntry)
 bool compactCandidateRetired = compactUseLong ? longDashboardRetired : shortDashboardRetired
@@ -2255,8 +2299,8 @@ string longDashboardSetupDisplay = f_dashboardSetupText(longSetupDisplay, longDa
 string shortDashboardSetupDisplay = f_dashboardSetupText(shortSetupDisplay, shortDashboardRetired)
 string longZoneEntrySummary = f_dashboardDetail(f_formatRange(tradeLongValidTop, tradeLongValidBottom) + " | " + f_formatLevel(tradeLongEntry), longDashboardRetired)
 string shortZoneEntrySummary = f_dashboardDetail(f_formatRange(tradeShortValidTop, tradeShortValidBottom) + " | " + f_formatLevel(tradeShortEntry), shortDashboardRetired)
-string longRiskTargetSummary = f_dashboardDetail(f_formatLevel(tradeLongStop) + " | " + f_formatLevel(tradeLongTarget), longDashboardRetired)
-string shortRiskTargetSummary = f_dashboardDetail(f_formatLevel(tradeShortStop) + " | " + f_formatLevel(tradeShortTarget), shortDashboardRetired)
+string longRiskTargetSummary = f_dashboardDetail(f_formatLevel(tradeLongStop) + " | " + f_formatLevel(activeLongTarget), longDashboardRetired)
+string shortRiskTargetSummary = f_dashboardDetail(f_formatLevel(tradeShortStop) + " | " + f_formatLevel(activeShortTarget), shortDashboardRetired)
 string longRrConfSummary = f_dashboardDetail(f_formatRr(longRr) + " | " + f_formatPercent(longConfidence), longDashboardRetired)
 string shortRrConfSummary = f_dashboardDetail(f_formatRr(shortRr) + " | " + f_formatPercent(shortConfidence), shortDashboardRetired)
 string longLifeSummary = f_dashboardLifeText(f_lifecycleText(longSetupAge, tradeLongTouched), longDashboardRetired)
@@ -2288,12 +2332,14 @@ bearStop = not na(tradeShortStop) ? tradeShortStop : not na(lastSwingHigh) ? las
 //------------------------------------------------------------------------------
 longExternalDraw = longPreferredReady ? longDolExternal : na
 shortExternalDraw = shortPreferredReady ? shortDolExternal : na
-primaryExternalDrawLevel = compactUseLong ? longDolExternal : shortDolExternal
+float longDashboardDol = longUsesExternalDolTarget ? longDolExternal : na
+float shortDashboardDol = shortUsesExternalDolTarget ? shortDolExternal : na
+primaryExternalDrawLevel = compactUseLong ? longDashboardDol : shortDashboardDol
 compactRrDrawDisplay := compactNeutral ? "-" : compactUseLong ? f_dashboardDetail(f_formatRr(compactRr) + " | " + f_formatLevel(primaryExternalDrawLevel), longDashboardRetired) : f_dashboardDetail(f_formatRr(compactRr) + " | " + f_formatLevel(primaryExternalDrawLevel), shortDashboardRetired)
-string longDrawTpSummary = f_dashboardDetail(f_formatLevel(longDolExternal) + " | " + f_formatPercent(longTpProbability), longDashboardRetired)
-string shortDrawTpSummary = f_dashboardDetail(f_formatLevel(shortDolExternal) + " | " + f_formatPercent(shortTpProbability), shortDashboardRetired)
-targetEqHigh = f_preferredLevelMatch(activeEqh, compactBalanced, compactUseLong, tradeLongTarget, tradeShortTarget)
-targetEqLow = f_preferredLevelMatch(activeEql, compactBalanced, compactUseLong, tradeLongTarget, tradeShortTarget)
+string longDrawTpSummary = f_dashboardDetail(f_formatLevel(longDashboardDol) + " | " + f_formatPercent(longTpProbability), longDashboardRetired)
+string shortDrawTpSummary = f_dashboardDetail(f_formatLevel(shortDashboardDol) + " | " + f_formatPercent(shortTpProbability), shortDashboardRetired)
+targetEqHigh = f_preferredLevelMatch(activeEqh, compactBalanced, compactUseLong, activeLongTarget, activeShortTarget)
+targetEqLow = f_preferredLevelMatch(activeEql, compactBalanced, compactUseLong, activeLongTarget, activeShortTarget)
 drawHtfHigh = f_preferredLevelMatch(htfStructureHigh, compactBalanced, compactUseLong, longExternalDraw, shortExternalDraw)
 drawHtfLow = f_preferredLevelMatch(htfStructureLow, compactBalanced, compactUseLong, longExternalDraw, shortExternalDraw)
 
@@ -2302,7 +2348,7 @@ showEqLowVisual = showLiquidity and displayEqLiquidity and f_targetVisualByMode(
 showProtectedHighVisual = displayProtectedLevels
 showProtectedLowVisual = displayProtectedLevels
 showRangeVisual = showLiquidity and displayDealingRange and f_contextVisualByMode(effectiveZoneDisplayMode)
-showOteVisual = showOteEffective
+showOteVisual = strictShowOte
 oteActiveSummary = not na(oteLongTop) ? "OTE:L" : not na(oteShortTop) ? "OTE:S" : "OTE:-"
 showHtfHighVisual = displayHtfLines and htfContextReady and f_targetVisualByMode(effectiveZoneDisplayMode, drawHtfHigh)
 showHtfLowVisual = displayHtfLines and htfContextReady and f_targetVisualByMode(effectiveZoneDisplayMode, drawHtfLow)
@@ -2329,8 +2375,8 @@ riskLongEntryLevel = f_horizontalLevel(tradeLongEntry, showLongRiskVisual)
 riskShortEntryLevel = f_horizontalLevel(tradeShortEntry, showShortRiskVisual)
 riskBullStopLevel = f_horizontalLevel(bullStop, showLongRiskVisual)
 riskBearStopLevel = f_horizontalLevel(bearStop, showShortRiskVisual)
-riskLongTargetLevel = f_horizontalLevel(tradeLongTarget, showLongRiskVisual)
-riskShortTargetLevel = f_horizontalLevel(tradeShortTarget, showShortRiskVisual)
+riskLongTargetLevel = f_horizontalLevel(activeLongTarget, showLongRiskVisual)
+riskShortTargetLevel = f_horizontalLevel(activeShortTarget, showShortRiskVisual)
 oteLongTopLevel = f_horizontalLevel(oteLongTop, showOteVisual)
 oteLongBottomLevel = f_horizontalLevel(oteLongBottom, showOteVisual)
 oteShortTopLevel = f_horizontalLevel(oteShortTop, showOteVisual)
