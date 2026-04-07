@@ -1115,7 +1115,7 @@ if not na(pivotLow)
     lastLowBroken := false
 
 //------------------------------------------------------------------------------
-// Liquidity sweeps, inducement, BOS / CHOCH
+// Liquidity sweeps, inducement, BOS / MSS
 //------------------------------------------------------------------------------
 activeEqh = latestEqhActive ? latestEqh : na
 activeEql = latestEqlActive ? latestEql : na
@@ -1795,7 +1795,7 @@ bool preferBearOb = false
 bool preferBearFvg = false
 
 if strictModeEnabled
-    // In strict ICT mode, prefer IRL/FVG first after the ERL sweep.
+    // In strict ICT mode, prefer FVG first after the ERL sweep.
     if hasBullFvg and bullFvgZoneConfirmPass
         preferBullFvg := true
     else if hasBullOb and bullObZoneConfirmPass
@@ -1812,7 +1812,7 @@ if strictModeEnabled
         preferBearFvg := hasBearFvg
         preferBearOb := not preferBearFvg and hasBearOb
 else
-    // Keep non-strict behavior aligned with the ICT flow as well: IRL/FVG first, OB fallback.
+    // Keep non-strict behavior aligned with the ICT flow as well: FVG first, OB fallback.
     preferBullFvg := hasBullFvg
     preferBullOb := not preferBullFvg and hasBullOb
     preferBearFvg := hasBearFvg
