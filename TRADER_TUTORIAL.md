@@ -68,14 +68,14 @@ Urutan baca yang sehat:
 
 Yang tampil di chart:
 - `HH / HL / LH / LL`
-- `BOS / CHOCH / MSS`
+- `BOS / MSS`
 - marker inducement dan sweep jika diaktifkan
 
 Maknanya:
 - `HH / HL` menunjukkan struktur bullish
 - `LH / LL` menunjukkan struktur bearish
 - `BOS` berarti kelanjutan struktur
-- `CHOCH / MSS` berarti potensi perubahan karakter / shift
+- `MSS` berarti potensi perubahan karakter / shift
 
 Prinsip baca:
 - jangan mulai dari zona dulu
@@ -135,8 +135,8 @@ Cara membacanya:
 Prinsip:
 - jangan anggap semua box adalah entry
 - utamakan zona yang searah dengan struktur, bias, dan session context
-- dalam profile `Strict Confirm`, indikator sekarang memprioritaskan `IRL/FVG` dulu
-- jika tidak ada `IRL` yang valid, `OB` dipakai sebagai fallback POI
+- dalam profile `Strict Confirm`, indikator sekarang memprioritaskan `FVG` dulu
+- jika tidak ada `FVG` yang valid, `OB` dipakai sebagai fallback POI
 
 Jika nama setup di dashboard diikuti:
 - `Q1`
@@ -264,8 +264,8 @@ Gunanya:
 
 Catatan:
 - `POI` = `Point of Interest`
-- dalam strict mode, `POI` yang paling disukai adalah `IRL/FVG`
-- `OB` tetap bisa dipakai jika tidak ada `IRL` yang lebih layak
+- dalam strict mode, `POI` yang paling disukai adalah `FVG`
+- `OB` tetap bisa dipakai jika tidak ada `FVG` yang lebih layak
 
 ### SL / TP
 
@@ -292,15 +292,15 @@ Cara baca:
 ### Draw / TP
 
 Menunjukkan:
-- `Draw` = `DOL` / target liquidity utama
+- `Draw` = `DOL` / external liquidity target utama
 - `TP` = probabilitas model rule-based
 
 Ini membantu melihat apakah target dekat / jauh dan seberapa kuat kualitas setup.
 
 Cara baca:
-- `DOL` = `Draw on Liquidity`
+- `DOL` = `Draw on Liquidity`, yaitu external draw utama
 - jika ada level liquidity yang jelas di atas/bawah harga, indikator akan memakainya
-- jika tidak ada `DOL` yang layak, strict confirmation tidak akan semudah itu memberi status siap entry
+- jika tidak ada `DOL` external yang layak, strict confirmation tidak akan semudah itu memberi status siap entry
 
 ### Life
 
@@ -340,7 +340,7 @@ Kolom Long/Short pada baris ini sekarang menunjukkan status konfirmasi:
 - `Ready` = konfirmasi strict sudah lengkap
 
 Dalam strict mode, ringkasan ini juga membawa jalur setup singkat:
-- `IRL > DOL` = paling dekat ke flow ICT yang dicari indikator
+- `FVG > DOL` = flow paling dekat ke ICT yang dicari indikator
 - `OB > DOL` = setup masih valid, tetapi POI yang dipakai adalah order block fallback
 
 ### Next
