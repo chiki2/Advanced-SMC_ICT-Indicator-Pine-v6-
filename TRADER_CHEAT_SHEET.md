@@ -25,7 +25,7 @@ Panduan satu halaman yang ringkas, visual, dan siap dibagikan untuk trader `Adva
 ## Workflow 30 Detik
 
 ```text
-BIAS -> SESSION -> ERL SWEEP -> IRL / POI -> DOL -> EXEC
+BIAS -> SESSION -> ERL SWEEP -> FVG / POI -> DOL -> EXEC
 ```
 
 Jika salah satu dari tiga hal ini belum jelas, `wait`:
@@ -83,7 +83,7 @@ Jika salah satu dari tiga hal ini belum jelas, `wait`:
 | `Z / E` | `POI` dan entry | lokasi setup |
 | `SL / TP` | stop dan target | risk plan |
 | `RR / Cf` | reward/risk dan confidence | pembanding, bukan alasan tunggal |
-| `Draw / TP` | `DOL` dan peluang model | arah tarikan liquidity utama |
+| `Draw / TP` | `DOL` dan peluang model | arah tarikan external liquidity utama |
 | `Next` | aksi berikutnya | baca ini paling akhir |
 
 ### Baca `Q`
@@ -114,12 +114,12 @@ Jika salah satu dari tiga hal ini belum jelas, `wait`:
 | Istilah | Arti Cepat |
 |---|---|
 | `POI` | `Point of Interest`, zona yang sedang dipakai model |
-| `IRL` | `Internal Range Liquidity`, biasanya FVG di dalam range |
-| `OB` | fallback POI jika tidak ada IRL yang lebih layak |
-| `DOL` | `Draw on Liquidity`, target liquidity utama |
+| `FVG` | POI utama yang diprioritaskan indikator untuk flow ICT |
+| `OB` | fallback POI jika tidak ada FVG yang lebih layak |
+| `DOL` | `Draw on Liquidity`, target external liquidity utama |
 
 Flow sehat indikator dalam `Strict Confirm`:
-- `ERL sweep -> IRL / POI -> DOL`
+- `ERL sweep -> FVG / POI -> DOL`
 
 ### Baca `RR / Cf`
 
@@ -154,8 +154,8 @@ Urutan fokus chart:
 **Prinsip sederhana**
 - session = konteks
 - `ERL` = sumber liquidity
-- `IRL / POI` = lokasi entry
-- `DOL` = target
+- `FVG / POI` = lokasi entry
+- `DOL` = external target
 - `Exec` = timing
 
 ---
