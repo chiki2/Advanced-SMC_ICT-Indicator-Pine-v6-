@@ -2,6 +2,8 @@
 
 Panduan ini ditulis untuk membantu trader memakai `Advanced SMC / ICT Indicator` tanpa harus membaca kode.
 
+Jika Anda ingin versi sangat singkat dan lebih visual, lihat [TRADER_CHEAT_SHEET.md](./TRADER_CHEAT_SHEET.md).
+
 ## Tujuan Indikator
 
 Indikator ini membantu membaca:
