@@ -2291,10 +2291,12 @@ bearStop = not na(tradeShortStop) ? tradeShortStop : not na(lastSwingHigh) ? las
 //------------------------------------------------------------------------------
 longExternalDraw = longPreferredReady ? longDolExternal : na
 shortExternalDraw = shortPreferredReady ? shortDolExternal : na
-primaryExternalDrawLevel = compactUseLong ? longDolExternal : shortDolExternal
+float longDashboardDol = longUsesExternalDolTarget ? longDolExternal : na
+float shortDashboardDol = shortUsesExternalDolTarget ? shortDolExternal : na
+primaryExternalDrawLevel = compactUseLong ? longDashboardDol : shortDashboardDol
 compactRrDrawDisplay := compactNeutral ? "-" : compactUseLong ? f_dashboardDetail(f_formatRr(compactRr) + " | " + f_formatLevel(primaryExternalDrawLevel), longDashboardRetired) : f_dashboardDetail(f_formatRr(compactRr) + " | " + f_formatLevel(primaryExternalDrawLevel), shortDashboardRetired)
-string longDrawTpSummary = f_dashboardDetail(f_formatLevel(longDolExternal) + " | " + f_formatPercent(longTpProbability), longDashboardRetired)
-string shortDrawTpSummary = f_dashboardDetail(f_formatLevel(shortDolExternal) + " | " + f_formatPercent(shortTpProbability), shortDashboardRetired)
+string longDrawTpSummary = f_dashboardDetail(f_formatLevel(longDashboardDol) + " | " + f_formatPercent(longTpProbability), longDashboardRetired)
+string shortDrawTpSummary = f_dashboardDetail(f_formatLevel(shortDashboardDol) + " | " + f_formatPercent(shortTpProbability), shortDashboardRetired)
 targetEqHigh = f_preferredLevelMatch(activeEqh, compactBalanced, compactUseLong, activeLongTarget, activeShortTarget)
 targetEqLow = f_preferredLevelMatch(activeEql, compactBalanced, compactUseLong, activeLongTarget, activeShortTarget)
 drawHtfHigh = f_preferredLevelMatch(htfStructureHigh, compactBalanced, compactUseLong, longExternalDraw, shortExternalDraw)
