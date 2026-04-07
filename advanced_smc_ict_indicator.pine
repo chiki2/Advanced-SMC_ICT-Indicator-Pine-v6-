@@ -64,6 +64,8 @@ int setupFreshBars = 6
 int setupExpiryBars = 25
 float setupChaseAtr = 1.50
 float setupManagedR = 1.00
+float zoneExpansionNormalAtr = 0.75
+float zoneExpansionStrongAtr = 1.50
 
 groupStrict = "8. Strict ICT Entry"
 strictIctMode = input.bool(false, "Enable Strict ICT Entry mode", group=groupStrict)
@@ -274,6 +276,21 @@ f_alignmentText(bool isBull, int ltfBias, int higherBias) =>
 
 f_statusCompact(string statusText) =>
     statusText == "Valid now" ? "Valid" : statusText == "Strict Ready" ? "Ready" : statusText == "Invalidated" ? "Invalid" : statusText == "Standby" ? "Standby" : statusText == "Managed" ? "Mngd" : statusText == "Replaced" ? "Newer" : statusText == "Expired" ? "Exp" : statusText == "Chased" ? "Chased" : statusText == "Filtered" ? "Filter" : statusText == "Wait KZ" ? "WaitKZ" : statusText
+
+f_zoneResponseScore(bool touched, bool fresh, bool managed, bool priceInZone, bool invalidated, bool replaced, bool expired, bool chased) =>
+    invalidated or replaced or expired or chased ? 0 : managed ? 2 : not touched and fresh ? 2 : priceInZone or touched ? 1 : 0
+
+f_zoneDisplacementScore(bool displacementSeen) =>
+    displacementSeen ? 2 : 0
+
+f_zoneAtrExpansionScore(float departureRange, float atrLevel) =>
+    na(departureRange) or na(atrLevel) or atrLevel <= 0 ? 0 : departureRange >= atrLevel * zoneExpansionStrongAtr ? 2 : departureRange >= atrLevel * zoneExpansionNormalAtr ? 1 : 0
+
+f_zoneQualityTier(bool hasSetup, int responseScore, int displacementScore, int atrExpansionScore) =>
+    not hasSetup ? "-" : responseScore + displacementScore + atrExpansionScore >= 5 ? "Q3" : responseScore + displacementScore + atrExpansionScore >= 3 ? "Q2" : "Q1"
+
+f_setupQualityText(string setupText, string qualityTier, bool hasSetup) =>
+    hasSetup ? setupText + " | " + qualityTier : setupText
 
 f_zoneTouched(float zoneTop, float zoneBottom) =>
     not na(zoneTop) and not na(zoneBottom) and high >= zoneBottom and low <= zoneTop
@@ -1670,6 +1687,18 @@ bool longHtfAligned = htfBias == 1
 bool shortHtfAligned = htfBias == -1
 bool longDisplacementSeen = bullLegHasDisplacement
 bool shortDisplacementSeen = bearLegHasDisplacement
+float longDepartureRange = not na(bullRangeHighActive) and not na(bullRangeLowActive) ? bullRangeHighActive - bullRangeLowActive : na
+float shortDepartureRange = not na(bearRangeHighActive) and not na(bearRangeLowActive) ? bearRangeHighActive - bearRangeLowActive : na
+int longResponseScore = f_zoneResponseScore(tradeLongTouched, longFresh, longManaged, longPriceInZone, longInvalidated, longReplaced, longExpired, longChased)
+int shortResponseScore = f_zoneResponseScore(tradeShortTouched, shortFresh, shortManaged, shortPriceInZone, shortInvalidated, shortReplaced, shortExpired, shortChased)
+int longDisplacementScore = f_zoneDisplacementScore(longDisplacementSeen)
+int shortDisplacementScore = f_zoneDisplacementScore(shortDisplacementSeen)
+int longAtrExpansionScore = f_zoneAtrExpansionScore(longDepartureRange, atr)
+int shortAtrExpansionScore = f_zoneAtrExpansionScore(shortDepartureRange, atr)
+string longQualityTier = f_zoneQualityTier(not na(tradeLongEntry), longResponseScore, longDisplacementScore, longAtrExpansionScore)
+string shortQualityTier = f_zoneQualityTier(not na(tradeShortEntry), shortResponseScore, shortDisplacementScore, shortAtrExpansionScore)
+string longSetupDisplay = f_setupQualityText(tradeLongSetup, longQualityTier, not na(tradeLongEntry))
+string shortSetupDisplay = f_setupQualityText(tradeShortSetup, shortQualityTier, not na(tradeShortEntry))
 
 float longConfidence = f_setupScore(not na(tradeLongEntry), longBiasAligned, longHtfAligned, bullLegHasSweep, longDisplacementSeen, tradeLongIsOb, tradeLongIsFvg, longPriceInZone, longPriceNearZone, longRr, longFresh, longManaged, strictModeEnabled, strictLongContextPass, strictLongKillzonePass, longReplaced, longChased, longExpired, longInvalidated)
 float longTpProbability = f_tpProbability(longConfidence, longRr, longPriceInZone, longPriceNearZone, longManaged, strictModeEnabled, strictLongContextPass, strictLongKillzonePass, longChased, longExpired, longInvalidated)
@@ -1843,7 +1872,7 @@ if effectiveZoneDisplayMode != "Full"
             else if not na(zoneLabel)
                 label.set_textcolor(zoneLabel, color.white)
 
-string compactSetup = compactUseLong ? tradeLongSetup : tradeShortSetup
+string compactSetup = compactUseLong ? longSetupDisplay : shortSetupDisplay
 string compactStatus = compactUseLong ? longStatus : shortStatus
 float compactZoneTop = compactUseLong ? tradeLongValidTop : tradeShortValidTop
 float compactZoneBottom = compactUseLong ? tradeLongValidBottom : tradeShortValidBottom
@@ -2061,8 +2090,8 @@ if barstate.islast and dashboardEnabled and not compactDashboardMode
 
     f_setCell(dashboard, 0, 3, "Preferred", color.white, panelCellBg)
     f_setCell(dashboard, 1, 3, preferredDirection, color.white, color.new(preferredDirection == "Long" ? bullColor : preferredDirection == "Short" ? bearColor : neutralColor, 15))
-    f_setCell(dashboard, 2, 3, tradeLongSetup, color.white, panelBullBg)
-    f_setCell(dashboard, 3, 3, tradeShortSetup, color.white, panelBearBg)
+    f_setCell(dashboard, 2, 3, longSetupDisplay, color.white, panelBullBg)
+    f_setCell(dashboard, 3, 3, shortSetupDisplay, color.white, panelBearBg)
 
     f_setCell(dashboard, 0, 4, "Valid Zone", color.white, panelCellBg)
     f_setCell(dashboard, 1, 4, "Entry Range", color.white, panelCellBg)
