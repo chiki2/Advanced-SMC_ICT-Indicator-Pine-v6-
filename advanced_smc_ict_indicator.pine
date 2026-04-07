@@ -25,9 +25,6 @@ string asiaSessionWindow = "2000-0000"
 string londonSessionWindow = "0100-0700"
 string nyAmSessionWindow = "0700-1300"
 string nyPmSessionWindow = "1300-1600"
-// Core liquidity families stay active in engine by design.
-bool usePrevSessionInEngine = true
-bool useHigherPeriodLiquidityInEngine = true
 float equalToleranceAtr = 0.10
 
 groupZones = "3. Zones"
@@ -213,9 +210,6 @@ f_breakUp(float level) =>
 
 f_breakDown(float level) =>
     breakMode == "Full Body Through" ? bodyHigh < level : close < level
-
-f_biasText(int bias) =>
-    bias == 1 ? "Bullish" : bias == -1 ? "Bearish" : "Consolidation"
 
 f_biasShort(int bias) =>
     bias == 1 ? "Bull" : bias == -1 ? "Bear" : "Range"
@@ -482,7 +476,7 @@ f_confirmationStateText(bool strictEnabled, bool contextPass, bool killzonePass,
         compactText ? "Ref" : "Refine"
 
 f_setupExecutionState(bool hasSetup, bool invalidated, bool expired, bool chased, bool completed, bool managed, bool baseContextPass, bool confirmationPass, bool mssFresh, bool displacementSeen, bool priceInZone, bool priceNearZone) =>
-    not hasSetup ? "Waiting" : invalidated ? "Invalidated" : expired or chased ? "Expired" : completed ? "Completed" : managed ? "Managed" : not baseContextPass ? "Waiting" : not confirmationPass ? "Confirming" : mssFresh and displacementSeen ? (priceInZone or priceNearZone ? "Active" : "Armed") : "Waiting"
+    not hasSetup ? "Waiting" : completed ? "Completed" : managed ? "Managed" : invalidated ? "Invalidated" : expired or chased ? "Expired" : not baseContextPass ? "Waiting" : not confirmationPass ? "Confirming" : mssFresh and displacementSeen ? (priceInZone or priceNearZone ? "Active" : "Armed") : "Waiting"
 
 f_executionStateCompact(string stateText) =>
     stateText == "Invalidated" ? "Invalid" : stateText == "Expired" ? "Exp" : stateText == "Managed" ? "Mngd" : stateText == "Completed" ? "Done" : stateText == "Confirming" ? "Cfm" : stateText
@@ -494,7 +488,7 @@ f_entryActionText(string statusText) =>
     statusText == "Active" ? "Entry active" : statusText == "Armed" ? "Monitor retest" : statusText == "Confirming" ? "Wait confirm" : statusText == "Managed" ? "Manage trade" : statusText == "Completed" ? "Wait next setup" : statusText == "Expired" or statusText == "Invalidated" ? "Stand down" : "Wait confirmation"
 
 f_dashboardRetired(string executionState, int setupAge, bool touched) =>
-    executionState == "Invalidated" or executionState == "Completed" or (touched and not na(setupAge) and setupAge > setupExpiryBars and not f_executionRiskVisible(executionState) and executionState != "Confirming")
+    executionState == "Invalidated" or executionState == "Completed" or executionState == "Expired" or (touched and not na(setupAge) and setupAge > setupExpiryBars and not f_executionRiskVisible(executionState) and executionState != "Confirming")
 
 f_dashboardDetail(string valueText, bool retired) =>
     retired ? "-" : valueText
@@ -932,6 +926,8 @@ bool sessionVisualsEnabled = displayKillzoneVisual and timeframe.isintraday
 
 if newAsiaSession
     activeAsiaSessionStartBar := bar_index
+if sessionVisualsEnabled and inAsiaSession and na(activeAsiaSessionBox)
+    activeAsiaSessionStartBar := na(activeAsiaSessionStartBar) ? bar_index : activeAsiaSessionStartBar
     [newAsiaSessionBox, newAsiaSessionLabel, newAsiaSessionHighLine, newAsiaSessionLowLine] = f_addSessionVisual("Asia", activeAsiaSessionStartBar, asiaSessionHigh, asiaSessionLow)
     activeAsiaSessionBox := newAsiaSessionBox
     activeAsiaSessionLabel := newAsiaSessionLabel
@@ -939,7 +935,8 @@ if newAsiaSession
     activeAsiaSessionLowLine := newAsiaSessionLowLine
 
 if inAsiaSession
-    f_syncSessionVisual(activeAsiaSessionBox, activeAsiaSessionLabel, activeAsiaSessionHighLine, activeAsiaSessionLowLine, activeAsiaSessionStartBar, asiaSessionHigh, asiaSessionLow, "Asia")
+    if sessionVisualsEnabled
+        f_syncSessionVisual(activeAsiaSessionBox, activeAsiaSessionLabel, activeAsiaSessionHighLine, activeAsiaSessionLowLine, activeAsiaSessionStartBar, asiaSessionHigh, asiaSessionLow, "Asia")
 else if asiaSessionEnded
     activeAsiaSessionBox := na
     activeAsiaSessionLabel := na
@@ -949,6 +946,8 @@ else if asiaSessionEnded
 
 if newLondonSession
     activeLondonSessionStartBar := bar_index
+if sessionVisualsEnabled and inLondonSession and na(activeLondonSessionBox)
+    activeLondonSessionStartBar := na(activeLondonSessionStartBar) ? bar_index : activeLondonSessionStartBar
     [newLondonSessionBox, newLondonSessionLabel, newLondonSessionHighLine, newLondonSessionLowLine] = f_addSessionVisual("London", activeLondonSessionStartBar, londonSessionHigh, londonSessionLow)
     activeLondonSessionBox := newLondonSessionBox
     activeLondonSessionLabel := newLondonSessionLabel
@@ -956,7 +955,8 @@ if newLondonSession
     activeLondonSessionLowLine := newLondonSessionLowLine
 
 if inLondonSession
-    f_syncSessionVisual(activeLondonSessionBox, activeLondonSessionLabel, activeLondonSessionHighLine, activeLondonSessionLowLine, activeLondonSessionStartBar, londonSessionHigh, londonSessionLow, "London")
+    if sessionVisualsEnabled
+        f_syncSessionVisual(activeLondonSessionBox, activeLondonSessionLabel, activeLondonSessionHighLine, activeLondonSessionLowLine, activeLondonSessionStartBar, londonSessionHigh, londonSessionLow, "London")
 else if londonSessionEnded
     activeLondonSessionBox := na
     activeLondonSessionLabel := na
@@ -966,6 +966,8 @@ else if londonSessionEnded
 
 if newNewYorkSessionVisual
     activeNewYorkSessionStartBar := bar_index
+if sessionVisualsEnabled and inNewYorkSessionVisual and na(activeNewYorkSessionBox)
+    activeNewYorkSessionStartBar := na(activeNewYorkSessionStartBar) ? bar_index : activeNewYorkSessionStartBar
     [newNewYorkSessionBox, newNewYorkSessionLabel, newNewYorkSessionHighLine, newNewYorkSessionLowLine] = f_addSessionVisual("New York", activeNewYorkSessionStartBar, newYorkSessionVisualHigh, newYorkSessionVisualLow)
     activeNewYorkSessionBox := newNewYorkSessionBox
     activeNewYorkSessionLabel := newNewYorkSessionLabel
@@ -973,7 +975,8 @@ if newNewYorkSessionVisual
     activeNewYorkSessionLowLine := newNewYorkSessionLowLine
 
 if inNewYorkSessionVisual
-    f_syncSessionVisual(activeNewYorkSessionBox, activeNewYorkSessionLabel, activeNewYorkSessionHighLine, activeNewYorkSessionLowLine, activeNewYorkSessionStartBar, newYorkSessionVisualHigh, newYorkSessionVisualLow, "New York")
+    if sessionVisualsEnabled
+        f_syncSessionVisual(activeNewYorkSessionBox, activeNewYorkSessionLabel, activeNewYorkSessionHighLine, activeNewYorkSessionLowLine, activeNewYorkSessionStartBar, newYorkSessionVisualHigh, newYorkSessionVisualLow, "New York")
 else if newYorkSessionVisualEnded
     activeNewYorkSessionBox := na
     activeNewYorkSessionLabel := na
@@ -1014,14 +1017,14 @@ prevWeekHigh = request.security(syminfo.tickerid, "W", high[1], lookahead=barmer
 prevWeekLow = request.security(syminfo.tickerid, "W", low[1], lookahead=barmerge.lookahead_off)
 prevMonthHigh = request.security(syminfo.tickerid, "M", high[1], lookahead=barmerge.lookahead_off)
 prevMonthLow = request.security(syminfo.tickerid, "M", low[1], lookahead=barmerge.lookahead_off)
-enginePrevSessionHigh = usePrevSessionInEngine ? prevSessionHigh : na
-enginePrevSessionLow = usePrevSessionInEngine ? prevSessionLow : na
-enginePrevDayHigh = useHigherPeriodLiquidityInEngine ? prevDayHigh : na
-enginePrevDayLow = useHigherPeriodLiquidityInEngine ? prevDayLow : na
-enginePrevWeekHigh = useHigherPeriodLiquidityInEngine ? prevWeekHigh : na
-enginePrevWeekLow = useHigherPeriodLiquidityInEngine ? prevWeekLow : na
-enginePrevMonthHigh = useHigherPeriodLiquidityInEngine ? prevMonthHigh : na
-enginePrevMonthLow = useHigherPeriodLiquidityInEngine ? prevMonthLow : na
+enginePrevSessionHigh = prevSessionHigh
+enginePrevSessionLow = prevSessionLow
+enginePrevDayHigh = prevDayHigh
+enginePrevDayLow = prevDayLow
+enginePrevWeekHigh = prevWeekHigh
+enginePrevWeekLow = prevWeekLow
+enginePrevMonthHigh = prevMonthHigh
+enginePrevMonthLow = prevMonthLow
 
 //------------------------------------------------------------------------------
 // Pivot-based market structure
@@ -1347,11 +1350,13 @@ if not na(bullLegStartBar) and trendBias == 1
     bullLegLow := na(bullLegLow) ? low : math.min(bullLegLow, low)
     bullLegHigh := na(bullLegHigh) ? high : math.max(bullLegHigh, high)
     bullLegEndBar := bar_index
+    bullNarrativeEndBar := bar_index
 
 if not na(bearLegStartBar) and trendBias == -1
     bearLegHigh := na(bearLegHigh) ? high : math.max(bearLegHigh, high)
     bearLegLow := na(bearLegLow) ? low : math.min(bearLegLow, low)
     bearLegEndBar := bar_index
+    bearNarrativeEndBar := bar_index
 
 //------------------------------------------------------------------------------
 // Order block qualification from a single strict leg: sweep -> displacement/FVG -> BOS
