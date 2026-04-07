@@ -260,6 +260,8 @@ Menunjukkan:
 Cara baca:
 - gunakan sebagai pembanding antar setup
 - jangan dipakai sendirian tanpa struktur dan session context
+- jika sisi tertentu sudah `Invalidated` atau `Completed`, detail ini bisa diredam menjadi `-`
+- pada compact mode, label `Ctx L/S` berarti angka yang tampil masih context strength, belum setup yang actionable
 
 ### Draw / TP
 
@@ -309,7 +311,7 @@ Kolom Long/Short pada baris ini sekarang menunjukkan status konfirmasi:
 ### Next
 
 Menunjukkan:
-- mode visual
+- mode efektif
 - pasangan timeframe execution / context / narrative
 - status OTE
 - aksi berikutnya yang disarankan model
@@ -322,6 +324,12 @@ Contoh:
 - `Wait next setup`
 
 Ini adalah ringkasan aksi praktis paling cepat dibaca.
+
+Jika Anda melihat teks seperti:
+- `Eff Focused`
+- `Eff Minimal`
+
+itu berarti yang ditampilkan adalah mode visual efektif setelah profile diterapkan, bukan sekadar nilai input mentah.
 
 ## Cara Membaca Dashboard Compact
 
