@@ -2,6 +2,8 @@
 
 Panduan ini ditulis untuk membantu trader memakai `Advanced SMC / ICT Indicator` tanpa harus membaca kode.
 
+Jika Anda ingin versi sangat singkat dan lebih visual, lihat [TRADER_CHEAT_SHEET.md](./TRADER_CHEAT_SHEET.md).
+
 ## Tujuan Indikator
 
 Indikator ini membantu membaca:
@@ -21,14 +23,37 @@ Indikator ini bukan mesin kepastian. Fungsinya adalah merapikan konteks supaya t
 ## Cara Mulai Cepat
 
 Untuk pemakaian paling mudah:
-- pilih preset `Intraday` untuk chart desktop
-- pilih preset `Android` jika layar kecil
+- pilih profile `Standard` untuk chart desktop
+- pilih profile `Compact` jika layar kecil
 - nyalakan `Show context dashboard`
 - nyalakan `Show trading sessions on chart`
 
 Jika ingin paling ketat ala ICT:
-- aktifkan `Strict ICT Entry mode`
+- pilih profile `Strict Confirm`
 - biarkan `Show active OTE overlay` tetap hidup
+
+Timeframe eksekusi yang didukung:
+- `M1`
+- `M5`
+- `M15`
+- `M30`
+
+Di luar timeframe itu, indikator berhenti agar tetap jujur sebagai intraday setup engine.
+
+## Struktur Panel Input
+
+Panel input sekarang dibagi ringkas menjadi:
+- `Profile`
+- `Structure`
+- `Liquidity`
+- `Zones`
+- `Context`
+- `Dashboard`
+- `Risk`
+
+Prinsipnya:
+- yang terlihat di panel adalah keputusan trader-facing
+- parameter engine internal sudah dibekukan di kode agar tidak mendorong bias dan overtuning
 
 ## Cara Membaca Chart
 
@@ -110,6 +135,25 @@ Cara membacanya:
 Prinsip:
 - jangan anggap semua box adalah entry
 - utamakan zona yang searah dengan struktur, bias, dan session context
+- dalam profile `Strict Confirm`, indikator sekarang memprioritaskan `IRL/FVG` dulu
+- jika tidak ada `IRL` yang valid, `OB` dipakai sebagai fallback POI
+
+Jika nama setup di dashboard diikuti:
+- `Q1`
+- `Q2`
+- `Q3`
+
+itu berarti `Quality tier` zona:
+- `Q1` = kualitas dasar
+- `Q2` = kualitas menengah
+- `Q3` = kualitas terbaik
+
+Tier ini dibangun dari:
+- response zona
+- displacement
+- ATR expansion
+
+Jadi `Q` membantu menilai mutu setup, tetapi bukan jaminan entry.
 
 ## 5. Dealing Range dan Decision Bands
 
@@ -173,6 +217,7 @@ Menunjukkan execution state sisi long dan short.
 
 State yang umum:
 - `Waiting` = belum ada alasan entry
+- `Confirming` = setup ada, tetapi konfirmasi strict belum lengkap
 - `Armed` = setup mulai siap, tunggu retest / trigger
 - `Active` = entry sedang aktif / sangat dekat
 - `Managed` = trade sudah berjalan, fokus kelola
@@ -210,12 +255,17 @@ Jika `Wait`, artinya chart belum memberi setup yang cukup bersih.
 ### Z / E
 
 Menunjukkan:
-- `Z` = valid zone / range entry
+- `Z` = valid `POI` / zone
 - `E` = level entry
 
 Gunanya:
 - trader bisa melihat area valid
 - lalu melihat trigger price yang sedang dipakai model
+
+Catatan:
+- `POI` = `Point of Interest`
+- dalam strict mode, `POI` yang paling disukai adalah `IRL/FVG`
+- `OB` tetap bisa dipakai jika tidak ada `IRL` yang lebih layak
 
 ### SL / TP
 
@@ -236,14 +286,21 @@ Menunjukkan:
 Cara baca:
 - gunakan sebagai pembanding antar setup
 - jangan dipakai sendirian tanpa struktur dan session context
+- jika sisi tertentu sudah `Invalidated` atau `Completed`, detail ini bisa diredam menjadi `-`
+- pada compact mode, label `Ctx L/S` berarti angka yang tampil masih context strength, belum setup yang actionable
 
 ### Draw / TP
 
 Menunjukkan:
-- `Draw` = external draw / target eksternal utama
+- `Draw` = `DOL` / target liquidity utama
 - `TP` = probabilitas model rule-based
 
 Ini membantu melihat apakah target dekat / jauh dan seberapa kuat kualitas setup.
+
+Cara baca:
+- `DOL` = `Draw on Liquidity`
+- jika ada level liquidity yang jelas di atas/bawah harga, indikator akan memakainya
+- jika tidak ada `DOL` yang layak, strict confirmation tidak akan semudah itu memberi status siap entry
 
 ### Life
 
@@ -260,12 +317,13 @@ Maknanya:
 
 Semakin tua setup, biasanya semakin lemah.
 
-### Sess
+### Sess/Cfm
 
 Menunjukkan:
 - mode session otomatis
 - source session yang sedang dipakai
 - timezone basis session
+- status konfirmasi long dan short
 
 Contoh:
 - `A-ICT LDN>AS | NY TZ`
@@ -275,14 +333,22 @@ Artinya:
 - previous source yang dipakai adalah Asia
 - pembacaan sesi berbasis New York time
 
-Kolom Long/Short di baris ini menunjukkan ringkasan map arah sesi untuk masing-masing sisi.
+Kolom Long/Short pada baris ini sekarang menunjukkan status konfirmasi:
+- `Standard` = profile standard, tanpa strict confirmation
+- `Refine` = context belum cukup rapi
+- `KZ Wait` = context sudah baik, menunggu timing killzone
+- `Ready` = konfirmasi strict sudah lengkap
+
+Dalam strict mode, ringkasan ini juga membawa jalur setup singkat:
+- `IRL > DOL` = paling dekat ke flow ICT yang dicari indikator
+- `OB > DOL` = setup masih valid, tetapi POI yang dipakai adalah order block fallback
 
 ### Next
 
 Menunjukkan:
-- mode visual
+- mode efektif
+- pasangan timeframe execution / context / narrative
 - status OTE
-- status killzone
 - aksi berikutnya yang disarankan model
 
 Contoh:
@@ -294,6 +360,12 @@ Contoh:
 
 Ini adalah ringkasan aksi praktis paling cepat dibaca.
 
+Jika Anda melihat teks seperti:
+- `Eff Focused`
+- `Eff Minimal`
+
+itu berarti yang ditampilkan adalah mode visual efektif setelah profile diterapkan, bukan sekadar nilai input mentah.
+
 ## Cara Membaca Dashboard Compact
 
 Dashboard compact dipakai untuk layar kecil.
@@ -304,7 +376,7 @@ Row penting:
 - `Zone`
 - `E / SL / TP`
 - `Exec`
-- `R / Draw`
+- `R / DOL`
 - `Life`
 - `Mode`
 - `Sessions`
@@ -312,6 +384,12 @@ Row penting:
 Prinsip pakai:
 - compact mode dipakai untuk keputusan cepat
 - jika butuh detail penuh, lihat dashboard full
+
+Catatan penting:
+- jika compact menulis setup seperti `Bullish OB | Q2 | Ctx`, artinya ada kandidat setup yang sedang terbentuk
+- `Ctx` berarti setup itu masih `context-only`, belum actionable untuk entry
+- selama `Zone` dan `E / SL / TP` masih `-`, trader sebaiknya tetap membaca itu sebagai fase scan
+- `R / DOL` berarti `Reward / Draw on Liquidity`
 
 ## Workflow Praktis
 
@@ -324,21 +402,28 @@ Gunakan indikator dengan urutan ini:
 - sesi apa yang sedang aktif
 - previous source apa yang sedang dipakai
 
-3. Lihat `Pref`
+3. Cari `ERL` yang disapu
+- swing high / low
+- EQH / EQL
+- session high / low
+- PDH / PDL / PWH / PWL bila relevan
+
+4. Lihat `Pref`
 - apakah indikator lebih condong ke long, short, atau wait
 
-4. Lihat chart
+5. Lihat chart
 - apakah ada OB / FVG terpilih
 - apakah harga berada di premium atau discount
 - apakah ada sweep / MSS
 
-5. Lihat `Exec`
+6. Lihat `Exec`
 - `Waiting` = belum trade
+- `Confirming` = ada setup, tunggu konfirmasi strict
 - `Armed` = mulai fokus
 - `Active` = entry bisa valid
 - `Managed` = kelola trade, bukan cari entry baru
 
-6. Lihat `SL / TP` dan `RR / Cf`
+7. Lihat `SL / TP`, `RR / Cf`, dan `Draw / TP`
 - pastikan jarak stop dan target masih masuk akal
 
 ## Cara Pakai yang Sehat
@@ -377,16 +462,16 @@ Karena visual chart sudah disederhanakan:
 ## Rekomendasi Pemakaian
 
 Untuk desktop:
-- preset `Intraday`
+- profile `Standard`
 - dashboard full
 - session visual aktif
 
 Untuk layar kecil:
-- preset `Android`
+- profile `Compact`
 - compact dashboard
 
 Untuk trader ICT yang lebih ketat:
-- aktifkan `Strict ICT Entry mode`
+- pilih profile `Strict Confirm`
 - gunakan OTE sebagai konfirmasi tambahan, bukan alasan tunggal
 
 ## Penutup
