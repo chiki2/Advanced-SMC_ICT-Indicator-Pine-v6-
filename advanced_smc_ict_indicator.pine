@@ -288,14 +288,24 @@ f_zoneResponseScore(bool touched, bool fresh, bool managed, bool priceInZone, bo
 f_zoneDisplacementScore(bool displacementSeen) =>
     displacementSeen ? 2 : 0
 
-f_zoneAtrExpansionScore(float departureRange, float atrLevel) =>
-    na(departureRange) or na(atrLevel) or atrLevel <= 0 ? 0 : departureRange >= atrLevel * zoneExpansionStrongAtr ? 2 : departureRange >= atrLevel * zoneExpansionNormalAtr ? 1 : 0
+f_regimeBias(int structureBias, float htfPrice, float htfTrendBase, float htfPastPrice) =>
+    bool bullRegime = not na(htfPrice) and not na(htfTrendBase) and not na(htfPastPrice) and htfPrice > htfTrendBase and htfPrice > htfPastPrice
+    bool bearRegime = not na(htfPrice) and not na(htfTrendBase) and not na(htfPastPrice) and htfPrice < htfTrendBase and htfPrice < htfPastPrice
+    structureBias == 1 and bullRegime ? 1 : structureBias == -1 and bearRegime ? -1 : 0
 
-f_zoneQualityTier(bool hasSetup, int responseScore, int displacementScore, int atrExpansionScore) =>
-    not hasSetup ? "-" : responseScore + displacementScore + atrExpansionScore >= 5 ? "Q3" : responseScore + displacementScore + atrExpansionScore >= 3 ? "Q2" : "Q1"
+f_regimeStrength(int regimeBias, float htfPrice, float htfTrendBase, float htfPastPrice) =>
+    if regimeBias == 1
+        htfPrice > htfTrendBase and htfPrice > htfPastPrice and htfTrendBase > htfPastPrice ? "Strong" : "Normal"
+    else if regimeBias == -1
+        htfPrice < htfTrendBase and htfPrice < htfPastPrice and htfTrendBase < htfPastPrice ? "Strong" : "Normal"
+    else
+        "Neutral"
 
-f_setupQualityText(string setupText, string qualityTier, bool hasSetup) =>
-    hasSetup ? setupText + " | " + qualityTier : setupText
+f_regimeSummary(int regimeBias, string regimeStrength) =>
+    regimeBias == 1 ? "Bull " + regimeStrength : regimeBias == -1 ? "Bear " + regimeStrength : "Neutral"
+
+f_statusCompact(string statusText) =>
+    statusText == "Valid now" ? "Valid" : statusText == "Strict Ready" ? "Ready" : statusText == "Invalidated" ? "Invalid" : statusText == "Standby" ? "Standby" : statusText == "Managed" ? "Mngd" : statusText == "Replaced" ? "Newer" : statusText == "Expired" ? "Exp" : statusText == "Chased" ? "Chased" : statusText == "Filtered" ? "Filter" : statusText == "Wait KZ" ? "WaitKZ" : statusText
 
 f_zoneTouched(float zoneTop, float zoneBottom) =>
     not na(zoneTop) and not na(zoneBottom) and high >= zoneBottom and low <= zoneTop
@@ -1572,7 +1582,11 @@ else
     htfStructureLow := na
     htfBias := 0
 
-activeBias = trendBias
+int regimeBias = htfContextReady ? f_regimeBias(htfBias, htfClose, htfTrendBase, htfPastClose) : 0
+string regimeStrength = htfContextReady ? f_regimeStrength(regimeBias, htfClose, htfTrendBase, htfPastClose) : "Neutral"
+string regimeSummary = htfContextReady ? f_regimeSummary(regimeBias, regimeStrength) : "HTF Guard"
+
+activeBias = not na(lastStructureBreakBar) and (bar_index - lastStructureBreakBar) > consolidationBars ? 0 : trendBias
 strictKillzoneActive = timeframe.isintraday and not na(time(timeframe.period, strictKillzoneSession, ictSessionTimezone))
 liquiditySessionSummary = "A-ICT " + f_sessionCode(currentSessionBlock) + ">" + f_sessionCode(liquiditySessionLabel)
 timezoneSummary = "NY TZ"
@@ -2404,10 +2418,10 @@ bgcolor(chartBackdrop)
 //------------------------------------------------------------------------------
 // Dashboard
 //------------------------------------------------------------------------------
-var table dashboard = table.new(position.top_right, 4, 11, border_width=1)
+var table dashboard = table.new(position.top_right, 4, 15, border_width=1)
 var table dashboardCompact = table.new(position.bottom_right, 2, 11, border_width=1)
 
-if barstate.islast and dashboardEnabled and not compactDashboardMode
+if barstate.islast and showDashboard and not compactDashboardMode
     table.clear(dashboardCompact, 0, 0, 1, 10)
     f_setCell(dashboard, 0, 0, "Field", color.white, panelHeaderBg)
     f_setCell(dashboard, 1, 0, "Market", color.white, panelHeaderBg)
@@ -2489,4 +2503,4 @@ else if barstate.islast and dashboardEnabled and compactDashboardMode
     f_setCell(dashboardCompact, 1, 10, sessionConfirmMarketSummary, color.white, panelCellBg)
 else if barstate.islast and not dashboardEnabled
     table.clear(dashboardCompact, 0, 0, 1, 10)
-    table.clear(dashboard, 0, 0, 3, 10)
+    table.clear(dashboard, 0, 0, 3, 14)
