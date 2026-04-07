@@ -19,8 +19,8 @@ int engineDisplacementLookback = 10
 
 groupLiquidity = "2. Liquidity"
 showLiquidity = input.bool(true, "Show liquidity pools", group=groupLiquidity)
-showPrevSession = input.bool(true, "Use + show previous source high / low", group=groupLiquidity)
-showHigherPeriodLiquidity = input.bool(true, "Use + show previous day / week / month high / low", group=groupLiquidity)
+showPrevSession = input.bool(true, "Use previous source high / low in engine", group=groupLiquidity)
+showHigherPeriodLiquidity = input.bool(true, "Use previous day / week / month high / low in engine", group=groupLiquidity)
 showInternalRange = input.bool(true, "Show internal range liquidity", group=groupLiquidity)
 showSweeps = input.bool(true, "Show liquidity sweep markers", group=groupLiquidity)
 string liquiditySessionMode = "Auto ICT"
@@ -126,7 +126,7 @@ decisionPremiumFillColor = color.new(color.rgb(177, 58, 58), 92)
 decisionDiscountFillColor = color.new(color.rgb(33, 140, 96), 92)
 decisionEqColor = color.new(color.rgb(65, 126, 214), 10)
 overlayLineDisplay = display.all - display.price_scale - display.status_line
-int maxSessionVisuals = 12
+int maxSessionVisuals = 6
 
 atr = ta.atr(14)
 bodyHigh = math.max(open, close)
@@ -151,7 +151,6 @@ displayInternalRange = showInternalRange and not (compactMode and mobileHideInte
 displayEqLiquidity = showLiquidity and not (compactMode and mobileHideEqLiquidity)
 displaySweepMarkers = showLiquidity and showSweeps
 displayTrendBackground = showTrendBackground and not (compactMode and mobileHideTrendBackground)
-displayWeekMonthLiquidity = showHigherPeriodLiquidity and not (compactMode and mobileHideSecondaryLiquidity)
 displayProtectedLevels = showProtectedLevelsEffective
 displayDealingRange = displayInternalRange
 displayLiquidityRightLabels = showLiquidityRightLabelsEffective and not (compactMode and mobileHideLiquidityRightLabels)
@@ -197,8 +196,8 @@ var bool[] pivotStructureIsHigh = array.new_bool()
 var box[] sessionRangeBoxes = array.new_box()
 var label[] sessionRangeLabels = array.new_label()
 var string[] sessionRangeNames = array.new_string()
-var label prevSessionHighLabel = na
-var label prevSessionLowLabel = na
+var line[] sessionRangeHighLines = array.new_line()
+var line[] sessionRangeLowLines = array.new_line()
 var label protectedHighLabel = na
 var label protectedLowLabel = na
 var label htfHighLabel = na
@@ -207,12 +206,18 @@ var label longStopLabel = na
 var label shortStopLabel = na
 var box activeAsiaSessionBox = na
 var label activeAsiaSessionLabel = na
+var line activeAsiaSessionHighLine = na
+var line activeAsiaSessionLowLine = na
 var int activeAsiaSessionStartBar = na
 var box activeLondonSessionBox = na
 var label activeLondonSessionLabel = na
+var line activeLondonSessionHighLine = na
+var line activeLondonSessionLowLine = na
 var int activeLondonSessionStartBar = na
 var box activeNewYorkSessionBox = na
 var label activeNewYorkSessionLabel = na
+var line activeNewYorkSessionHighLine = na
+var line activeNewYorkSessionLowLine = na
 var int activeNewYorkSessionStartBar = na
 
 f_breakUp(float level) =>
@@ -465,6 +470,9 @@ f_sessionBorderColor(string sessionName) =>
 f_sessionTextColor(string sessionName) =>
     color.new(f_sessionBorderColor(sessionName), compactMode ? 32 : 46)
 
+f_sessionLineColor(string sessionName, bool isHigh) =>
+    color.new(f_sessionBorderColor(sessionName), isHigh ? 8 : 18)
+
 f_setCell(table targetTable, int col, int row, string cellText, color textClr, color bgClr) =>
     table.cell(targetTable, col, row, cellText, text_color=textClr, bgcolor=bgClr, text_size=compactDashboardMode ? size.small : size.normal)
 
@@ -479,10 +487,6 @@ f_entryActionText(string statusText) =>
 
 f_biasSummary(int currentBias, bool htfReady, int higherBias, int regimeBias, string regimeStrength) =>
     f_biasShort(currentBias) + "/" + (htfReady ? f_biasShort(higherBias) : "G") + "/R" + f_biasShort(regimeBias) + " " + f_regimeStrengthShort(regimeStrength)
-
-f_prevSourceShortLabel(string sourceLabel, bool isHigh) =>
-    string sourceCode = sourceLabel == "Asia" ? "AS" : sourceLabel == "London" ? "LDN" : sourceLabel == "New York AM" ? "NYA" : sourceLabel == "New York PM" ? "NYP" : "NYC"
-    sourceCode + (isHigh ? " H" : " L")
 
 f_zoneVisibleByMode(string mode, bool isSelected, bool isBull, string preferredDirection, bool useLongPreference) =>
     mode == "Full" ? true : mode == "Focused" or preferredDirection == "Balanced" ? isSelected : preferredDirection == "Wait" ? isSelected : useLongPreference ? (isBull and isSelected) : (not isBull and isSelected)
@@ -518,10 +522,16 @@ f_trimSessionVisuals() =>
         oldBox = array.shift(sessionRangeBoxes)
         oldLabel = array.shift(sessionRangeLabels)
         array.shift(sessionRangeNames)
+        oldHighLine = array.shift(sessionRangeHighLines)
+        oldLowLine = array.shift(sessionRangeLowLines)
         if not na(oldBox)
             box.delete(oldBox)
         if not na(oldLabel)
             label.delete(oldLabel)
+        if not na(oldHighLine)
+            line.delete(oldHighLine)
+        if not na(oldLowLine)
+            line.delete(oldLowLine)
 
 f_addSessionVisual(string sessionName, int leftBar, float sessionHigh, float sessionLow) =>
     int safeLeftBar = f_safeBarIndexX(leftBar)
@@ -529,19 +539,31 @@ f_addSessionVisual(string sessionName, int leftBar, float sessionHigh, float ses
     color borderColor = f_sessionBorderColor(sessionName)
     box newBox = box.new(left=safeLeftBar, top=sessionHigh, right=bar_index, bottom=sessionLow, xloc=xloc.bar_index, bgcolor=fillColor, border_color=borderColor)
     label newLabel = label.new(x=f_safeBarIndexX(int(math.floor((safeLeftBar + bar_index) * 0.5))), y=f_zoneMid(sessionHigh, sessionLow), xloc=xloc.bar_index, text=f_sessionVisualLabel(sessionName), style=label.style_none, color=color.new(color.black, 100), textcolor=f_sessionTextColor(sessionName), size=compactMode ? size.small : size.normal)
+    line newHighLine = line.new(x1=safeLeftBar, y1=sessionHigh, x2=bar_index, y2=sessionHigh, xloc=xloc.bar_index, color=f_sessionLineColor(sessionName, true), width=1, style=line.style_dotted)
+    line newLowLine = line.new(x1=safeLeftBar, y1=sessionLow, x2=bar_index, y2=sessionLow, xloc=xloc.bar_index, color=f_sessionLineColor(sessionName, false), width=1, style=line.style_dotted)
     array.push(sessionRangeBoxes, newBox)
     array.push(sessionRangeLabels, newLabel)
     array.push(sessionRangeNames, sessionName)
+    array.push(sessionRangeHighLines, newHighLine)
+    array.push(sessionRangeLowLines, newLowLine)
     f_trimSessionVisuals()
-    [newBox, newLabel]
+    [newBox, newLabel, newHighLine, newLowLine]
 
-f_syncSessionVisual(box currentBox, label currentLabel, int leftBar, float sessionHigh, float sessionLow, string sessionName) =>
+f_syncSessionVisual(box currentBox, label currentLabel, line currentHighLine, line currentLowLine, int leftBar, float sessionHigh, float sessionLow, string sessionName) =>
     if not na(currentBox) and not na(sessionHigh) and not na(sessionLow)
-        int safeLeftBar = f_safeBarIndexX(leftBar)
-        box.set_left(currentBox, safeLeftBar)
+        int safeBoxLeftBar = f_safeBarIndexX(leftBar)
+        box.set_left(currentBox, safeBoxLeftBar)
         box.set_right(currentBox, bar_index)
         box.set_top(currentBox, sessionHigh)
         box.set_bottom(currentBox, sessionLow)
+    if not na(currentHighLine) and not na(sessionHigh)
+        int safeHighLineLeftBar = f_safeBarIndexX(leftBar)
+        line.set_xy1(currentHighLine, safeHighLineLeftBar, sessionHigh)
+        line.set_xy2(currentHighLine, bar_index, sessionHigh)
+    if not na(currentLowLine) and not na(sessionLow)
+        int safeLowLineLeftBar = f_safeBarIndexX(leftBar)
+        line.set_xy1(currentLowLine, safeLowLineLeftBar, sessionLow)
+        line.set_xy2(currentLowLine, bar_index, sessionLow)
     if not na(currentLabel) and not na(sessionHigh) and not na(sessionLow)
         label.set_x(currentLabel, f_safeBarIndexX(int(math.floor((leftBar + bar_index) * 0.5))))
         label.set_y(currentLabel, f_zoneMid(sessionHigh, sessionLow))
@@ -914,41 +936,53 @@ bool sessionVisualsEnabled = displayKillzoneVisual and timeframe.isintraday
 
 if newAsiaSession
     activeAsiaSessionStartBar := bar_index
-    [newAsiaSessionBox, newAsiaSessionLabel] = f_addSessionVisual("Asia", activeAsiaSessionStartBar, asiaSessionHigh, asiaSessionLow)
+    [newAsiaSessionBox, newAsiaSessionLabel, newAsiaSessionHighLine, newAsiaSessionLowLine] = f_addSessionVisual("Asia", activeAsiaSessionStartBar, asiaSessionHigh, asiaSessionLow)
     activeAsiaSessionBox := newAsiaSessionBox
     activeAsiaSessionLabel := newAsiaSessionLabel
+    activeAsiaSessionHighLine := newAsiaSessionHighLine
+    activeAsiaSessionLowLine := newAsiaSessionLowLine
 
 if inAsiaSession
-    f_syncSessionVisual(activeAsiaSessionBox, activeAsiaSessionLabel, activeAsiaSessionStartBar, asiaSessionHigh, asiaSessionLow, "Asia")
+    f_syncSessionVisual(activeAsiaSessionBox, activeAsiaSessionLabel, activeAsiaSessionHighLine, activeAsiaSessionLowLine, activeAsiaSessionStartBar, asiaSessionHigh, asiaSessionLow, "Asia")
 else if asiaSessionEnded
     activeAsiaSessionBox := na
     activeAsiaSessionLabel := na
+    activeAsiaSessionHighLine := na
+    activeAsiaSessionLowLine := na
     activeAsiaSessionStartBar := na
 
 if newLondonSession
     activeLondonSessionStartBar := bar_index
-    [newLondonSessionBox, newLondonSessionLabel] = f_addSessionVisual("London", activeLondonSessionStartBar, londonSessionHigh, londonSessionLow)
+    [newLondonSessionBox, newLondonSessionLabel, newLondonSessionHighLine, newLondonSessionLowLine] = f_addSessionVisual("London", activeLondonSessionStartBar, londonSessionHigh, londonSessionLow)
     activeLondonSessionBox := newLondonSessionBox
     activeLondonSessionLabel := newLondonSessionLabel
+    activeLondonSessionHighLine := newLondonSessionHighLine
+    activeLondonSessionLowLine := newLondonSessionLowLine
 
 if inLondonSession
-    f_syncSessionVisual(activeLondonSessionBox, activeLondonSessionLabel, activeLondonSessionStartBar, londonSessionHigh, londonSessionLow, "London")
+    f_syncSessionVisual(activeLondonSessionBox, activeLondonSessionLabel, activeLondonSessionHighLine, activeLondonSessionLowLine, activeLondonSessionStartBar, londonSessionHigh, londonSessionLow, "London")
 else if londonSessionEnded
     activeLondonSessionBox := na
     activeLondonSessionLabel := na
+    activeLondonSessionHighLine := na
+    activeLondonSessionLowLine := na
     activeLondonSessionStartBar := na
 
 if newNewYorkSessionVisual
     activeNewYorkSessionStartBar := bar_index
-    [newNewYorkSessionBox, newNewYorkSessionLabel] = f_addSessionVisual("New York", activeNewYorkSessionStartBar, newYorkSessionVisualHigh, newYorkSessionVisualLow)
+    [newNewYorkSessionBox, newNewYorkSessionLabel, newNewYorkSessionHighLine, newNewYorkSessionLowLine] = f_addSessionVisual("New York", activeNewYorkSessionStartBar, newYorkSessionVisualHigh, newYorkSessionVisualLow)
     activeNewYorkSessionBox := newNewYorkSessionBox
     activeNewYorkSessionLabel := newNewYorkSessionLabel
+    activeNewYorkSessionHighLine := newNewYorkSessionHighLine
+    activeNewYorkSessionLowLine := newNewYorkSessionLowLine
 
 if inNewYorkSessionVisual
-    f_syncSessionVisual(activeNewYorkSessionBox, activeNewYorkSessionLabel, activeNewYorkSessionStartBar, newYorkSessionVisualHigh, newYorkSessionVisualLow, "New York")
+    f_syncSessionVisual(activeNewYorkSessionBox, activeNewYorkSessionLabel, activeNewYorkSessionHighLine, activeNewYorkSessionLowLine, activeNewYorkSessionStartBar, newYorkSessionVisualHigh, newYorkSessionVisualLow, "New York")
 else if newYorkSessionVisualEnded
     activeNewYorkSessionBox := na
     activeNewYorkSessionLabel := na
+    activeNewYorkSessionHighLine := na
+    activeNewYorkSessionLowLine := na
     activeNewYorkSessionStartBar := na
 
 if array.size(sessionRangeBoxes) > 0
@@ -956,12 +990,22 @@ if array.size(sessionRangeBoxes) > 0
         sessionBox = array.get(sessionRangeBoxes, i)
         sessionLabel = array.get(sessionRangeLabels, i)
         sessionName = array.get(sessionRangeNames, i)
+        sessionHighLine = array.get(sessionRangeHighLines, i)
+        sessionLowLine = array.get(sessionRangeLowLines, i)
         fillColor = sessionVisualsEnabled ? f_sessionFillColor(sessionName) : color.new(color.black, 100)
         borderColor = sessionVisualsEnabled ? f_sessionBorderColor(sessionName) : color.new(color.black, 100)
         textColor = sessionVisualsEnabled ? f_sessionTextColor(sessionName) : color.new(color.white, 100)
+        highLineColor = sessionVisualsEnabled ? f_sessionLineColor(sessionName, true) : color.new(color.black, 100)
+        lowLineColor = sessionVisualsEnabled ? f_sessionLineColor(sessionName, false) : color.new(color.black, 100)
         if not na(sessionBox)
             box.set_bgcolor(sessionBox, fillColor)
             box.set_border_color(sessionBox, borderColor)
+        if not na(sessionHighLine)
+            line.set_x2(sessionHighLine, bar_index)
+            line.set_color(sessionHighLine, highLineColor)
+        if not na(sessionLowLine)
+            line.set_x2(sessionLowLine, bar_index)
+            line.set_color(sessionLowLine, lowLineColor)
         if not na(sessionLabel)
             label.set_text(sessionLabel, f_sessionVisualLabel(sessionName))
             label.set_textcolor(sessionLabel, textColor)
@@ -2100,9 +2144,9 @@ bearStop = not na(tradeShortStop) ? tradeShortStop : not na(lastSwingHigh) ? las
 // Retired FVG / deleted OB / swept EQH-EQL:
 //   Engine: remove / deactivate
 //   Visual: never show
-// Liquidity targets (session/day/week/month/EQH/EQL):
-//   Full: show all active references
-//   Focused / Minimal: show nearest selected target + one primary external draw
+// Liquidity targets:
+//   Session/calendar liquidity stays engine-only
+//   Chart uses session range boxes + extended H/L lines instead
 // Context ranges:
 //   Full / Focused: show
 //   Minimal: hide except protected level and active OTE
@@ -2113,33 +2157,11 @@ primaryExternalDrawLevel = compactUseLong ? longExternalDraw : shortExternalDraw
 compactRrDrawDisplay := compactNeutral ? "-" : f_formatRr(compactRr) + " | " + f_formatLevel(primaryExternalDrawLevel)
 string longDrawTpSummary = f_formatLevel(longExternalDraw) + " | " + f_formatPercent(longTpProbability)
 string shortDrawTpSummary = f_formatLevel(shortExternalDraw) + " | " + f_formatPercent(shortTpProbability)
-targetPrevSessionHigh = f_preferredLevelMatch(prevSessionHigh, compactBalanced, compactUseLong, tradeLongTarget, tradeShortTarget)
-targetPrevSessionLow = f_preferredLevelMatch(prevSessionLow, compactBalanced, compactUseLong, tradeLongTarget, tradeShortTarget)
-targetPrevDayHigh = f_preferredLevelMatch(prevDayHigh, compactBalanced, compactUseLong, tradeLongTarget, tradeShortTarget)
-targetPrevDayLow = f_preferredLevelMatch(prevDayLow, compactBalanced, compactUseLong, tradeLongTarget, tradeShortTarget)
-targetPrevWeekHigh = f_preferredLevelMatch(prevWeekHigh, compactBalanced, compactUseLong, tradeLongTarget, tradeShortTarget)
-targetPrevWeekLow = f_preferredLevelMatch(prevWeekLow, compactBalanced, compactUseLong, tradeLongTarget, tradeShortTarget)
-targetPrevMonthHigh = f_preferredLevelMatch(prevMonthHigh, compactBalanced, compactUseLong, tradeLongTarget, tradeShortTarget)
-targetPrevMonthLow = f_preferredLevelMatch(prevMonthLow, compactBalanced, compactUseLong, tradeLongTarget, tradeShortTarget)
 targetEqHigh = f_preferredLevelMatch(activeEqh, compactBalanced, compactUseLong, tradeLongTarget, tradeShortTarget)
 targetEqLow = f_preferredLevelMatch(activeEql, compactBalanced, compactUseLong, tradeLongTarget, tradeShortTarget)
-drawPrevDayHigh = f_preferredLevelMatch(prevDayHigh, compactBalanced, compactUseLong, longExternalDraw, shortExternalDraw)
-drawPrevDayLow = f_preferredLevelMatch(prevDayLow, compactBalanced, compactUseLong, longExternalDraw, shortExternalDraw)
-drawPrevWeekHigh = f_preferredLevelMatch(prevWeekHigh, compactBalanced, compactUseLong, longExternalDraw, shortExternalDraw)
-drawPrevWeekLow = f_preferredLevelMatch(prevWeekLow, compactBalanced, compactUseLong, longExternalDraw, shortExternalDraw)
-drawPrevMonthHigh = f_preferredLevelMatch(prevMonthHigh, compactBalanced, compactUseLong, longExternalDraw, shortExternalDraw)
-drawPrevMonthLow = f_preferredLevelMatch(prevMonthLow, compactBalanced, compactUseLong, longExternalDraw, shortExternalDraw)
 drawHtfHigh = f_preferredLevelMatch(htfStructureHigh, compactBalanced, compactUseLong, longExternalDraw, shortExternalDraw)
 drawHtfLow = f_preferredLevelMatch(htfStructureLow, compactBalanced, compactUseLong, longExternalDraw, shortExternalDraw)
 
-showPrevSessionHighVisual = showLiquidity and showPrevSession and f_targetVisualByMode(effectiveZoneDisplayMode, targetPrevSessionHigh)
-showPrevSessionLowVisual = showLiquidity and showPrevSession and f_targetVisualByMode(effectiveZoneDisplayMode, targetPrevSessionLow)
-showPrevDayHighVisual = showLiquidity and showHigherPeriodLiquidity and f_targetVisualByMode(effectiveZoneDisplayMode, targetPrevDayHigh or drawPrevDayHigh)
-showPrevDayLowVisual = showLiquidity and showHigherPeriodLiquidity and f_targetVisualByMode(effectiveZoneDisplayMode, targetPrevDayLow or drawPrevDayLow)
-showPrevWeekHighVisual = showLiquidity and displayWeekMonthLiquidity and f_targetVisualByMode(effectiveZoneDisplayMode, targetPrevWeekHigh or drawPrevWeekHigh)
-showPrevWeekLowVisual = showLiquidity and displayWeekMonthLiquidity and f_targetVisualByMode(effectiveZoneDisplayMode, targetPrevWeekLow or drawPrevWeekLow)
-showPrevMonthHighVisual = showLiquidity and displayWeekMonthLiquidity and f_targetVisualByMode(effectiveZoneDisplayMode, targetPrevMonthHigh or drawPrevMonthHigh)
-showPrevMonthLowVisual = showLiquidity and displayWeekMonthLiquidity and f_targetVisualByMode(effectiveZoneDisplayMode, targetPrevMonthLow or drawPrevMonthLow)
 showEqHighVisual = showLiquidity and displayEqLiquidity and f_targetVisualByMode(effectiveZoneDisplayMode, targetEqHigh)
 showEqLowVisual = showLiquidity and displayEqLiquidity and f_targetVisualByMode(effectiveZoneDisplayMode, targetEqLow)
 showProtectedHighVisual = displayProtectedLevels
@@ -2153,29 +2175,12 @@ showLongRiskVisual = displayRiskLines and f_executionRiskVisible(longExecutionSt
 showShortRiskVisual = displayRiskLines and f_executionRiskVisible(shortExecutionState)
 
 if effectiveZoneDisplayMode != "Full"
-    showPrevMonthHighVisual := f_uniqueLevelVisual(showPrevMonthHighVisual, prevMonthHigh, showHtfHighVisual, htfStructureHigh, false, na, false, na, false, na, false, na)
-    showPrevWeekHighVisual := f_uniqueLevelVisual(showPrevWeekHighVisual, prevWeekHigh, showHtfHighVisual, htfStructureHigh, showPrevMonthHighVisual, prevMonthHigh, false, na, false, na, false, na)
-    showPrevDayHighVisual := f_uniqueLevelVisual(showPrevDayHighVisual, prevDayHigh, showHtfHighVisual, htfStructureHigh, showPrevMonthHighVisual, prevMonthHigh, showPrevWeekHighVisual, prevWeekHigh, false, na, false, na)
-    showPrevSessionHighVisual := f_uniqueLevelVisual(showPrevSessionHighVisual, prevSessionHigh, showHtfHighVisual, htfStructureHigh, showPrevMonthHighVisual, prevMonthHigh, showPrevWeekHighVisual, prevWeekHigh, showPrevDayHighVisual, prevDayHigh, false, na)
-    showEqHighVisual := f_uniqueLevelVisual(showEqHighVisual, activeEqh, showHtfHighVisual, htfStructureHigh, showPrevMonthHighVisual, prevMonthHigh, showPrevWeekHighVisual, prevWeekHigh, showPrevDayHighVisual, prevDayHigh, showPrevSessionHighVisual, prevSessionHigh)
-
-    showPrevMonthLowVisual := f_uniqueLevelVisual(showPrevMonthLowVisual, prevMonthLow, showHtfLowVisual, htfStructureLow, false, na, false, na, false, na, false, na)
-    showPrevWeekLowVisual := f_uniqueLevelVisual(showPrevWeekLowVisual, prevWeekLow, showHtfLowVisual, htfStructureLow, showPrevMonthLowVisual, prevMonthLow, false, na, false, na, false, na)
-    showPrevDayLowVisual := f_uniqueLevelVisual(showPrevDayLowVisual, prevDayLow, showHtfLowVisual, htfStructureLow, showPrevMonthLowVisual, prevMonthLow, showPrevWeekLowVisual, prevWeekLow, false, na, false, na)
-    showPrevSessionLowVisual := f_uniqueLevelVisual(showPrevSessionLowVisual, prevSessionLow, showHtfLowVisual, htfStructureLow, showPrevMonthLowVisual, prevMonthLow, showPrevWeekLowVisual, prevWeekLow, showPrevDayLowVisual, prevDayLow, false, na)
-    showEqLowVisual := f_uniqueLevelVisual(showEqLowVisual, activeEql, showHtfLowVisual, htfStructureLow, showPrevMonthLowVisual, prevMonthLow, showPrevWeekLowVisual, prevWeekLow, showPrevDayLowVisual, prevDayLow, showPrevSessionLowVisual, prevSessionLow)
+    showEqHighVisual := f_uniqueLevelVisual(showEqHighVisual, activeEqh, showHtfHighVisual, htfStructureHigh, false, na, false, na, false, na, false, na)
+    showEqLowVisual := f_uniqueLevelVisual(showEqLowVisual, activeEql, showHtfLowVisual, htfStructureLow, false, na, false, na, false, na, false, na)
 
 //------------------------------------------------------------------------------
 // Plots
 //------------------------------------------------------------------------------
-prevSessionHighLevel = f_horizontalLevel(prevSessionHigh, showPrevSessionHighVisual)
-prevSessionLowLevel = f_horizontalLevel(prevSessionLow, showPrevSessionLowVisual)
-prevDayHighLevel = f_horizontalLevel(prevDayHigh, showPrevDayHighVisual)
-prevDayLowLevel = f_horizontalLevel(prevDayLow, showPrevDayLowVisual)
-prevWeekHighLevel = f_horizontalLevel(prevWeekHigh, showPrevWeekHighVisual)
-prevWeekLowLevel = f_horizontalLevel(prevWeekLow, showPrevWeekLowVisual)
-prevMonthHighLevel = f_horizontalLevel(prevMonthHigh, showPrevMonthHighVisual)
-prevMonthLowLevel = f_horizontalLevel(prevMonthLow, showPrevMonthLowVisual)
 eqHighLevel = f_horizontalLevel(activeEqh, showEqHighVisual)
 eqLowLevel = f_horizontalLevel(activeEql, showEqLowVisual)
 protectedHighLevel = f_horizontalLevel(activeProtectedHigh, showProtectedHighVisual)
@@ -2200,14 +2205,6 @@ oteShortMid = not na(oteShortTop) and not na(oteShortBottom) ? f_zoneMid(oteShor
 oteLongMidLevel = not na(oteLongTopLevel) and not na(oteLongBottomLevel) ? f_zoneMid(oteLongTopLevel, oteLongBottomLevel) : na
 oteShortMidLevel = not na(oteShortTopLevel) and not na(oteShortBottomLevel) ? f_zoneMid(oteShortTopLevel, oteShortBottomLevel) : na
 
-plotPrevSessionHigh = plot(prevSessionHighLevel, "Previous Source High", color=color.new(liqHighColor, 20), linewidth=1, style=plot.style_linebr, display=overlayLineDisplay)
-plotPrevSessionLow = plot(prevSessionLowLevel, "Previous Source Low", color=color.new(liqLowColor, 20), linewidth=1, style=plot.style_linebr, display=overlayLineDisplay)
-plotPrevDayHigh = plot(prevDayHighLevel, "PDH", color=color.new(liqHighColor, 0), linewidth=1, style=plot.style_linebr, display=overlayLineDisplay)
-plotPrevDayLow = plot(prevDayLowLevel, "PDL", color=color.new(liqLowColor, 0), linewidth=1, style=plot.style_linebr, display=overlayLineDisplay)
-plotPrevWeekHigh = plot(prevWeekHighLevel, "PWH", color=color.new(liqHighColor, 30), linewidth=1, style=plot.style_linebr, display=overlayLineDisplay)
-plotPrevWeekLow = plot(prevWeekLowLevel, "PWL", color=color.new(liqLowColor, 30), linewidth=1, style=plot.style_linebr, display=overlayLineDisplay)
-plotPrevMonthHigh = plot(prevMonthHighLevel, "PMH", color=color.new(liqHighColor, 55), linewidth=1, style=plot.style_linebr, display=overlayLineDisplay)
-plotPrevMonthLow = plot(prevMonthLowLevel, "PML", color=color.new(liqLowColor, 55), linewidth=1, style=plot.style_linebr, display=overlayLineDisplay)
 plotEqHigh = plot(eqHighLevel, "EQH Liquidity", color=color.new(liqHighColor, 12), linewidth=1, style=plot.style_linebr, display=overlayLineDisplay)
 plotEqLow = plot(eqLowLevel, "EQL Liquidity", color=color.new(liqLowColor, 12), linewidth=1, style=plot.style_linebr, display=overlayLineDisplay)
 
@@ -2221,8 +2218,6 @@ fill(internalHighPlot, internalEqPlot, color=showRangeVisual ? decisionPremiumFi
 fill(internalEqPlot, internalLowPlot, color=showRangeVisual ? decisionDiscountFillColor : na)
 
 if barstate.islast
-    prevSessionHighLabel := f_syncRightEdgeLabel(prevSessionHighLabel, prevSessionHighLevel, f_prevSourceShortLabel(liquiditySessionLabel, true), color.new(liqHighColor, 5), color.white, displayLiquidityRightLabels and showPrevSessionHighVisual)
-    prevSessionLowLabel := f_syncRightEdgeLabel(prevSessionLowLabel, prevSessionLowLevel, f_prevSourceShortLabel(liquiditySessionLabel, false), color.new(liqLowColor, 5), color.white, displayLiquidityRightLabels and showPrevSessionLowVisual)
     protectedHighLabel := f_syncRightEdgeLabel(protectedHighLabel, protectedHighLevel, "Prot H", color.new(liqHighColor, 8), color.white, displayLiquidityRightLabels and showProtectedHighVisual)
     protectedLowLabel := f_syncRightEdgeLabel(protectedLowLabel, protectedLowLevel, "Prot L", color.new(liqLowColor, 8), color.white, displayLiquidityRightLabels and showProtectedLowVisual)
     htfHighLabel := f_syncRightEdgeLabel(htfHighLabel, htfStructureHighLevel, "HTF H", color.new(color.fuchsia, 15), color.white, displayLiquidityRightLabels and showHtfHighVisual)
