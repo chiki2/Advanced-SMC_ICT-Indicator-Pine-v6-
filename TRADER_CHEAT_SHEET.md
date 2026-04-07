@@ -85,6 +85,19 @@ Jika salah satu dari tiga hal ini belum jelas, `wait`:
 | `RR / Cf` | reward/risk dan confidence | pembanding, bukan alasan tunggal |
 | `Next` | aksi berikutnya | baca ini paling akhir |
 
+### Baca `Q`
+
+| Tag | Arti |
+|---|---|
+| `Q1` | kualitas dasar |
+| `Q2` | kualitas menengah |
+| `Q3` | kualitas terbaik |
+
+`Q` = `Quality tier` zona, dibentuk dari:
+- response
+- displacement
+- ATR expansion
+
 ### Baca `Sess/Cfm`
 
 | Teks | Arti |
@@ -100,6 +113,8 @@ Jika salah satu dari tiga hal ini belum jelas, `wait`:
 - `RR` = reward / risk
 - `Cf` = confidence
 - jika compact menulis `Ctx L/S`, itu masih `context strength`, belum setup siap entry
+- jika compact menulis setup seperti `Bullish OB | Q2 | Ctx`, itu berarti setup kandidat sudah ada tetapi masih `context-only`
+- selama `Zone` dan `E / SL / TP` masih `-`, trader tetap membaca kondisi itu sebagai `scan`, bukan entry
 
 ### Baca `Next`
 

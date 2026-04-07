@@ -136,6 +136,23 @@ Prinsip:
 - jangan anggap semua box adalah entry
 - utamakan zona yang searah dengan struktur, bias, dan session context
 
+Jika nama setup di dashboard diikuti:
+- `Q1`
+- `Q2`
+- `Q3`
+
+itu berarti `Quality tier` zona:
+- `Q1` = kualitas dasar
+- `Q2` = kualitas menengah
+- `Q3` = kualitas terbaik
+
+Tier ini dibangun dari:
+- response zona
+- displacement
+- ATR expansion
+
+Jadi `Q` membantu menilai mutu setup, tetapi bukan jaminan entry.
+
 ## 5. Dealing Range dan Decision Bands
 
 Indikator juga menampilkan:
@@ -351,6 +368,11 @@ Row penting:
 Prinsip pakai:
 - compact mode dipakai untuk keputusan cepat
 - jika butuh detail penuh, lihat dashboard full
+
+Catatan penting:
+- jika compact menulis setup seperti `Bullish OB | Q2 | Ctx`, artinya ada kandidat setup yang sedang terbentuk
+- `Ctx` berarti setup itu masih `context-only`, belum actionable untuk entry
+- selama `Zone` dan `E / SL / TP` masih `-`, trader sebaiknya tetap membaca itu sebagai fase scan
 
 ## Workflow Praktis
 
