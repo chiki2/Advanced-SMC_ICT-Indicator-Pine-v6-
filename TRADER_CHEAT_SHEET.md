@@ -25,7 +25,7 @@ Panduan satu halaman yang ringkas, visual, dan siap dibagikan untuk trader `Adva
 ## Workflow 30 Detik
 
 ```text
-BIAS -> SESSION -> PREF -> EXEC -> ZONE -> E / SL / TP
+BIAS -> SESSION -> ERL SWEEP -> IRL / POI -> DOL -> EXEC
 ```
 
 Jika salah satu dari tiga hal ini belum jelas, `wait`:
@@ -80,9 +80,10 @@ Jika salah satu dari tiga hal ini belum jelas, `wait`:
 | `Bias` | `chart / context / narrative` | kalau konflik, jangan agresif |
 | `Sess/Cfm` | sesi aktif + status konfirmasi | tahu market sedang di jam apa dan setup sudah rapi atau belum |
 | `Pref` | `Long / Short / Wait` | arah yang lebih layak dipantau |
-| `Z / E` | zona dan entry | lokasi setup |
+| `Z / E` | `POI` dan entry | lokasi setup |
 | `SL / TP` | stop dan target | risk plan |
 | `RR / Cf` | reward/risk dan confidence | pembanding, bukan alasan tunggal |
+| `Draw / TP` | `DOL` dan peluang model | arah tarikan liquidity utama |
 | `Next` | aksi berikutnya | baca ini paling akhir |
 
 ### Baca `Q`
@@ -108,6 +109,18 @@ Jika salah satu dari tiga hal ini belum jelas, `wait`:
 | `KZ Wait` | context sudah baik, menunggu timing killzone |
 | `Ready` | konfirmasi strict lengkap |
 
+### Baca `POI` dan `DOL`
+
+| Istilah | Arti Cepat |
+|---|---|
+| `POI` | `Point of Interest`, zona yang sedang dipakai model |
+| `IRL` | `Internal Range Liquidity`, biasanya FVG di dalam range |
+| `OB` | fallback POI jika tidak ada IRL yang lebih layak |
+| `DOL` | `Draw on Liquidity`, target liquidity utama |
+
+Flow sehat indikator dalam `Strict Confirm`:
+- `ERL sweep -> IRL / POI -> DOL`
+
 ### Baca `RR / Cf`
 
 - `RR` = reward / risk
@@ -132,14 +145,17 @@ Contoh arti cepat:
 Urutan fokus chart:
 1. struktur `HH/HL/LH/LL`
 2. `BOS / MSS`
-3. session box + garis `High/Low`
-4. zona `OB / FVG` terpilih
-5. protected level
-6. OTE aktif jika ada
+3. `ERL` yang disapu
+4. session box + garis `High/Low`
+5. zona `OB / FVG` terpilih
+6. protected level
+7. OTE aktif jika ada
 
 **Prinsip sederhana**
 - session = konteks
-- zona = lokasi
+- `ERL` = sumber liquidity
+- `IRL / POI` = lokasi entry
+- `DOL` = target
 - `Exec` = timing
 
 ---
