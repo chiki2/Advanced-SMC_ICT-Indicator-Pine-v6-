@@ -9,7 +9,7 @@ usagePreset = input.string("Standard", "Usage profile", options=["Standard", "Co
 
 groupStructure = "1. Structure"
 bool showStructureLabels = input.bool(true, "Show HH / HL / LL / LH labels", group=groupStructure)
-bool showBosChoch = input.bool(true, "Show BOS / MSS markers", group=groupStructure)
+bool showBosMss = input.bool(true, "Show BOS / MSS markers", group=groupStructure)
 bool showIdm = input.bool(true, "Show inducement markers", group=groupStructure)
 bool showTrendBackground = input.bool(true, "Tint background by current bias", group=groupStructure)
 int swingLen = 3
@@ -730,7 +730,7 @@ f_addPivotLabel(int pivotBar, float pivotPrice, string pivotText, bool isHigh) =
         f_trimPivotLabels()
 
 f_drawStructureEvent(int fromBar, float level, string eventText, bool isBull) =>
-    if showBosChoch and not na(fromBar)
+    if showBosMss and not na(fromBar)
         eventLineStyle = eventText == "MSS" ? line.style_dashed : line.style_dotted
         fromShift = math.max(bar_index - fromBar, 0)
         if fromShift <= 5000
@@ -1953,7 +1953,7 @@ float longRr = not na(longRisk) and longRisk > 0 and not na(longReward) ? longRe
 bool longPriceInZone = not na(tradeLongValidBottom) and close >= tradeLongValidBottom and close <= tradeLongValidTop
 bool longPriceNearZone = not na(tradeLongEntry) and math.abs(close - tradeLongEntry) <= atr * 0.25
 int longSetupAge = not na(tradeLongCreatedBar) ? bar_index - tradeLongCreatedBar : na
-bool longExpired = not tradeLongTouched and not na(longSetupAge) and longSetupAge > expiryBarsEffective
+bool longExpiredUntouched = not tradeLongTouched and not na(longSetupAge) and longSetupAge > expiryBarsEffective
 bool longChased = not tradeLongTouched and not na(tradeLongValidTop) and close > tradeLongValidTop + atr * setupChaseAtr
 bool longStructureInvalidated = not na(tradeLongCreatedBar) and not na(lastBearMssBar) and lastBearMssBar > tradeLongCreatedBar
 bool longFresh = not tradeLongTouched and not na(longSetupAge) and longSetupAge <= freshBarsEffective
@@ -1984,13 +1984,18 @@ else if currentLongSetupTag != lastLongSetupTag
 bool longManagedHit = tradeLongTouched and not na(longRisk) and high >= tradeLongEntry + longRisk * setupManagedR
 if longManagedHit
     longManagedLatched := true
-bool longManaged = currentLongSetupTag != "" and longManagedLatched
-bool longCompletedHit = tradeLongTouched and ((not na(activeLongTarget) and high >= activeLongTarget) or (longManaged and not na(longSetupAge) and longSetupAge > expiryBarsEffective))
-if longCompletedHit
+bool longManagedLatchedState = currentLongSetupTag != "" and longManagedLatched
+bool longTpHit = tradeLongTouched and not na(activeLongTarget) and high >= activeLongTarget
+if longTpHit
     longCompletedLatched := true
 bool longCompleted = currentLongSetupTag != "" and longCompletedLatched
 lastLongSetupTag := currentLongSetupTag
 bool longInvalidated = (not na(tradeLongStop) and close <= tradeLongStop) or longStructureInvalidated
+bool longManagedStale = longManagedLatchedState and not longCompleted and not na(longSetupAge) and longSetupAge > expiryBarsEffective
+bool longManaged = longManagedLatchedState and not longManagedStale
+bool longTouchedStale = tradeLongTouched and not longManagedLatchedState and not longCompleted and not na(longSetupAge) and longSetupAge > expiryBarsEffective
+bool longExpired = longExpiredUntouched or longTouchedStale
+longExpired := longExpired or longManagedStale
 
 float shortRisk = not na(tradeShortEntry) and not na(tradeShortStop) ? tradeShortStop - tradeShortEntry : na
 float shortReward = not na(tradeShortEntry) and not na(activeShortTarget) ? tradeShortEntry - activeShortTarget : na
@@ -1998,7 +2003,7 @@ float shortRr = not na(shortRisk) and shortRisk > 0 and not na(shortReward) ? sh
 bool shortPriceInZone = not na(tradeShortValidBottom) and close >= tradeShortValidBottom and close <= tradeShortValidTop
 bool shortPriceNearZone = not na(tradeShortEntry) and math.abs(close - tradeShortEntry) <= atr * 0.25
 int shortSetupAge = not na(tradeShortCreatedBar) ? bar_index - tradeShortCreatedBar : na
-bool shortExpired = not tradeShortTouched and not na(shortSetupAge) and shortSetupAge > expiryBarsEffective
+bool shortExpiredUntouched = not tradeShortTouched and not na(shortSetupAge) and shortSetupAge > expiryBarsEffective
 bool shortChased = not tradeShortTouched and not na(tradeShortValidBottom) and close < tradeShortValidBottom - atr * setupChaseAtr
 bool shortStructureInvalidated = not na(tradeShortCreatedBar) and not na(lastBullMssBar) and lastBullMssBar > tradeShortCreatedBar
 bool shortFresh = not tradeShortTouched and not na(shortSetupAge) and shortSetupAge <= freshBarsEffective
@@ -2029,13 +2034,18 @@ else if currentShortSetupTag != lastShortSetupTag
 bool shortManagedHit = tradeShortTouched and not na(shortRisk) and low <= tradeShortEntry - shortRisk * setupManagedR
 if shortManagedHit
     shortManagedLatched := true
-bool shortManaged = currentShortSetupTag != "" and shortManagedLatched
-bool shortCompletedHit = tradeShortTouched and ((not na(activeShortTarget) and low <= activeShortTarget) or (shortManaged and not na(shortSetupAge) and shortSetupAge > expiryBarsEffective))
-if shortCompletedHit
+bool shortManagedLatchedState = currentShortSetupTag != "" and shortManagedLatched
+bool shortTpHit = tradeShortTouched and not na(activeShortTarget) and low <= activeShortTarget
+if shortTpHit
     shortCompletedLatched := true
 bool shortCompleted = currentShortSetupTag != "" and shortCompletedLatched
 lastShortSetupTag := currentShortSetupTag
 bool shortInvalidated = (not na(tradeShortStop) and close >= tradeShortStop) or shortStructureInvalidated
+bool shortManagedStale = shortManagedLatchedState and not shortCompleted and not na(shortSetupAge) and shortSetupAge > expiryBarsEffective
+bool shortManaged = currentShortSetupTag != "" and shortManagedLatched and not shortManagedStale
+bool shortTouchedStale = tradeShortTouched and not shortManagedLatchedState and not shortCompleted and not na(shortSetupAge) and shortSetupAge > expiryBarsEffective
+bool shortExpired = shortExpiredUntouched or shortTouchedStale
+shortExpired := shortExpired or shortManagedStale
 
 // Keep setup scoring intentionally simple to reduce overtuning.
 bool longBiasAligned = activeBias == 1
@@ -2071,7 +2081,7 @@ int selectedBullObBar = tradeLongIsOb ? tradeLongCreatedBar : na
 int selectedBearObBar = tradeShortIsOb ? tradeShortCreatedBar : na
 string longTargetModeSummary = f_targetModeText(not na(activeLongTarget), longUsesExternalDolTarget, longTargetIsLiquidity)
 string shortTargetModeSummary = f_targetModeText(not na(activeShortTarget), shortUsesExternalDolTarget, shortTargetIsLiquidity)
-string opTargetSummary = longTargetModeSummary == shortTargetModeSummary ? longTargetModeSummary : "L " + longTargetModeSummary + " | S " + shortTargetModeSummary
+string opTargetSummary = longTargetModeSummary == shortTargetModeSummary ? longTargetModeSummary : longTargetModeSummary == "-" ? shortTargetModeSummary : shortTargetModeSummary == "-" ? longTargetModeSummary : "Mixed"
 
 if array.size(pivotStructureLabels) > 0
     for idx = 0 to array.size(pivotStructureLabels) - 1
@@ -2089,10 +2099,10 @@ if array.size(structureEventLines) > 0
         eventLine = array.get(structureEventLines, i)
         eventLabel = array.get(structureEventLabels, i)
         if not na(eventLine)
-            line.set_color(eventLine, showBosChoch ? structureEventColor : na)
+            line.set_color(eventLine, showBosMss ? structureEventColor : na)
         if not na(eventLabel)
             label.set_color(eventLabel, color.new(color.black, 100))
-            label.set_textcolor(eventLabel, showBosChoch ? structureTextColor : na)
+            label.set_textcolor(eventLabel, showBosMss ? structureTextColor : na)
             label.set_style(eventLabel, label.style_none)
 
 if array.size(fvgBoxes) > 0
