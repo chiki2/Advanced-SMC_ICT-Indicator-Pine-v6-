@@ -475,6 +475,14 @@ f_confirmationStateText(bool strictEnabled, bool contextPass, bool killzonePass,
     else
         compactText ? "Ref" : "Refine"
 
+f_setupPathText(bool hasSetup, bool isFvg, bool isOb, float dolLevel, bool compactText) =>
+    if not hasSetup
+        "-"
+    else
+        string poiText = isFvg ? "IRL" : isOb ? "OB" : "POI"
+        string dolText = not na(dolLevel) ? (compactText ? ">D" : " > DOL") : ""
+        poiText + dolText
+
 f_setupExecutionState(bool hasSetup, bool invalidated, bool expired, bool chased, bool completed, bool managed, bool baseContextPass, bool confirmationPass, bool mssFresh, bool displacementSeen, bool priceInZone, bool priceNearZone) =>
     not hasSetup ? "Waiting" : completed ? "Completed" : managed ? "Managed" : invalidated ? "Invalidated" : expired or chased ? "Expired" : not baseContextPass ? "Waiting" : not confirmationPass ? "Confirming" : mssFresh and displacementSeen ? (priceInZone or priceNearZone ? "Active" : "Armed") : "Waiting"
 
@@ -1756,21 +1764,22 @@ bool preferBearOb = false
 bool preferBearFvg = false
 
 if strictModeEnabled
-    if hasBullOb and bullObZoneConfirmPass
-        preferBullOb := true
-    else if hasBullFvg and bullFvgZoneConfirmPass
+    // In strict ICT mode, prefer IRL/FVG first after the ERL sweep.
+    if hasBullFvg and bullFvgZoneConfirmPass
         preferBullFvg := true
+    else if hasBullOb and bullObZoneConfirmPass
+        preferBullOb := true
     else
-        preferBullOb := hasBullOb
-        preferBullFvg := not preferBullOb and hasBullFvg
+        preferBullFvg := hasBullFvg
+        preferBullOb := not preferBullFvg and hasBullOb
 
-    if hasBearOb and bearObZoneConfirmPass
-        preferBearOb := true
-    else if hasBearFvg and bearFvgZoneConfirmPass
+    if hasBearFvg and bearFvgZoneConfirmPass
         preferBearFvg := true
+    else if hasBearOb and bearObZoneConfirmPass
+        preferBearOb := true
     else
-        preferBearOb := hasBearOb
-        preferBearFvg := not preferBearOb and hasBearFvg
+        preferBearFvg := hasBearFvg
+        preferBearOb := not preferBearFvg and hasBearOb
 else
     preferBullOb := hasBullOb
     preferBullFvg := not preferBullOb and hasBullFvg
@@ -1865,6 +1874,11 @@ if not na(tradeShortEntry)
     if na(tradeShortTarget) and not na(tempShortRisk) and tempShortRisk > 0
         tradeShortTarget := tradeShortEntry - tempShortRisk * 2.0
 
+float longDolExternal = not na(tradeLongEntry) ? f_nearestAbove(tradeLongEntry, enginePrevDayHigh, enginePrevWeekHigh, enginePrevMonthHigh, htfStructureHigh, na, na, na) : na
+float shortDolExternal = not na(tradeShortEntry) ? f_nearestBelow(tradeShortEntry, enginePrevDayLow, enginePrevWeekLow, enginePrevMonthLow, htfStructureLow, na, na, na) : na
+float longDolLevel = not na(longDolExternal) ? longDolExternal : longTargetIsLiquidity ? tradeLongTarget : na
+float shortDolLevel = not na(shortDolExternal) ? shortDolExternal : shortTargetIsLiquidity ? tradeShortTarget : na
+
 float longRisk = not na(tradeLongEntry) and not na(tradeLongStop) ? tradeLongEntry - tradeLongStop : na
 float longReward = not na(tradeLongEntry) and not na(tradeLongTarget) ? tradeLongTarget - tradeLongEntry : na
 float longRr = not na(longRisk) and longRisk > 0 and not na(longReward) ? longReward / longRisk : na
@@ -1881,12 +1895,13 @@ bool strictLongMssFresh = not na(lastBullMssBar) and (bar_index - lastBullMssBar
 bool strictLongMssPass = not strictModeEnabled or (bullLegHasMss and strictLongMssFresh and activeBias == 1)
 bool strictLongPdPass = not strictModeEnabled or (not na(tradeLongValidTop) and not na(bullEquilibriumActive) and f_zoneMid(tradeLongValidTop, tradeLongValidBottom) < bullEquilibriumActive)
 bool strictLongOtePass = not strictModeEnabled or (f_zoneIntersects(tradeLongValidTop, tradeLongValidBottom, oteLongTop, oteLongBottom) and f_zoneFreshNearEvent(tradeLongCreatedBar, bullOteCreatedBar, strictMssLookback))
+bool strictLongDolPass = not strictModeEnabled or not na(longDolLevel)
 bool strictLongKillzonePass = not strictModeEnabled or strictKillzoneActive
-bool strictLongContextPass = strictLongBiasPass and strictLongSweepPass and strictLongMssPass and strictLongPdPass and strictLongOtePass
+bool strictLongContextPass = strictLongBiasPass and strictLongSweepPass and strictLongMssPass and strictLongPdPass and strictLongOtePass and strictLongDolPass
 bool longBaseContextPass = activeBias == 1 and bullLegHasSweep and bullLegHasMss
 bool longConfirmationPass = not strictModeEnabled or (strictLongContextPass and strictLongKillzonePass)
 bool longExecutionFreshPass = strictModeEnabled ? strictLongMssFresh : bullLegHasMss
-string longConfirmationSummary = not na(tradeLongEntry) ? f_confirmationStateText(strictModeEnabled, strictLongContextPass, strictLongKillzonePass, false) : "-"
+string longConfirmationSummary = not na(tradeLongEntry) ? f_confirmationStateText(strictModeEnabled, strictLongContextPass, strictLongKillzonePass, false) + " | " + f_setupPathText(true, tradeLongIsFvg, tradeLongIsOb, longDolLevel, false) : "-"
 var string lastLongSetupTag = ""
 var bool longManagedLatched = false
 var bool longCompletedLatched = false
@@ -1925,12 +1940,13 @@ bool strictShortMssFresh = not na(lastBearMssBar) and (bar_index - lastBearMssBa
 bool strictShortMssPass = not strictModeEnabled or (bearLegHasMss and strictShortMssFresh and activeBias == -1)
 bool strictShortPdPass = not strictModeEnabled or (not na(tradeShortValidTop) and not na(bearEquilibriumActive) and f_zoneMid(tradeShortValidTop, tradeShortValidBottom) > bearEquilibriumActive)
 bool strictShortOtePass = not strictModeEnabled or (f_zoneIntersects(tradeShortValidTop, tradeShortValidBottom, oteShortTop, oteShortBottom) and f_zoneFreshNearEvent(tradeShortCreatedBar, bearOteCreatedBar, strictMssLookback))
+bool strictShortDolPass = not strictModeEnabled or not na(shortDolLevel)
 bool strictShortKillzonePass = not strictModeEnabled or strictKillzoneActive
-bool strictShortContextPass = strictShortBiasPass and strictShortSweepPass and strictShortMssPass and strictShortPdPass and strictShortOtePass
+bool strictShortContextPass = strictShortBiasPass and strictShortSweepPass and strictShortMssPass and strictShortPdPass and strictShortOtePass and strictShortDolPass
 bool shortBaseContextPass = activeBias == -1 and bearLegHasSweep and bearLegHasMss
 bool shortConfirmationPass = not strictModeEnabled or (strictShortContextPass and strictShortKillzonePass)
 bool shortExecutionFreshPass = strictModeEnabled ? strictShortMssFresh : bearLegHasMss
-string shortConfirmationSummary = not na(tradeShortEntry) ? f_confirmationStateText(strictModeEnabled, strictShortContextPass, strictShortKillzonePass, false) : "-"
+string shortConfirmationSummary = not na(tradeShortEntry) ? f_confirmationStateText(strictModeEnabled, strictShortContextPass, strictShortKillzonePass, false) + " | " + f_setupPathText(true, tradeShortIsFvg, tradeShortIsOb, shortDolLevel, false) : "-"
 var string lastShortSetupTag = ""
 var bool shortManagedLatched = false
 var bool shortCompletedLatched = false
@@ -2222,12 +2238,12 @@ bearStop = not na(tradeShortStop) ? tradeShortStop : not na(lastSwingHigh) ? las
 //   Full / Focused: show
 //   Minimal: hide except protected level and active OTE
 //------------------------------------------------------------------------------
-longExternalDraw = longPreferredReady and not na(tradeLongEntry) ? f_nearestAbove(tradeLongEntry, enginePrevDayHigh, enginePrevWeekHigh, enginePrevMonthHigh, htfStructureHigh, na, na, na) : na
-shortExternalDraw = shortPreferredReady and not na(tradeShortEntry) ? f_nearestBelow(tradeShortEntry, enginePrevDayLow, enginePrevWeekLow, enginePrevMonthLow, htfStructureLow, na, na, na) : na
-primaryExternalDrawLevel = compactUseLong ? longExternalDraw : shortExternalDraw
+longExternalDraw = longPreferredReady ? longDolExternal : na
+shortExternalDraw = shortPreferredReady ? shortDolExternal : na
+primaryExternalDrawLevel = compactUseLong ? longDolLevel : shortDolLevel
 compactRrDrawDisplay := compactNeutral ? "-" : compactUseLong ? f_dashboardDetail(f_formatRr(compactRr) + " | " + f_formatLevel(primaryExternalDrawLevel), longDashboardRetired) : f_dashboardDetail(f_formatRr(compactRr) + " | " + f_formatLevel(primaryExternalDrawLevel), shortDashboardRetired)
-string longDrawTpSummary = f_dashboardDetail(f_formatLevel(longExternalDraw) + " | " + f_formatPercent(longTpProbability), longDashboardRetired)
-string shortDrawTpSummary = f_dashboardDetail(f_formatLevel(shortExternalDraw) + " | " + f_formatPercent(shortTpProbability), shortDashboardRetired)
+string longDrawTpSummary = f_dashboardDetail(f_formatLevel(longDolLevel) + " | " + f_formatPercent(longTpProbability), longDashboardRetired)
+string shortDrawTpSummary = f_dashboardDetail(f_formatLevel(shortDolLevel) + " | " + f_formatPercent(shortTpProbability), shortDashboardRetired)
 targetEqHigh = f_preferredLevelMatch(activeEqh, compactBalanced, compactUseLong, tradeLongTarget, tradeShortTarget)
 targetEqLow = f_preferredLevelMatch(activeEql, compactBalanced, compactUseLong, tradeLongTarget, tradeShortTarget)
 drawHtfHigh = f_preferredLevelMatch(htfStructureHigh, compactBalanced, compactUseLong, longExternalDraw, shortExternalDraw)
@@ -2345,7 +2361,7 @@ if barstate.islast and dashboardEnabled and not compactDashboardMode
     f_setCell(dashboard, 3, 3, shortDashboardSetupDisplay, color.white, panelBearBg)
 
     f_setCell(dashboard, 0, 4, "Z / E", color.white, panelCellBg)
-    f_setCell(dashboard, 1, 4, "Range | trig", color.white, panelCellBg)
+    f_setCell(dashboard, 1, 4, "POI | trig", color.white, panelCellBg)
     f_setCell(dashboard, 2, 4, longZoneEntrySummary, color.white, panelBullBg)
     f_setCell(dashboard, 3, 4, shortZoneEntrySummary, color.white, panelBearBg)
 
@@ -2360,7 +2376,7 @@ if barstate.islast and dashboardEnabled and not compactDashboardMode
     f_setCell(dashboard, 3, 6, shortRrConfSummary, color.white, panelBearBg)
 
     f_setCell(dashboard, 0, 7, "Draw / TP", color.white, panelCellBg)
-    f_setCell(dashboard, 1, 7, "Ext | TP", color.white, panelCellBg)
+    f_setCell(dashboard, 1, 7, "DOL | TP", color.white, panelCellBg)
     f_setCell(dashboard, 2, 7, longDrawTpSummary, color.white, panelBullBg)
     f_setCell(dashboard, 3, 7, shortDrawTpSummary, color.white, panelBearBg)
 
@@ -2394,7 +2410,7 @@ else if barstate.islast and dashboardEnabled and compactDashboardMode
     f_setCell(dashboardCompact, 1, 5, compactStatusDisplay, color.white, compactAccent)
     f_setCell(dashboardCompact, 0, 6, compactConfTpLabel, color.white, panelCellBg)
     f_setCell(dashboardCompact, 1, 6, compactConfTpDisplay, color.white, compactAccent)
-    f_setCell(dashboardCompact, 0, 7, "R / Draw", color.white, panelCellBg)
+    f_setCell(dashboardCompact, 0, 7, "R / DOL", color.white, panelCellBg)
     f_setCell(dashboardCompact, 1, 7, compactRrDrawDisplay, color.white, compactAccent)
     f_setCell(dashboardCompact, 0, 8, "Life", color.white, panelCellBg)
     f_setCell(dashboardCompact, 1, 8, compactLifecycleDisplay, color.white, panelCellBg)
