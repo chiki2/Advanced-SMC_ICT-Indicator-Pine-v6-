@@ -125,23 +125,17 @@ strictModeEnabled = profileStrict
 compactMode = profileCompact or androidCompactMode
 compactDashboardMode = compactMode and mobileCompactDashboard
 dashboardEnabled = showDashboard
-showHtfEffective = showHtf
-showRiskEffective = showRisk
-showProtectedLevelsEffective = showProtectedLevels
-showLiquidityRightLabelsEffective = showLiquidityRightLabels
-showKillzoneVisualEffective = showKillzoneVisual
-showOteEffective = strictShowOte
 displayStructureLabels = showStructureLabels and not (compactMode and mobileHideStructureLabels)
 displayInternalRange = showInternalRange and not (compactMode and mobileHideInternalRange)
 displayEqLiquidity = showLiquidity and not (compactMode and mobileHideEqLiquidity)
 displaySweepMarkers = showLiquidity and showSweeps
 displayTrendBackground = showTrendBackground and not (compactMode and mobileHideTrendBackground)
-displayProtectedLevels = showProtectedLevelsEffective
+displayProtectedLevels = showProtectedLevels
 displayDealingRange = displayInternalRange
-displayLiquidityRightLabels = showLiquidityRightLabelsEffective and not (compactMode and mobileHideLiquidityRightLabels)
-displayHtfLines = showHtfEffective and not (compactMode and mobileHideHtfLines)
-displayRiskLines = showRiskEffective and not (compactMode and mobileHideRiskLines)
-displayKillzoneVisual = showKillzoneVisualEffective and not (compactMode and mobileHideKillzoneVisual)
+displayLiquidityRightLabels = showLiquidityRightLabels and not (compactMode and mobileHideLiquidityRightLabels)
+displayHtfLines = showHtf and not (compactMode and mobileHideHtfLines)
+displayRiskLines = showRisk and not (compactMode and mobileHideRiskLines)
+displayKillzoneVisual = showKillzoneVisual and not (compactMode and mobileHideKillzoneVisual)
 effectiveZoneDisplayMode = profileCompact ? "Minimal" : profileStrict ? "Focused" : zoneDisplayMode
 maxStructureEventObjects = 80
 maxPivotLabelObjects = 160
@@ -475,13 +469,24 @@ f_confirmationStateText(bool strictEnabled, bool contextPass, bool killzonePass,
     else
         compactText ? "Ref" : "Refine"
 
-f_setupPathText(bool hasSetup, bool isFvg, bool isOb, float dolLevel, bool compactText) =>
+f_setupPathText(bool hasSetup, bool isFvg, bool isOb, bool usesDolTarget, bool compactText) =>
     if not hasSetup
         "-"
     else
         string poiText = isFvg ? "FVG" : isOb ? "OB" : "POI"
-        string dolText = not na(dolLevel) ? (compactText ? ">D" : " > DOL") : ""
+        string dolText = usesDolTarget ? (compactText ? ">D" : " > DOL") : ""
         poiText + dolText
+
+f_candidatePriority(bool hasCandidate, bool confirmPass, int createdBar, bool isPreferredType) =>
+    if not hasCandidate
+        -1000.0
+    else
+        int candidateAge = not na(createdBar) ? math.max(0, bar_index - createdBar) : 10000
+        float score = confirmPass ? 100.0 : 0.0
+        score += candidateAge <= setupFreshBars ? 20.0 : 0.0
+        score += math.max(0.0, 10.0 - math.min(candidateAge, 10))
+        score += isPreferredType ? 1.0 : 0.0
+        score
 
 f_setupExecutionState(bool hasSetup, bool invalidated, bool expired, bool chased, bool completed, bool managed, bool baseContextPass, bool confirmationPass, bool mssFresh, bool displacementSeen, bool priceInZone, bool priceNearZone) =>
     not hasSetup ? "Waiting" : completed ? "Completed" : managed ? "Managed" : invalidated ? "Invalidated" : expired or chased ? "Expired" : not baseContextPass ? "Waiting" : not confirmationPass ? "Confirming" : mssFresh and displacementSeen ? (priceInZone or priceNearZone ? "Active" : "Armed") : "Waiting"
@@ -1812,22 +1817,20 @@ if strictModeEnabled
         preferBearFvg := hasBearFvg
         preferBearOb := not preferBearFvg and hasBearOb
 else
-    // In standard mode, still prefer FVG first, but do not ignore a healthier validated alternative.
-    if hasBullFvg and bullFvgZoneConfirmPass
+    // In standard mode, rank candidates simply: confirm pass > freshness/recency > FVG tie-break.
+    float bullFvgPriority = f_candidatePriority(hasBullFvg, bullFvgZoneConfirmPass, latestBullFvgCreatedBar, true)
+    float bullObPriority = f_candidatePriority(hasBullOb, bullObZoneConfirmPass, latestBullZoneCreatedBar, false)
+    if bullFvgPriority >= bullObPriority and hasBullFvg
         preferBullFvg := true
-    else if hasBullOb and bullObZoneConfirmPass
+    else if hasBullOb
         preferBullOb := true
-    else
-        preferBullFvg := hasBullFvg
-        preferBullOb := not preferBullFvg and hasBullOb
 
-    if hasBearFvg and bearFvgZoneConfirmPass
+    float bearFvgPriority = f_candidatePriority(hasBearFvg, bearFvgZoneConfirmPass, latestBearFvgCreatedBar, true)
+    float bearObPriority = f_candidatePriority(hasBearOb, bearObZoneConfirmPass, latestBearZoneCreatedBar, false)
+    if bearFvgPriority >= bearObPriority and hasBearFvg
         preferBearFvg := true
-    else if hasBearOb and bearObZoneConfirmPass
+    else if hasBearOb
         preferBearOb := true
-    else
-        preferBearFvg := hasBearFvg
-        preferBearOb := not preferBearFvg and hasBearOb
 
 float tradeLongEntry = na
 float tradeLongStop = na
@@ -1921,8 +1924,6 @@ float longDolExternal = not na(tradeLongEntry) ? f_nearestAbove(tradeLongEntry, 
 float shortDolExternal = not na(tradeShortEntry) ? f_nearestBelow(tradeShortEntry, enginePrevDayLow, enginePrevWeekLow, enginePrevMonthLow, htfStructureLow, na, na, na) : na
 bool longHasExternalDol = not na(longDolExternal)
 bool shortHasExternalDol = not na(shortDolExternal)
-float longDolLevel = not na(longDolExternal) ? longDolExternal : longTargetIsLiquidity ? tradeLongTarget : na
-float shortDolLevel = not na(shortDolExternal) ? shortDolExternal : shortTargetIsLiquidity ? tradeShortTarget : na
 bool longUsesExternalDolTarget = strictModeEnabled and longHasExternalDol
 bool shortUsesExternalDolTarget = strictModeEnabled and shortHasExternalDol
 float activeLongTarget = longUsesExternalDolTarget ? longDolExternal : tradeLongTarget
@@ -1950,7 +1951,7 @@ bool strictLongContextPass = strictLongBiasPass and strictLongSweepPass and stri
 bool longBaseContextPass = activeBias == 1 and bullLegHasSweep and bullLegHasMss
 bool longConfirmationPass = not strictModeEnabled or (strictLongContextPass and strictLongKillzonePass)
 bool longExecutionFreshPass = strictModeEnabled ? strictLongMssFresh : bullLegHasMss
-string longConfirmationSummary = not na(tradeLongEntry) ? f_confirmationStateText(strictModeEnabled, strictLongContextPass, strictLongKillzonePass, false) + " | " + f_setupPathText(true, tradeLongIsFvg, tradeLongIsOb, longDolExternal, false) : "-"
+string longConfirmationSummary = not na(tradeLongEntry) ? f_confirmationStateText(strictModeEnabled, strictLongContextPass, strictLongKillzonePass, false) + " | " + f_setupPathText(true, tradeLongIsFvg, tradeLongIsOb, longUsesExternalDolTarget, false) : "-"
 var string lastLongSetupTag = ""
 var bool longManagedLatched = false
 var bool longCompletedLatched = false
@@ -1995,7 +1996,7 @@ bool strictShortContextPass = strictShortBiasPass and strictShortSweepPass and s
 bool shortBaseContextPass = activeBias == -1 and bearLegHasSweep and bearLegHasMss
 bool shortConfirmationPass = not strictModeEnabled or (strictShortContextPass and strictShortKillzonePass)
 bool shortExecutionFreshPass = strictModeEnabled ? strictShortMssFresh : bearLegHasMss
-string shortConfirmationSummary = not na(tradeShortEntry) ? f_confirmationStateText(strictModeEnabled, strictShortContextPass, strictShortKillzonePass, false) + " | " + f_setupPathText(true, tradeShortIsFvg, tradeShortIsOb, shortDolExternal, false) : "-"
+string shortConfirmationSummary = not na(tradeShortEntry) ? f_confirmationStateText(strictModeEnabled, strictShortContextPass, strictShortKillzonePass, false) + " | " + f_setupPathText(true, tradeShortIsFvg, tradeShortIsOb, shortUsesExternalDolTarget, false) : "-"
 var string lastShortSetupTag = ""
 var bool shortManagedLatched = false
 var bool shortCompletedLatched = false
@@ -2304,7 +2305,7 @@ showEqLowVisual = showLiquidity and displayEqLiquidity and f_targetVisualByMode(
 showProtectedHighVisual = displayProtectedLevels
 showProtectedLowVisual = displayProtectedLevels
 showRangeVisual = showLiquidity and displayDealingRange and f_contextVisualByMode(effectiveZoneDisplayMode)
-showOteVisual = showOteEffective
+showOteVisual = strictShowOte
 oteActiveSummary = not na(oteLongTop) ? "OTE:L" : not na(oteShortTop) ? "OTE:S" : "OTE:-"
 showHtfHighVisual = displayHtfLines and htfContextReady and f_targetVisualByMode(effectiveZoneDisplayMode, drawHtfHigh)
 showHtfLowVisual = displayHtfLines and htfContextReady and f_targetVisualByMode(effectiveZoneDisplayMode, drawHtfLow)
