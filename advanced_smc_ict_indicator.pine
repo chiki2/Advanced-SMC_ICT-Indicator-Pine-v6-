@@ -9,7 +9,7 @@ usagePreset = input.string("Standard", "Usage profile", options=["Standard", "Co
 
 groupStructure = "1. Structure"
 showStructureLabels = input.bool(true, "Show HH / HL / LL / LH labels", group=groupStructure)
-showBosChoch = input.bool(true, "Show BOS / CHOCH markers", group=groupStructure)
+showBosChoch = input.bool(true, "Show BOS / MSS markers", group=groupStructure)
 showIdm = input.bool(true, "Show inducement markers", group=groupStructure)
 showTrendBackground = input.bool(true, "Tint background by current bias", group=groupStructure)
 int swingLen = 3
@@ -479,7 +479,7 @@ f_setupPathText(bool hasSetup, bool isFvg, bool isOb, float dolLevel, bool compa
     if not hasSetup
         "-"
     else
-        string poiText = isFvg ? "IRL" : isOb ? "OB" : "POI"
+        string poiText = isFvg ? "FVG" : isOb ? "OB" : "POI"
         string dolText = not na(dolLevel) ? (compactText ? ">D" : " > DOL") : ""
         poiText + dolText
 
@@ -517,6 +517,22 @@ f_hybridStopDistance(float structuralDistance, float sessionVolRange, float atrL
 
 f_trimSessionVisuals() =>
     while array.size(sessionRangeBoxes) > maxSessionVisuals
+        oldBox = array.shift(sessionRangeBoxes)
+        oldLabel = array.shift(sessionRangeLabels)
+        array.shift(sessionRangeNames)
+        oldHighLine = array.shift(sessionRangeHighLines)
+        oldLowLine = array.shift(sessionRangeLowLines)
+        if not na(oldBox)
+            box.delete(oldBox)
+        if not na(oldLabel)
+            label.delete(oldLabel)
+        if not na(oldHighLine)
+            line.delete(oldHighLine)
+        if not na(oldLowLine)
+            line.delete(oldLowLine)
+
+f_clearSessionVisuals() =>
+    while array.size(sessionRangeBoxes) > 0
         oldBox = array.shift(sessionRangeBoxes)
         oldLabel = array.shift(sessionRangeLabels)
         array.shift(sessionRangeNames)
