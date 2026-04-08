@@ -116,6 +116,7 @@ Jika salah satu dari tiga hal ini belum jelas, `wait`:
 | `POI` | `Point of Interest`, zona yang sedang dipakai model |
 | `FVG` | POI utama yang diprioritaskan indikator untuk flow ICT |
 | `OB` | fallback POI jika tidak ada FVG yang lebih layak |
+| `iFVG` | `Inversion FVG`, FVG gagal yang flip fungsi dan dipakai sebagai konteks tambahan |
 | `DOL` | `Draw on Liquidity`, target external liquidity utama |
 
 Flow sehat indikator dalam `Strict Confirm`:
@@ -127,6 +128,8 @@ Flow sehat indikator dalam `Strict Confirm`:
 - `Cf` = confidence
 - jika compact menulis `Ctx L/S`, itu masih `context strength`, belum setup siap entry
 - jika compact menulis setup seperti `Bullish OB | Q2 | Ctx`, itu berarti setup kandidat sudah ada tetapi masih `context-only`
+- jika compact menulis `Ctx+i`, itu berarti ada `iFVG` aktif yang sedang menambah konteks
+- jika compact menulis `Ctx+i+`, itu berarti `iFVG` aktif itu juga selaras dengan setup kandidat
 - selama `Zone` dan `E / SL / TP` masih `-`, trader tetap membaca kondisi itu sebagai `scan`, bukan entry
 
 ### Baca `Next`
