@@ -45,7 +45,7 @@ string zoneDisplayMode = input.string("Full", "Zone display mode", options=["Ful
 groupContext = "4. Context"
 bool showHtf = input.bool(true, "Show context HTF structure", group=groupContext)
 bool showProtectedLevels = input.bool(true, "Show protected high / low", group=groupContext)
-bool showKillzoneVisual = input.bool(true, "Show trading sessions on chart", group=groupContext)
+bool showSessionVisuals = input.bool(true, "Show trading sessions on chart", group=groupContext)
 bool showLiquidityRightLabels = input.bool(true, "Show right-edge liquidity labels", group=groupContext)
 bool stopOnInvalidTf = true
 int htfSwingLen = 2
@@ -70,7 +70,7 @@ int strictMssLookback = 10
 
 groupDashboard = "5. Dashboard"
 bool showDashboard = input.bool(true, "Show context dashboard", group=groupDashboard)
-bool androidCompactMode = input.bool(false, "Compact dashboard mode", group=groupDashboard)
+bool compactDashboardInput = input.bool(false, "Compact dashboard mode", group=groupDashboard)
 bool mobileCompactDashboard = true
 bool mobileCompactLabels = true
 bool mobileHideStructureLabels = true
@@ -80,7 +80,7 @@ bool mobileHideLiquidityRightLabels = true
 bool mobileHideHtfLines = true
 bool mobileHideRiskLines = true
 bool mobileHideTrendBackground = true
-bool mobileHideKillzoneVisual = true
+bool mobileHideSessionVisuals = true
 
 //------------------------------------------------------------------------------
 // Styling and helpers
@@ -124,7 +124,7 @@ profileCompact = usagePreset == "Compact"
 profileStrict = usagePreset == "Strict Confirm"
 presetLabel = usagePreset
 strictModeEnabled = profileStrict
-compactMode = profileCompact or androidCompactMode
+compactMode = profileCompact or compactDashboardInput
 compactDashboardMode = compactMode and mobileCompactDashboard
 dashboardEnabled = showDashboard
 displayStructureLabels = showStructureLabels and not (compactMode and mobileHideStructureLabels)
@@ -137,7 +137,7 @@ displayDealingRange = displayInternalRange
 displayLiquidityRightLabels = showLiquidityRightLabels and not (compactMode and mobileHideLiquidityRightLabels)
 displayHtfLines = showHtf and not (compactMode and mobileHideHtfLines)
 displayRiskLines = showRisk and not (compactMode and mobileHideRiskLines)
-displayKillzoneVisual = showKillzoneVisual and not (compactMode and mobileHideKillzoneVisual)
+displaySessionVisuals = showSessionVisuals and not (compactMode and mobileHideSessionVisuals)
 effectiveZoneDisplayMode = profileCompact ? "Minimal" : profileStrict ? "Focused" : zoneDisplayMode
 maxStructureEventObjects = 80
 maxPivotLabelObjects = 160
@@ -171,7 +171,6 @@ var float[] obOriginHighs = array.new_float()
 var float[] obOriginLows = array.new_float()
 var line[] structureEventLines = array.new_line()
 var label[] structureEventLabels = array.new_label()
-var bool[] structureEventBull = array.new_bool()
 var label[] pivotStructureLabels = array.new_label()
 var bool[] pivotStructureIsHigh = array.new_bool()
 var box[] sessionRangeBoxes = array.new_box()
@@ -320,20 +319,6 @@ f_regimeBias(int structureBias, float htfPrice, float htfTrendBase, float htfPas
     bool bullRegime = not na(htfPrice) and not na(htfTrendBase) and not na(htfPastPrice) and htfPrice > htfTrendBase and htfPrice > htfPastPrice
     bool bearRegime = not na(htfPrice) and not na(htfTrendBase) and not na(htfPastPrice) and htfPrice < htfTrendBase and htfPrice < htfPastPrice
     structureBias == 1 and bullRegime ? 1 : structureBias == -1 and bearRegime ? -1 : 0
-
-f_regimeStrength(int regimeBias, float htfPrice, float htfTrendBase, float htfPastPrice) =>
-    if regimeBias == 1
-        htfPrice > htfTrendBase and htfPrice > htfPastPrice and htfTrendBase > htfPastPrice ? "Strong" : "Normal"
-    else if regimeBias == -1
-        htfPrice < htfTrendBase and htfPrice < htfPastPrice and htfTrendBase < htfPastPrice ? "Strong" : "Normal"
-    else
-        "Neutral"
-
-f_regimeSummary(int regimeBias, string regimeStrength) =>
-    regimeBias == 1 ? "Bull " + regimeStrength : regimeBias == -1 ? "Bear " + regimeStrength : "Neutral"
-
-f_statusCompact(string statusText) =>
-    statusText == "Valid now" ? "Valid" : statusText == "Strict Ready" ? "Ready" : statusText == "Invalidated" ? "Invalid" : statusText == "Standby" ? "Standby" : statusText == "Managed" ? "Mngd" : statusText == "Replaced" ? "Newer" : statusText == "Expired" ? "Exp" : statusText == "Chased" ? "Chased" : statusText == "Filtered" ? "Filter" : statusText == "Wait KZ" ? "WaitKZ" : statusText
 
 f_zoneTouched(float zoneTop, float zoneBottom) =>
     not na(zoneTop) and not na(zoneBottom) and high >= zoneBottom and low <= zoneTop
@@ -536,7 +521,7 @@ f_candidatePriority(bool hasCandidate, bool confirmPass, int createdBar, bool is
         score
 
 f_setupExecutionState(bool hasSetup, bool invalidated, bool expired, bool chased, bool completed, bool managed, bool baseContextPass, bool confirmationPass, bool mssFresh, bool displacementSeen, bool priceInZone, bool priceNearZone) =>
-    not hasSetup ? "Waiting" : completed ? "Completed" : managed ? "Managed" : invalidated ? "Invalidated" : expired or chased ? "Expired" : not baseContextPass ? "Waiting" : not confirmationPass ? "Confirming" : mssFresh and displacementSeen ? (priceInZone or priceNearZone ? "Active" : "Armed") : "Waiting"
+    not hasSetup ? "Waiting" : completed ? "Completed" : invalidated ? "Invalidated" : managed ? "Managed" : expired or chased ? "Expired" : not baseContextPass ? "Waiting" : not confirmationPass ? "Confirming" : mssFresh and displacementSeen ? (priceInZone or priceNearZone ? "Active" : "Armed") : "Waiting"
 
 f_executionStateCompact(string stateText) =>
     stateText == "Invalidated" ? "Invalid" : stateText == "Expired" ? "Exp" : stateText == "Managed" ? "Mngd" : stateText == "Completed" ? "Done" : stateText == "Confirming" ? "Cfm" : stateText
@@ -679,13 +664,11 @@ f_setupScore(bool hasSetup, bool biasAligned, bool htfAligned, bool sweepSeen, b
         score := f_clamp(points / maxPoints * 100.0, 0.0, 100.0)
     score
 
-f_tpProbability(float confidence, float rr, bool priceInZone, bool priceNearZone, bool managed, bool strictModeEnabled, bool strictContextPass, bool strictKillzonePass, bool chased, bool expired, bool invalidated) =>
+f_tpProbability(float confidence, bool priceInZone, bool priceNearZone, bool chased, bool expired, bool invalidated) =>
     float probability = na
     if not na(confidence)
         probability := confidence
-        probability += rr >= 2.0 ? 6.0 : rr >= 1.2 ? 3.0 : -6.0
-        probability += managed ? 4.0 : priceInZone ? 3.0 : priceNearZone ? 1.0 : 0.0
-        probability -= strictModeEnabled and (not strictContextPass or not strictKillzonePass) ? 10.0 : 0.0
+        probability += priceInZone ? 3.0 : priceNearZone ? 1.0 : 0.0
         probability -= chased ? 12.0 : 0.0
         probability -= expired ? 14.0 : 0.0
         probability -= invalidated ? 25.0 : 0.0
@@ -752,14 +735,13 @@ f_trimOb() =>
         array.shift(obOriginLows)
 
 f_trimStructureEvents() =>
-    while array.size(structureEventBull) > maxStructureEventObjects
+    while array.size(structureEventLines) > maxStructureEventObjects
         oldLine = array.shift(structureEventLines)
         if not na(oldLine)
             line.delete(oldLine)
         oldLabel = array.shift(structureEventLabels)
         if not na(oldLabel)
             label.delete(oldLabel)
-        array.shift(structureEventBull)
 
 f_trimPivotLabels() =>
     while array.size(pivotStructureIsHigh) > maxPivotLabelObjects
@@ -785,7 +767,6 @@ f_drawStructureEvent(int fromBar, float level, string eventText, bool isBull) =>
             eventLabel = label.new(x=time, y=level, text=eventText, xloc=xloc.bar_time, style=label.style_none, color=color.new(color.black, 100), textcolor=structureTextColor, size=size.tiny)
             array.push(structureEventLines, eventLine)
             array.push(structureEventLabels, eventLabel)
-            array.push(structureEventBull, isBull)
             f_trimStructureEvents()
 
 // Strict OB anchor: last opposing candle after the sweep but before the FVG/displacement leg.
@@ -1009,7 +990,7 @@ float prevSessionVolRange = not na(prevVolSourceHigh) and not na(prevVolSourceLo
 //------------------------------------------------------------------------------
 // Session range visuals
 //------------------------------------------------------------------------------
-bool sessionVisualsEnabled = displayKillzoneVisual and timeframe.isintraday
+bool sessionVisualsEnabled = displaySessionVisuals and timeframe.isintraday
 
 if not sessionVisualsEnabled and array.size(sessionRangeBoxes) > 0
     f_clearSessionVisuals()
@@ -2155,10 +2136,10 @@ string longSetupDisplay = f_setupQualityText(tradeLongSetup, longQualityTier, no
 string shortSetupDisplay = f_setupQualityText(tradeShortSetup, shortQualityTier, not na(tradeShortEntry))
 
 float longConfidence = f_setupScore(not na(tradeLongEntry), longBiasAligned, longHtfAligned, bullLegHasSweep, longDisplacementSeen, tradeLongIsOb, tradeLongIsFvg, longPriceInZone, longPriceNearZone, longRr, longFresh, longManaged, strictModeEnabled, strictLongContextPass, strictLongKillzonePass, longReplaced, longChased, longExpired, longInvalidated)
-float longTpProbability = f_tpProbability(longConfidence, longRr, longPriceInZone, longPriceNearZone, longManaged, strictModeEnabled, strictLongContextPass, strictLongKillzonePass, longChased, longExpired, longInvalidated)
+float longTpProbability = f_tpProbability(longConfidence, longPriceInZone, longPriceNearZone, longChased, longExpired, longInvalidated)
 
 float shortConfidence = f_setupScore(not na(tradeShortEntry), shortBiasAligned, shortHtfAligned, bearLegHasSweep, shortDisplacementSeen, tradeShortIsOb, tradeShortIsFvg, shortPriceInZone, shortPriceNearZone, shortRr, shortFresh, shortManaged, strictModeEnabled, strictShortContextPass, strictShortKillzonePass, shortReplaced, shortChased, shortExpired, shortInvalidated)
-float shortTpProbability = f_tpProbability(shortConfidence, shortRr, shortPriceInZone, shortPriceNearZone, shortManaged, strictModeEnabled, strictShortContextPass, strictShortKillzonePass, shortChased, shortExpired, shortInvalidated)
+float shortTpProbability = f_tpProbability(shortConfidence, shortPriceInZone, shortPriceNearZone, shortChased, shortExpired, shortInvalidated)
 
 int selectedBullFvgBar = tradeLongIsFvg ? tradeLongCreatedBar : na
 int selectedBearFvgBar = tradeShortIsFvg ? tradeShortCreatedBar : na
