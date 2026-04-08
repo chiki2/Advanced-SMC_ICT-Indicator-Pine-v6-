@@ -351,6 +351,10 @@ Dalam strict mode, ringkasan ini juga membawa jalur setup singkat:
 - `iCtx` = ada `iFVG` aktif yang sedang memberi konteks tambahan
 - `iCtx+` = ada `iFVG` aktif dan posisinya selaras dengan setup yang sedang dibaca
 
+Jika sisi `Long` atau `Short` sudah tidak actionable lagi:
+- baris `Sess/Cfm` untuk sisi itu akan ditulis `Retired`
+- ini sengaja supaya dashboard tidak terus membahas konfirmasi untuk setup yang sudah selesai, invalid, atau basi
+
 ### Next
 
 Menunjukkan:

@@ -563,6 +563,9 @@ f_dashboardSetupText(string setupText, bool retired) =>
 f_dashboardLifeText(string lifeText, bool retired) =>
     retired ? "Retired" : lifeText
 
+f_dashboardContextText(string contextText, bool retired) =>
+    retired ? "Retired" : contextText
+
 f_hybridStopDistance(float structuralDistance, float sessionVolRange, float atrLevel) =>
     float result = structuralDistance
     if not na(structuralDistance) and structuralDistance > 0 and not na(sessionVolRange) and sessionVolRange > 0 and not na(atrLevel) and atrLevel > 0
@@ -2439,6 +2442,8 @@ string longRrConfSummary = f_dashboardDetail(f_formatRr(longRr) + " | " + f_form
 string shortRrConfSummary = f_dashboardDetail(f_formatRr(shortRr) + " | " + f_formatPercent(shortConfidence), shortDashboardRetired)
 string longLifeSummary = f_dashboardLifeText(f_lifecycleText(longSetupAge, tradeLongTouched), longDashboardRetired)
 string shortLifeSummary = f_dashboardLifeText(f_lifecycleText(shortSetupAge, tradeShortTouched), shortDashboardRetired)
+string longSessionConfirmSummary = f_dashboardContextText(longConfirmationSummary, longDashboardRetired)
+string shortSessionConfirmSummary = f_dashboardContextText(shortConfirmationSummary, shortDashboardRetired)
 
 bullStop = not na(tradeLongStop) ? tradeLongStop : not na(lastSwingLow) ? lastSwingLow - atr * stopAtrBuffer : na
 bearStop = not na(tradeShortStop) ? tradeShortStop : not na(lastSwingHigh) ? lastSwingHigh + atr * stopAtrBuffer : na
@@ -2615,8 +2620,8 @@ if barstate.islast and showDashboard and not compactDashboardMode
 
     f_setCell(dashboard, 0, 9, "Sess/Cfm", color.white, panelCellBg)
     f_setCell(dashboard, 1, 9, sessionConfirmMarketSummary, color.white, color.new(strictModeEnabled ? color.teal : neutralColor, 15))
-    f_setCell(dashboard, 2, 9, longConfirmationSummary, color.white, panelBullBg)
-    f_setCell(dashboard, 3, 9, shortConfirmationSummary, color.white, panelBearBg)
+    f_setCell(dashboard, 2, 9, longSessionConfirmSummary, color.white, panelBullBg)
+    f_setCell(dashboard, 3, 9, shortSessionConfirmSummary, color.white, panelBearBg)
 
     f_setCell(dashboard, 0, 10, "Next", color.white, panelCellBg)
     f_setCell(dashboard, 1, 10, effectiveModeSummary + " | " + mtfSummary + " | " + oteActiveSummary, color.white, panelCellBg)

@@ -130,6 +130,7 @@ Flow sehat indikator dalam `Strict Confirm`:
 - jika compact menulis setup seperti `Bullish OB | Q2 | Ctx`, itu berarti setup kandidat sudah ada tetapi masih `context-only`
 - jika compact menulis `Ctx+i`, itu berarti ada `iFVG` aktif yang sedang menambah konteks
 - jika compact menulis `Ctx+i+`, itu berarti `iFVG` aktif itu juga selaras dengan setup kandidat
+- jika sisi dashboard full sudah `Retired`, maka `Sess/Cfm` sisi itu juga ikut `Retired`
 - selama `Zone` dan `E / SL / TP` masih `-`, trader tetap membaca kondisi itu sebagai `scan`, bukan entry
 
 ### Baca `Next`
