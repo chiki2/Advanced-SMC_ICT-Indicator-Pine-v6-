@@ -45,7 +45,7 @@ string zoneDisplayMode = input.string("Full", "Zone display mode", options=["Ful
 groupContext = "4. Context"
 bool showHtf = input.bool(true, "Show context HTF structure", group=groupContext)
 bool showProtectedLevels = input.bool(true, "Show protected high / low", group=groupContext)
-bool showSessionVisuals = input.bool(true, "Show trading sessions on chart", group=groupContext)
+bool showKillzoneVisual = input.bool(true, "Show trading sessions on chart", group=groupContext)
 bool showLiquidityRightLabels = input.bool(true, "Show right-edge liquidity labels", group=groupContext)
 bool stopOnInvalidTf = true
 int htfSwingLen = 2
@@ -70,7 +70,7 @@ int strictMssLookback = 10
 
 groupDashboard = "5. Dashboard"
 bool showDashboard = input.bool(true, "Show context dashboard", group=groupDashboard)
-bool compactDashboardInput = input.bool(false, "Compact dashboard mode", group=groupDashboard)
+bool androidCompactMode = input.bool(false, "Compact dashboard mode", group=groupDashboard)
 bool mobileCompactDashboard = true
 bool mobileCompactLabels = true
 bool mobileHideStructureLabels = true
@@ -80,7 +80,7 @@ bool mobileHideLiquidityRightLabels = true
 bool mobileHideHtfLines = true
 bool mobileHideRiskLines = true
 bool mobileHideTrendBackground = true
-bool mobileHideSessionVisuals = true
+bool mobileHideKillzoneVisual = true
 
 //------------------------------------------------------------------------------
 // Styling and helpers
@@ -96,6 +96,8 @@ panelBullBg = color.new(color.rgb(36, 54, 48), 26)
 panelBearBg = color.new(color.rgb(65, 44, 44), 26)
 fvgBullColor = color.new(color.rgb(33, 150, 120), 90)
 fvgBearColor = color.new(color.rgb(206, 81, 81), 90)
+ifvgBullColor = color.new(color.rgb(66, 132, 201), 88)
+ifvgBearColor = color.new(color.rgb(212, 123, 61), 88)
 obBullColor = color.new(color.rgb(33, 150, 120), 90)
 obBearColor = color.new(color.rgb(206, 81, 81), 90)
 bbBullColor = color.new(color.rgb(33, 100, 180), 88)
@@ -122,7 +124,7 @@ profileCompact = usagePreset == "Compact"
 profileStrict = usagePreset == "Strict Confirm"
 presetLabel = usagePreset
 strictModeEnabled = profileStrict
-compactMode = profileCompact or compactDashboardInput
+compactMode = profileCompact or androidCompactMode
 compactDashboardMode = compactMode and mobileCompactDashboard
 dashboardEnabled = showDashboard
 displayStructureLabels = showStructureLabels and not (compactMode and mobileHideStructureLabels)
@@ -135,7 +137,7 @@ displayDealingRange = displayInternalRange
 displayLiquidityRightLabels = showLiquidityRightLabels and not (compactMode and mobileHideLiquidityRightLabels)
 displayHtfLines = showHtf and not (compactMode and mobileHideHtfLines)
 displayRiskLines = showRisk and not (compactMode and mobileHideRiskLines)
-displaySessionVisuals = showSessionVisuals and not (compactMode and mobileHideSessionVisuals)
+displayKillzoneVisual = showKillzoneVisual and not (compactMode and mobileHideKillzoneVisual)
 effectiveZoneDisplayMode = profileCompact ? "Minimal" : profileStrict ? "Focused" : zoneDisplayMode
 maxStructureEventObjects = 80
 maxPivotLabelObjects = 160
@@ -169,6 +171,7 @@ var float[] obOriginHighs = array.new_float()
 var float[] obOriginLows = array.new_float()
 var line[] structureEventLines = array.new_line()
 var label[] structureEventLabels = array.new_label()
+var bool[] structureEventBull = array.new_bool()
 var label[] pivotStructureLabels = array.new_label()
 var bool[] pivotStructureIsHigh = array.new_bool()
 var box[] sessionRangeBoxes = array.new_box()
@@ -182,6 +185,18 @@ var label htfHighLabel = na
 var label htfLowLabel = na
 var label longStopLabel = na
 var label shortStopLabel = na
+var float bullIfvgTop = na
+var float bullIfvgBottom = na
+var int bullIfvgCreatedBar = na
+var bool bullIfvgTouched = false
+var box bullIfvgBox = na
+var label bullIfvgLabel = na
+var float bearIfvgTop = na
+var float bearIfvgBottom = na
+var int bearIfvgCreatedBar = na
+var bool bearIfvgTouched = false
+var box bearIfvgBox = na
+var label bearIfvgLabel = na
 var box activeAsiaSessionBox = na
 var label activeAsiaSessionLabel = na
 var line activeAsiaSessionHighLine = na
@@ -287,6 +302,19 @@ f_zoneResponseScore(bool touched, bool fresh, bool managed, bool priceInZone, bo
 
 f_zoneDisplacementScore(bool displacementSeen) =>
     displacementSeen ? 2 : 0
+
+f_zoneAtrExpansionScore(float departureRange, float atrLevel) =>
+    na(departureRange) or na(atrLevel) or atrLevel <= 0 ? 0 : departureRange >= atrLevel * 2.0 ? 2 : departureRange >= atrLevel ? 1 : 0
+
+f_zoneQualityTier(bool hasSetup, int responseScore, int displacementScore, int atrExpansionScore) =>
+    if not hasSetup
+        "-"
+    else
+        int totalScore = responseScore + displacementScore + atrExpansionScore
+        totalScore >= 5 ? "Q3" : totalScore >= 3 ? "Q2" : "Q1"
+
+f_setupQualityText(string setupText, string qualityTier, bool hasSetup) =>
+    not hasSetup or qualityTier == "-" ? setupText : setupText + " | " + qualityTier
 
 f_regimeBias(int structureBias, float htfPrice, float htfTrendBase, float htfPastPrice) =>
     bool bullRegime = not na(htfPrice) and not na(htfTrendBase) and not na(htfPastPrice) and htfPrice > htfTrendBase and htfPrice > htfPastPrice
@@ -489,7 +517,13 @@ f_setupPathText(bool hasSetup, bool isFvg, bool isOb, bool usesDolTarget, bool c
         string dolText = usesDolTarget ? (compactText ? ">D" : " > DOL") : ""
         poiText + dolText
 
-f_candidatePriority(bool hasCandidate, bool confirmPass, int createdBar, int freshBarsWindow) =>
+f_ifvgLabelText(bool isBull) =>
+    compactMode and mobileCompactLabels ? (isBull ? "iFVG+" : "iFVG-") : (isBull ? "Bullish iFVG" : "Bearish iFVG")
+
+f_appendIfvgContext(string baseText, bool hasIfvg, bool ifvgSupport, bool compactText) =>
+    hasIfvg and baseText != "-" ? baseText + (compactText ? (ifvgSupport ? " | i+" : " | i") : (ifvgSupport ? " | iCtx+" : " | iCtx")) : baseText
+
+f_candidatePriority(bool hasCandidate, bool confirmPass, int createdBar, bool isPreferredType, int freshBarsWindow) =>
     if not hasCandidate
         -1000.0
     else
@@ -498,6 +532,7 @@ f_candidatePriority(bool hasCandidate, bool confirmPass, int createdBar, int fre
         score += candidateAge <= freshBarsWindow ? 20.0 : 0.0
         float recencyScale = freshBarsWindow > 0 ? 10.0 / freshBarsWindow : 0.0
         score += math.max(0.0, 10.0 - candidateAge * recencyScale)
+        score += isPreferredType ? 1.0 : 0.0
         score
 
 f_setupExecutionState(bool hasSetup, bool invalidated, bool expired, bool chased, bool completed, bool managed, bool baseContextPass, bool confirmationPass, bool mssFresh, bool displacementSeen, bool priceInZone, bool priceNearZone) =>
@@ -527,6 +562,9 @@ f_dashboardSetupText(string setupText, bool retired) =>
 
 f_dashboardLifeText(string lifeText, bool retired) =>
     retired ? "Retired" : lifeText
+
+f_dashboardContextText(string contextText, bool retired) =>
+    retired ? "Retired" : contextText
 
 f_hybridStopDistance(float structuralDistance, float sessionVolRange, float atrLevel) =>
     float result = structuralDistance
@@ -619,17 +657,21 @@ f_executionSelectedLineWidth(string stateText) =>
 f_preferredExecutionText(string preferredDirection, string longExecutionState, string shortExecutionState, bool compactText) =>
     preferredDirection == "Long" ? "Long | " + (compactText ? f_executionStateCompact(longExecutionState) : longExecutionState) : preferredDirection == "Short" ? "Short | " + (compactText ? f_executionStateCompact(shortExecutionState) : shortExecutionState) : preferredDirection == "Balanced" ? (compactText ? "Bal | L " + f_executionStateCompact(longExecutionState) + " / S " + f_executionStateCompact(shortExecutionState) : "Balanced | L " + longExecutionState + " / S " + shortExecutionState) : compactText ? "Wait | Scan" : "Wait | Scan"
 
-f_setupScore(bool hasSetup, bool biasAligned, bool htfAligned, bool displacementSeen, bool priceInZone, bool priceNearZone, float rr, bool fresh, bool replaced, bool chased, bool expired, bool invalidated) =>
+f_setupScore(bool hasSetup, bool biasAligned, bool htfAligned, bool sweepSeen, bool displacementSeen, bool hasOb, bool hasFvg, bool priceInZone, bool priceNearZone, float rr, bool fresh, bool managed, bool strictModeEnabled, bool strictContextPass, bool strictKillzonePass, bool replaced, bool chased, bool expired, bool invalidated) =>
     float score = na
     if hasSetup
         float points = 1.0
-        float maxPoints = 9.0
+        float maxPoints = 13.0
         points += biasAligned ? 2.0 : 0.0
         points += htfAligned ? 1.0 : 0.0
+        points += sweepSeen ? 1.0 : 0.0
         points += displacementSeen ? 1.0 : 0.0
+        points += hasOb ? 1.0 : hasFvg ? 1.0 : 0.0
         points += priceInZone ? 2.0 : priceNearZone ? 1.0 : 0.0
         points += f_rrPoints(rr)
         points += fresh ? 1.0 : 0.0
+        points += managed ? 1.0 : 0.0
+        points += strictModeEnabled and strictContextPass and strictKillzonePass ? 1.0 : 0.0
         points -= replaced ? 1.0 : 0.0
         points -= chased ? 2.0 : 0.0
         points -= expired ? 2.0 : 0.0
@@ -637,10 +679,13 @@ f_setupScore(bool hasSetup, bool biasAligned, bool htfAligned, bool displacement
         score := f_clamp(points / maxPoints * 100.0, 0.0, 100.0)
     score
 
-f_tpProbability(float confidence, bool chased, bool expired, bool invalidated) =>
+f_tpProbability(float confidence, float rr, bool priceInZone, bool priceNearZone, bool managed, bool strictModeEnabled, bool strictContextPass, bool strictKillzonePass, bool chased, bool expired, bool invalidated) =>
     float probability = na
     if not na(confidence)
         probability := confidence
+        probability += rr >= 2.0 ? 6.0 : rr >= 1.2 ? 3.0 : -6.0
+        probability += managed ? 4.0 : priceInZone ? 3.0 : priceNearZone ? 1.0 : 0.0
+        probability -= strictModeEnabled and (not strictContextPass or not strictKillzonePass) ? 10.0 : 0.0
         probability -= chased ? 12.0 : 0.0
         probability -= expired ? 14.0 : 0.0
         probability -= invalidated ? 25.0 : 0.0
@@ -707,13 +752,14 @@ f_trimOb() =>
         array.shift(obOriginLows)
 
 f_trimStructureEvents() =>
-    while array.size(structureEventLines) > maxStructureEventObjects
+    while array.size(structureEventBull) > maxStructureEventObjects
         oldLine = array.shift(structureEventLines)
         if not na(oldLine)
             line.delete(oldLine)
         oldLabel = array.shift(structureEventLabels)
         if not na(oldLabel)
             label.delete(oldLabel)
+        array.shift(structureEventBull)
 
 f_trimPivotLabels() =>
     while array.size(pivotStructureIsHigh) > maxPivotLabelObjects
@@ -739,6 +785,7 @@ f_drawStructureEvent(int fromBar, float level, string eventText, bool isBull) =>
             eventLabel = label.new(x=time, y=level, text=eventText, xloc=xloc.bar_time, style=label.style_none, color=color.new(color.black, 100), textcolor=structureTextColor, size=size.tiny)
             array.push(structureEventLines, eventLine)
             array.push(structureEventLabels, eventLabel)
+            array.push(structureEventBull, isBull)
             f_trimStructureEvents()
 
 // Strict OB anchor: last opposing candle after the sweep but before the FVG/displacement leg.
@@ -962,7 +1009,7 @@ float prevSessionVolRange = not na(prevVolSourceHigh) and not na(prevVolSourceLo
 //------------------------------------------------------------------------------
 // Session range visuals
 //------------------------------------------------------------------------------
-bool sessionVisualsEnabled = displaySessionVisuals and timeframe.isintraday
+bool sessionVisualsEnabled = displayKillzoneVisual and timeframe.isintraday
 
 if not sessionVisualsEnabled and array.size(sessionRangeBoxes) > 0
     f_clearSessionVisuals()
@@ -1269,7 +1316,10 @@ if array.size(fvgBoxes) > 0
         zoneTop = array.get(fvgTops, i)
         zoneBottom = array.get(fvgBottoms, i)
         zoneBull = array.get(fvgBull, i)
+        zoneCreatedBar = array.get(fvgCreatedBars, i)
         zoneTouched = array.get(fvgTouched, i)
+        float originalZoneTop = zoneTop
+        float originalZoneBottom = zoneBottom
         removeZone = false
         if f_zoneTouched(zoneTop, zoneBottom)
             array.set(fvgTouched, i, true)
@@ -1281,6 +1331,11 @@ if array.size(fvgBoxes) > 0
                 if not na(zoneBox)
                     box.set_top(zoneBox, zoneTop)
             if low <= zoneBottom
+                if zoneTouched and not na(zoneCreatedBar) and bar_index > zoneCreatedBar and close < open and f_breakDown(zoneBottom)
+                    bearIfvgTop := originalZoneTop
+                    bearIfvgBottom := originalZoneBottom
+                    bearIfvgCreatedBar := bar_index
+                    bearIfvgTouched := false
                 removeZone := true
         else
             if high > zoneBottom
@@ -1289,6 +1344,11 @@ if array.size(fvgBoxes) > 0
                 if not na(zoneBox)
                     box.set_bottom(zoneBox, zoneBottom)
             if high >= zoneTop
+                if zoneTouched and not na(zoneCreatedBar) and bar_index > zoneCreatedBar and close > open and f_breakUp(zoneTop)
+                    bullIfvgTop := originalZoneTop
+                    bullIfvgBottom := originalZoneBottom
+                    bullIfvgCreatedBar := bar_index
+                    bullIfvgTouched := false
                 removeZone := true
         if not na(zoneLabel)
             label.set_y(zoneLabel, f_zoneMid(zoneTop, zoneBottom))
@@ -1313,6 +1373,28 @@ if array.size(fvgBoxes) > 0
             array.remove(fvgBull, i)
             array.remove(fvgCreatedBars, i)
             array.remove(fvgTouched, i)
+
+if not na(bullIfvgCreatedBar)
+    if bar_index > bullIfvgCreatedBar and f_zoneTouched(bullIfvgTop, bullIfvgBottom)
+        bullIfvgTouched := true
+    bool bullIfvgExpired = bar_index - bullIfvgCreatedBar > expiryBarsEffective
+    bool bullIfvgInvalidated = f_breakDown(bullIfvgBottom)
+    if bullIfvgExpired or bullIfvgInvalidated
+        bullIfvgTop := na
+        bullIfvgBottom := na
+        bullIfvgCreatedBar := na
+        bullIfvgTouched := false
+
+if not na(bearIfvgCreatedBar)
+    if bar_index > bearIfvgCreatedBar and f_zoneTouched(bearIfvgTop, bearIfvgBottom)
+        bearIfvgTouched := true
+    bool bearIfvgExpired = bar_index - bearIfvgCreatedBar > expiryBarsEffective
+    bool bearIfvgInvalidated = f_breakUp(bearIfvgTop)
+    if bearIfvgExpired or bearIfvgInvalidated
+        bearIfvgTop := na
+        bearIfvgBottom := na
+        bearIfvgCreatedBar := na
+        bearIfvgTouched := false
 
 if not na(bullSequenceSweepBar) and (bar_index - bullSequenceSweepBar) > obValidationLookback
     bullSequenceSweepBar := na
@@ -1582,11 +1664,7 @@ else
     htfStructureLow := na
     htfBias := 0
 
-int regimeBias = htfContextReady ? f_regimeBias(htfBias, htfClose, htfTrendBase, htfPastClose) : 0
-string regimeStrength = htfContextReady ? f_regimeStrength(regimeBias, htfClose, htfTrendBase, htfPastClose) : "Neutral"
-string regimeSummary = htfContextReady ? f_regimeSummary(regimeBias, regimeStrength) : "HTF Guard"
-
-activeBias = not na(lastStructureBreakBar) and (bar_index - lastStructureBreakBar) > consolidationBars ? 0 : trendBias
+activeBias = trendBias
 strictKillzoneActive = timeframe.isintraday and not na(time(timeframe.period, strictKillzoneSession, ictSessionTimezone))
 liquiditySessionSummary = "A-ICT " + f_sessionCode(currentSessionBlock) + ">" + f_sessionCode(liquiditySessionLabel)
 timezoneSummary = "NY TZ"
@@ -1833,15 +1911,15 @@ if strictModeEnabled
         preferBearOb := not preferBearFvg and hasBearOb
 else
     // In standard mode, rank candidates simply: confirm pass > freshness/recency > FVG tie-break.
-    float bullFvgPriority = f_candidatePriority(hasBullFvg, bullFvgZoneConfirmPass, latestBullFvgCreatedBar, freshBarsEffective)
-    float bullObPriority = f_candidatePriority(hasBullOb, bullObZoneConfirmPass, latestBullZoneCreatedBar, freshBarsEffective)
+    float bullFvgPriority = f_candidatePriority(hasBullFvg, bullFvgZoneConfirmPass, latestBullFvgCreatedBar, true, freshBarsEffective)
+    float bullObPriority = f_candidatePriority(hasBullOb, bullObZoneConfirmPass, latestBullZoneCreatedBar, false, freshBarsEffective)
     if bullFvgPriority >= bullObPriority and hasBullFvg
         preferBullFvg := true
     else if hasBullOb
         preferBullOb := true
 
-    float bearFvgPriority = f_candidatePriority(hasBearFvg, bearFvgZoneConfirmPass, latestBearFvgCreatedBar, freshBarsEffective)
-    float bearObPriority = f_candidatePriority(hasBearOb, bearObZoneConfirmPass, latestBearZoneCreatedBar, freshBarsEffective)
+    float bearFvgPriority = f_candidatePriority(hasBearFvg, bearFvgZoneConfirmPass, latestBearFvgCreatedBar, true, freshBarsEffective)
+    float bearObPriority = f_candidatePriority(hasBearOb, bearObZoneConfirmPass, latestBearZoneCreatedBar, false, freshBarsEffective)
     if bearFvgPriority >= bearObPriority and hasBearFvg
         preferBearFvg := true
     else if hasBearOb
@@ -1972,7 +2050,9 @@ bool strictLongContextPass = strictLongBiasPass and strictLongSweepPass and stri
 bool longBaseContextPass = activeBias == 1 and bullLegHasSweep and bullLegHasMss
 bool longConfirmationPass = not strictModeEnabled or (strictLongContextPass and strictLongKillzonePass)
 bool longExecutionFreshPass = strictModeEnabled ? strictLongMssFresh : bullLegHasMss
-string longConfirmationSummary = not na(tradeLongEntry) ? f_confirmationStateText(strictModeEnabled, strictLongContextPass, strictLongKillzonePass, false) + " | " + f_setupPathText(true, tradeLongIsFvg, tradeLongIsOb, longUsesExternalDolTarget, false) : "-"
+bool longHasIfvgContext = not na(bullIfvgCreatedBar)
+bool longIfvgSupportContext = longHasIfvgContext and not na(tradeLongEntry) and (f_zoneIntersects(bullIfvgTop, bullIfvgBottom, tradeLongValidTop, tradeLongValidBottom) or f_zoneMid(bullIfvgTop, bullIfvgBottom) <= tradeLongEntry)
+string longConfirmationSummary = not na(tradeLongEntry) ? f_appendIfvgContext(f_confirmationStateText(strictModeEnabled, strictLongContextPass, strictLongKillzonePass, false) + " | " + f_setupPathText(true, tradeLongIsFvg, tradeLongIsOb, longUsesExternalDolTarget, false), longHasIfvgContext, longIfvgSupportContext, false) : "-"
 var string lastLongSetupTag = ""
 var bool longManagedLatched = false
 var bool longCompletedLatched = false
@@ -2022,7 +2102,9 @@ bool strictShortContextPass = strictShortBiasPass and strictShortSweepPass and s
 bool shortBaseContextPass = activeBias == -1 and bearLegHasSweep and bearLegHasMss
 bool shortConfirmationPass = not strictModeEnabled or (strictShortContextPass and strictShortKillzonePass)
 bool shortExecutionFreshPass = strictModeEnabled ? strictShortMssFresh : bearLegHasMss
-string shortConfirmationSummary = not na(tradeShortEntry) ? f_confirmationStateText(strictModeEnabled, strictShortContextPass, strictShortKillzonePass, false) + " | " + f_setupPathText(true, tradeShortIsFvg, tradeShortIsOb, shortUsesExternalDolTarget, false) : "-"
+bool shortHasIfvgContext = not na(bearIfvgCreatedBar)
+bool shortIfvgSupportContext = shortHasIfvgContext and not na(tradeShortEntry) and (f_zoneIntersects(bearIfvgTop, bearIfvgBottom, tradeShortValidTop, tradeShortValidBottom) or f_zoneMid(bearIfvgTop, bearIfvgBottom) >= tradeShortEntry)
+string shortConfirmationSummary = not na(tradeShortEntry) ? f_appendIfvgContext(f_confirmationStateText(strictModeEnabled, strictShortContextPass, strictShortKillzonePass, false) + " | " + f_setupPathText(true, tradeShortIsFvg, tradeShortIsOb, shortUsesExternalDolTarget, false), shortHasIfvgContext, shortIfvgSupportContext, false) : "-"
 var string lastShortSetupTag = ""
 var bool shortManagedLatched = false
 var bool shortCompletedLatched = false
@@ -2072,11 +2154,11 @@ string shortQualityTier = f_zoneQualityTier(not na(tradeShortEntry), shortRespon
 string longSetupDisplay = f_setupQualityText(tradeLongSetup, longQualityTier, not na(tradeLongEntry))
 string shortSetupDisplay = f_setupQualityText(tradeShortSetup, shortQualityTier, not na(tradeShortEntry))
 
-float longConfidence = f_setupScore(not na(tradeLongEntry), longBiasAligned, longHtfAligned, longDisplacementSeen, longPriceInZone, longPriceNearZone, longRr, longFresh, longReplaced, longChased, longExpired, longInvalidated)
-float longTpProbability = f_tpProbability(longConfidence, longChased, longExpired, longInvalidated)
+float longConfidence = f_setupScore(not na(tradeLongEntry), longBiasAligned, longHtfAligned, bullLegHasSweep, longDisplacementSeen, tradeLongIsOb, tradeLongIsFvg, longPriceInZone, longPriceNearZone, longRr, longFresh, longManaged, strictModeEnabled, strictLongContextPass, strictLongKillzonePass, longReplaced, longChased, longExpired, longInvalidated)
+float longTpProbability = f_tpProbability(longConfidence, longRr, longPriceInZone, longPriceNearZone, longManaged, strictModeEnabled, strictLongContextPass, strictLongKillzonePass, longChased, longExpired, longInvalidated)
 
-float shortConfidence = f_setupScore(not na(tradeShortEntry), shortBiasAligned, shortHtfAligned, shortDisplacementSeen, shortPriceInZone, shortPriceNearZone, shortRr, shortFresh, shortReplaced, shortChased, shortExpired, shortInvalidated)
-float shortTpProbability = f_tpProbability(shortConfidence, shortChased, shortExpired, shortInvalidated)
+float shortConfidence = f_setupScore(not na(tradeShortEntry), shortBiasAligned, shortHtfAligned, bearLegHasSweep, shortDisplacementSeen, tradeShortIsOb, tradeShortIsFvg, shortPriceInZone, shortPriceNearZone, shortRr, shortFresh, shortManaged, strictModeEnabled, strictShortContextPass, strictShortKillzonePass, shortReplaced, shortChased, shortExpired, shortInvalidated)
+float shortTpProbability = f_tpProbability(shortConfidence, shortRr, shortPriceInZone, shortPriceNearZone, shortManaged, strictModeEnabled, strictShortContextPass, strictShortKillzonePass, shortChased, shortExpired, shortInvalidated)
 
 int selectedBullFvgBar = tradeLongIsFvg ? tradeLongCreatedBar : na
 int selectedBearFvgBar = tradeShortIsFvg ? tradeShortCreatedBar : na
@@ -2084,7 +2166,7 @@ int selectedBullObBar = tradeLongIsOb ? tradeLongCreatedBar : na
 int selectedBearObBar = tradeShortIsOb ? tradeShortCreatedBar : na
 string longTargetModeSummary = f_targetModeText(not na(activeLongTarget), longUsesExternalDolTarget, longTargetIsLiquidity)
 string shortTargetModeSummary = f_targetModeText(not na(activeShortTarget), shortUsesExternalDolTarget, shortTargetIsLiquidity)
-string opTargetSummary = longTargetModeSummary == shortTargetModeSummary ? longTargetModeSummary : longTargetModeSummary == "-" ? shortTargetModeSummary : shortTargetModeSummary == "-" ? longTargetModeSummary : "Split"
+string opTargetSummary = longTargetModeSummary == shortTargetModeSummary ? longTargetModeSummary : longTargetModeSummary == "-" ? shortTargetModeSummary : shortTargetModeSummary == "-" ? longTargetModeSummary : "Mixed"
 
 if array.size(pivotStructureLabels) > 0
     for idx = 0 to array.size(pivotStructureLabels) - 1
@@ -2145,6 +2227,69 @@ if array.size(fvgBoxes) > 0
                 label.set_text(zoneLabel, isSelected ? (selectedBadge != "" ? baseLabel + " | " + selectedBadge : baseLabel) : "")
                 label.set_color(zoneLabel, color.new(color.black, 100))
                 label.set_textcolor(zoneLabel, isSelected ? color.white : color.new(color.white, 100))
+
+bool showBullIfvgVisual = showFvg and f_contextVisualByMode(effectiveZoneDisplayMode) and not na(bullIfvgCreatedBar)
+bool showBearIfvgVisual = showFvg and f_contextVisualByMode(effectiveZoneDisplayMode) and not na(bearIfvgCreatedBar)
+
+if showBullIfvgVisual
+    color bullIfvgBorder = color.new(color.rgb(66, 132, 201), bullIfvgTouched ? 28 : 8)
+    color bullIfvgFill = bullIfvgTouched ? color.new(color.rgb(66, 132, 201), 92) : ifvgBullColor
+    int bullIfvgLeft = f_safeBarIndexX(bullIfvgCreatedBar)
+    if na(bullIfvgBox)
+        bullIfvgBox := box.new(left=bullIfvgLeft, top=bullIfvgTop, right=bar_index, bottom=bullIfvgBottom, xloc=xloc.bar_index, extend=extend.right, bgcolor=bullIfvgFill, border_color=bullIfvgBorder)
+    else
+        box.set_left(bullIfvgBox, bullIfvgLeft)
+        box.set_right(bullIfvgBox, bar_index)
+        box.set_top(bullIfvgBox, bullIfvgTop)
+        box.set_bottom(bullIfvgBox, bullIfvgBottom)
+        box.set_bgcolor(bullIfvgBox, bullIfvgFill)
+        box.set_border_color(bullIfvgBox, bullIfvgBorder)
+    if na(bullIfvgLabel)
+        bullIfvgLabel := label.new(x=bar_index, y=f_zoneMid(bullIfvgTop, bullIfvgBottom), xloc=xloc.bar_index, text=f_ifvgLabelText(true), style=label.style_label_left, color=color.new(bullIfvgBorder, 0), textcolor=color.white, size=size.tiny)
+    else
+        label.set_x(bullIfvgLabel, bar_index)
+        label.set_y(bullIfvgLabel, f_zoneMid(bullIfvgTop, bullIfvgBottom))
+        label.set_text(bullIfvgLabel, f_ifvgLabelText(true))
+        label.set_style(bullIfvgLabel, label.style_label_left)
+        label.set_color(bullIfvgLabel, color.new(bullIfvgBorder, 0))
+        label.set_textcolor(bullIfvgLabel, color.white)
+else
+    if not na(bullIfvgBox)
+        box.delete(bullIfvgBox)
+        bullIfvgBox := na
+    if not na(bullIfvgLabel)
+        label.delete(bullIfvgLabel)
+        bullIfvgLabel := na
+
+if showBearIfvgVisual
+    color bearIfvgBorder = color.new(color.rgb(212, 123, 61), bearIfvgTouched ? 28 : 8)
+    color bearIfvgFill = bearIfvgTouched ? color.new(color.rgb(212, 123, 61), 92) : ifvgBearColor
+    int bearIfvgLeft = f_safeBarIndexX(bearIfvgCreatedBar)
+    if na(bearIfvgBox)
+        bearIfvgBox := box.new(left=bearIfvgLeft, top=bearIfvgTop, right=bar_index, bottom=bearIfvgBottom, xloc=xloc.bar_index, extend=extend.right, bgcolor=bearIfvgFill, border_color=bearIfvgBorder)
+    else
+        box.set_left(bearIfvgBox, bearIfvgLeft)
+        box.set_right(bearIfvgBox, bar_index)
+        box.set_top(bearIfvgBox, bearIfvgTop)
+        box.set_bottom(bearIfvgBox, bearIfvgBottom)
+        box.set_bgcolor(bearIfvgBox, bearIfvgFill)
+        box.set_border_color(bearIfvgBox, bearIfvgBorder)
+    if na(bearIfvgLabel)
+        bearIfvgLabel := label.new(x=bar_index, y=f_zoneMid(bearIfvgTop, bearIfvgBottom), xloc=xloc.bar_index, text=f_ifvgLabelText(false), style=label.style_label_left, color=color.new(bearIfvgBorder, 0), textcolor=color.white, size=size.tiny)
+    else
+        label.set_x(bearIfvgLabel, bar_index)
+        label.set_y(bearIfvgLabel, f_zoneMid(bearIfvgTop, bearIfvgBottom))
+        label.set_text(bearIfvgLabel, f_ifvgLabelText(false))
+        label.set_style(bearIfvgLabel, label.style_label_left)
+        label.set_color(bearIfvgLabel, color.new(bearIfvgBorder, 0))
+        label.set_textcolor(bearIfvgLabel, color.white)
+else
+    if not na(bearIfvgBox)
+        box.delete(bearIfvgBox)
+        bearIfvgBox := na
+    if not na(bearIfvgLabel)
+        label.delete(bearIfvgLabel)
+        bearIfvgLabel := na
 
 if array.size(obBoxes) > 0
     for idx = 0 to array.size(obBoxes) - 1
@@ -2272,13 +2417,16 @@ color compactAccent = compactNeutral ? color.new(neutralColor, 12) : compactUseL
 bool compactCandidateHasSetup = not na(compactEntry)
 bool compactCandidateRetired = compactUseLong ? longDashboardRetired : shortDashboardRetired
 string compactCandidateSetup = compactUseLong ? f_dashboardSetupText(compactSetup, longDashboardRetired) : f_dashboardSetupText(compactSetup, shortDashboardRetired)
-string compactSetupDisplay = compactBalanced ? "Both active" : compactWaiting and compactContextOnly and compactCandidateHasSetup and not compactCandidateRetired ? compactCandidateSetup + " | Ctx" : compactWaiting ? "Scan both" : compactCandidateSetup
+bool compactHasIfvgContext = compactUseLong ? longHasIfvgContext : shortHasIfvgContext
+bool compactIfvgSupportContext = compactUseLong ? longIfvgSupportContext : shortIfvgSupportContext
+string compactContextTag = compactHasIfvgContext ? (compactIfvgSupportContext ? " | Ctx+i+" : " | Ctx+i") : " | Ctx"
+string compactSetupDisplay = compactBalanced ? "Both active" : compactWaiting and compactContextOnly and compactCandidateHasSetup and not compactCandidateRetired ? compactCandidateSetup + compactContextTag : compactWaiting ? "Scan both" : compactCandidateSetup
 string compactZoneDisplay = compactNeutral ? "-" : compactUseLong ? f_dashboardDetail(f_formatRange(compactZoneTop, compactZoneBottom), longDashboardRetired) : f_dashboardDetail(f_formatRange(compactZoneTop, compactZoneBottom), shortDashboardRetired)
 string compactEntryTriplet = compactNeutral ? "-" : compactUseLong ? f_dashboardDetail(f_formatLevel(compactEntry) + " | " + f_formatLevel(compactStop) + " | " + f_formatLevel(compactTarget), longDashboardRetired) : f_dashboardDetail(f_formatLevel(compactEntry) + " | " + f_formatLevel(compactStop) + " | " + f_formatLevel(compactTarget), shortDashboardRetired)
-string compactStatusDisplay = compactBalanced ? "Split" : compactWaiting and compactContextOnly and compactCandidateHasSetup and not compactCandidateRetired ? "Ctx" : compactWaiting ? "Scan" : f_executionStateCompact(compactExecutionState)
+string compactStatusDisplay = compactBalanced ? "Mixed" : compactWaiting and compactContextOnly and compactCandidateHasSetup and not compactCandidateRetired ? "Ctx" : compactWaiting ? "Scan" : f_executionStateCompact(compactExecutionState)
 string compactConfTpLabel = compactNeutral ? (compactContextOnly ? "Ctx L/S" : "Conf L/S") : "Conf / TP"
 string compactConfTpDisplay = compactNeutral ? "L " + f_formatPercent(longConfidence) + " / S " + f_formatPercent(shortConfidence) : compactUseLong ? f_dashboardDetail(f_formatPercent(compactConfidence) + " / " + f_formatPercent(compactTpProbability), longDashboardRetired) : f_dashboardDetail(f_formatPercent(compactConfidence) + " / " + f_formatPercent(compactTpProbability), shortDashboardRetired)
-string compactLifecycleDisplay = compactBalanced ? "Split" : compactWaiting ? "Scan" : compactUseLong ? f_dashboardLifeText(f_compactLifecycleText(compactUseLong, longSetupAge, tradeLongTouched, shortSetupAge, tradeShortTouched), longDashboardRetired) : f_dashboardLifeText(f_compactLifecycleText(compactUseLong, longSetupAge, tradeLongTouched, shortSetupAge, tradeShortTouched), shortDashboardRetired)
+string compactLifecycleDisplay = compactBalanced ? "Mixed" : compactWaiting ? "Scan" : compactUseLong ? f_dashboardLifeText(f_compactLifecycleText(compactUseLong, longSetupAge, tradeLongTouched, shortSetupAge, tradeShortTouched), longDashboardRetired) : f_dashboardLifeText(f_compactLifecycleText(compactUseLong, longSetupAge, tradeLongTouched, shortSetupAge, tradeShortTouched), shortDashboardRetired)
 string compactRrDrawDisplay = "-"
 string preferredExecutionSummary = f_preferredExecutionText(preferredDirection, longExecutionState, shortExecutionState, false)
 string compactPreferredSummary = f_preferredExecutionText(preferredDirection, longExecutionState, shortExecutionState, true)
@@ -2294,6 +2442,8 @@ string longRrConfSummary = f_dashboardDetail(f_formatRr(longRr) + " | " + f_form
 string shortRrConfSummary = f_dashboardDetail(f_formatRr(shortRr) + " | " + f_formatPercent(shortConfidence), shortDashboardRetired)
 string longLifeSummary = f_dashboardLifeText(f_lifecycleText(longSetupAge, tradeLongTouched), longDashboardRetired)
 string shortLifeSummary = f_dashboardLifeText(f_lifecycleText(shortSetupAge, tradeShortTouched), shortDashboardRetired)
+string longSessionConfirmSummary = f_dashboardContextText(longConfirmationSummary, longDashboardRetired)
+string shortSessionConfirmSummary = f_dashboardContextText(shortConfirmationSummary, shortDashboardRetired)
 
 bullStop = not na(tradeLongStop) ? tradeLongStop : not na(lastSwingLow) ? lastSwingLow - atr * stopAtrBuffer : na
 bearStop = not na(tradeShortStop) ? tradeShortStop : not na(lastSwingHigh) ? lastSwingHigh + atr * stopAtrBuffer : na
@@ -2470,8 +2620,8 @@ if barstate.islast and showDashboard and not compactDashboardMode
 
     f_setCell(dashboard, 0, 9, "Sess/Cfm", color.white, panelCellBg)
     f_setCell(dashboard, 1, 9, sessionConfirmMarketSummary, color.white, color.new(strictModeEnabled ? color.teal : neutralColor, 15))
-    f_setCell(dashboard, 2, 9, longConfirmationSummary, color.white, panelBullBg)
-    f_setCell(dashboard, 3, 9, shortConfirmationSummary, color.white, panelBearBg)
+    f_setCell(dashboard, 2, 9, longSessionConfirmSummary, color.white, panelBullBg)
+    f_setCell(dashboard, 3, 9, shortSessionConfirmSummary, color.white, panelBearBg)
 
     f_setCell(dashboard, 0, 10, "Next", color.white, panelCellBg)
     f_setCell(dashboard, 1, 10, effectiveModeSummary + " | " + mtfSummary + " | " + oteActiveSummary, color.white, panelCellBg)
