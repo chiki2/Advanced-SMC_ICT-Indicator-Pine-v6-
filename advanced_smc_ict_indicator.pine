@@ -47,7 +47,6 @@ bool showHtf = input.bool(true, "Show context HTF structure", group=groupContext
 bool showProtectedLevels = input.bool(true, "Show protected high / low", group=groupContext)
 bool showSessionVisuals = input.bool(true, "Show trading sessions on chart", group=groupContext)
 bool showLiquidityRightLabels = input.bool(true, "Show right-edge liquidity labels", group=groupContext)
-bool stopOnInvalidTf = true
 int htfSwingLen = 2
 int regimeMomentumLookbackBars = 20
 float regimeStrongAtrThreshold = 1.0
@@ -71,16 +70,6 @@ int strictMssLookback = 10
 groupDashboard = "5. Dashboard"
 bool showDashboard = input.bool(true, "Show context dashboard", group=groupDashboard)
 bool compactDashboardInput = input.bool(false, "Compact dashboard mode", group=groupDashboard)
-bool mobileCompactDashboard = true
-bool mobileCompactLabels = true
-bool mobileHideStructureLabels = true
-bool mobileHideEqLiquidity = true
-bool mobileHideInternalRange = true
-bool mobileHideLiquidityRightLabels = true
-bool mobileHideHtfLines = true
-bool mobileHideRiskLines = true
-bool mobileHideTrendBackground = true
-bool mobileHideSessionVisuals = true
 
 //------------------------------------------------------------------------------
 // Styling and helpers
@@ -125,18 +114,18 @@ profileStrict = usagePreset == "Strict Confirm"
 presetLabel = usagePreset
 strictModeEnabled = profileStrict
 compactMode = profileCompact
-compactDashboardMode = (profileCompact and mobileCompactDashboard) or (not profileCompact and compactDashboardInput)
-displayStructureLabels = showStructureLabels and not (compactMode and mobileHideStructureLabels)
-displayInternalRange = showInternalRange and not (compactMode and mobileHideInternalRange)
-displayEqLiquidity = showLiquidity and not (compactMode and mobileHideEqLiquidity)
+compactDashboardMode = profileCompact or (not profileCompact and compactDashboardInput)
+displayStructureLabels = showStructureLabels and not compactMode
+displayInternalRange = showInternalRange and not compactMode
+displayEqLiquidity = showLiquidity and not compactMode
 displaySweepMarkers = showLiquidity and showSweeps
-displayTrendBackground = showTrendBackground and not (compactMode and mobileHideTrendBackground)
+displayTrendBackground = showTrendBackground and not compactMode
 displayProtectedLevels = showProtectedLevels
 displayDealingRange = displayInternalRange
-displayLiquidityRightLabels = showLiquidityRightLabels and not (compactMode and mobileHideLiquidityRightLabels)
-displayHtfLines = showHtf and not (compactMode and mobileHideHtfLines)
-displayRiskLines = showRisk and not (compactMode and mobileHideRiskLines)
-displaySessionVisuals = showSessionVisuals and not (compactMode and mobileHideSessionVisuals)
+displayLiquidityRightLabels = showLiquidityRightLabels and not compactMode
+displayHtfLines = showHtf and not compactMode
+displayRiskLines = showRisk and not compactMode
+displaySessionVisuals = showSessionVisuals and not compactMode
 effectiveZoneDisplayMode = profileCompact ? "Minimal" : zoneDisplayMode
 maxStructureEventObjects = 80
 maxPivotLabelObjects = 160
@@ -249,10 +238,10 @@ f_zoneMid(float zoneTop, float zoneBottom) =>
     (zoneTop + zoneBottom) * 0.5
 
 f_fvgLabelText(bool isBull) =>
-    compactMode and mobileCompactLabels ? (isBull ? "FVG+" : "FVG-") : (isBull ? "Bullish FVG" : "Bearish FVG")
+    compactMode ? (isBull ? "FVG+" : "FVG-") : (isBull ? "Bullish FVG" : "Bearish FVG")
 
 f_obLabelText(bool isBull, bool isBreaker) =>
-    compactMode and mobileCompactLabels ? (isBreaker ? (isBull ? "BRK+" : "BRK-") : (isBull ? "OB+" : "OB-")) : (isBreaker ? (isBull ? "Bullish Breaker" : "Bearish Breaker") : (isBull ? "Bullish OB" : "Bearish OB"))
+    compactMode ? (isBreaker ? (isBull ? "BRK+" : "BRK-") : (isBull ? "OB+" : "OB-")) : (isBreaker ? (isBull ? "Bullish Breaker" : "Bearish Breaker") : (isBull ? "Bullish OB" : "Bearish OB"))
 
 f_formatLevel(float price) =>
     na(price) ? "-" : str.tostring(price, format.mintick)
@@ -448,7 +437,7 @@ f_syncRightEdgeLabel(label currentLabel, float level, string labelText, color la
     updatedLabel
 
 f_sessionVisualLabel(string sessionName) =>
-    compactMode and mobileCompactLabels ? (sessionName == "New York" ? "NY" : f_sessionCode(sessionName)) : sessionName
+    compactMode ? (sessionName == "New York" ? "NY" : f_sessionCode(sessionName)) : sessionName
 
 f_sessionFillColor(string sessionName) =>
     sessionName == "Asia" ? asiaSessionFillColor : sessionName == "London" ? londonSessionFillColor : newYorkSessionFillColor
@@ -522,25 +511,25 @@ f_setupPathText(bool hasSetup, bool isFvg, bool isOb, bool usesDolTarget, bool c
         poiText + dolText
 
 f_ifvgLabelText(bool isBull) =>
-    compactMode and mobileCompactLabels ? (isBull ? "iFVG+" : "iFVG-") : (isBull ? "Bullish iFVG" : "Bearish iFVG")
+    compactMode ? (isBull ? "iFVG+" : "iFVG-") : (isBull ? "Bullish iFVG" : "Bearish iFVG")
 
 f_appendIfvgContext(string baseText, bool hasIfvg, bool ifvgSupport, bool compactText) =>
     hasIfvg and baseText != "-" ? baseText + (compactText ? (ifvgSupport ? " | i+" : " | i") : (ifvgSupport ? " | iCtx+" : " | iCtx")) : baseText
 
-f_setupExecutionState(bool hasSetup, bool invalidated, bool expired, bool chased, bool completed, bool managed, bool baseContextPass, bool confirmationPass, bool mssFresh, bool displacementSeen, bool priceInZone, bool priceNearZone) =>
-    not hasSetup ? "Waiting" : completed ? "Completed" : invalidated ? "Invalidated" : managed ? "Managed" : expired or chased ? "Expired" : not baseContextPass ? "Waiting" : not confirmationPass ? "Confirming" : mssFresh and displacementSeen ? (priceInZone or priceNearZone ? "Active" : "Armed") : "Waiting"
+f_setupExecutionState(bool hasSetup, bool ambiguous, bool invalidated, bool expired, bool chased, bool completed, bool managed, bool baseContextPass, bool confirmationPass, bool mssFresh, bool displacementSeen, bool priceInZone, bool priceNearZone) =>
+    not hasSetup ? "Waiting" : ambiguous ? "Ambiguous" : completed ? "Completed" : invalidated ? "Invalidated" : managed ? "Managed" : expired or chased ? "Expired" : not baseContextPass ? "Waiting" : not confirmationPass ? "Confirming" : mssFresh and displacementSeen ? (priceInZone or priceNearZone ? "Active" : "Armed") : "Waiting"
 
 f_executionStateCompact(string stateText) =>
-    stateText == "Invalidated" ? "Invalid" : stateText == "Expired" ? "Exp" : stateText == "Managed" ? "Mngd" : stateText == "Completed" ? "Done" : stateText == "Confirming" ? "Cfm" : stateText
+    stateText == "Ambiguous" ? "Ambg" : stateText == "Invalidated" ? "Invalid" : stateText == "Expired" ? "Exp" : stateText == "Managed" ? "Mngd" : stateText == "Completed" ? "Done" : stateText == "Confirming" ? "Cfm" : stateText
 
 f_executionRiskVisible(string stateText) =>
     stateText == "Armed" or stateText == "Active" or stateText == "Managed"
 
 f_entryActionText(string statusText) =>
-    statusText == "Active" ? "Entry active" : statusText == "Armed" ? "Monitor retest" : statusText == "Confirming" ? "Wait confirm" : statusText == "Managed" ? "Manage trade" : statusText == "Completed" ? "Wait next setup" : statusText == "Expired" or statusText == "Invalidated" ? "Stand down" : "Wait confirmation"
+    statusText == "Active" ? "Entry active" : statusText == "Armed" ? "Monitor retest" : statusText == "Confirming" ? "Wait confirm" : statusText == "Managed" ? "Manage trade" : statusText == "Ambiguous" ? "Review candle" : statusText == "Completed" ? "Wait next setup" : statusText == "Expired" or statusText == "Invalidated" ? "Stand down" : "Wait confirmation"
 
 f_dashboardRetired(string executionState, int setupAge, bool touched, int expiryBarsWindow) =>
-    executionState == "Invalidated" or executionState == "Completed" or executionState == "Expired" or (touched and not na(setupAge) and setupAge > expiryBarsWindow and not f_executionRiskVisible(executionState) and executionState != "Confirming")
+    executionState == "Ambiguous" or executionState == "Invalidated" or executionState == "Completed" or executionState == "Expired" or (touched and not na(setupAge) and setupAge > expiryBarsWindow and not f_executionRiskVisible(executionState) and executionState != "Confirming")
 
 f_timeNormalizedBars(int baseBars, int baselineTfSeconds, int currentTfSeconds, int minBars) =>
     float baselineDurationSeconds = float(baseBars) * baselineTfSeconds
@@ -556,7 +545,7 @@ f_dashboardLifeText(string lifeText, bool retired) =>
     retired ? "Retired" : lifeText
 
 f_dashboardContextText(string contextText, string executionState, bool retired) =>
-    retired ? "Retired" : executionState == "Managed" ? "Manage trade" : executionState == "Active" ? "Entry active" : executionState == "Armed" ? "Monitor retest" : contextText
+    retired ? "Retired" : executionState == "Ambiguous" ? "Review candle" : executionState == "Managed" ? "Manage trade" : executionState == "Active" ? "Entry active" : executionState == "Armed" ? "Monitor retest" : contextText
 
 f_dashboardMarketSummary(string longValue, bool longRetired, string shortValue, bool shortRetired) =>
     string effectiveLongValue = longRetired ? "-" : longValue
@@ -643,7 +632,7 @@ f_syncSessionVisual(box currentBox, label currentLabel, line currentHighLine, li
         label.set_size(currentLabel, compactMode ? size.small : size.normal)
 
 f_executionStateBadge(string stateText, bool compactText) =>
-    stateText == "Active" ? (compactText ? "ACT" : "Active") : stateText == "Armed" ? (compactText ? "ARM" : "Armed") : stateText == "Managed" ? (compactText ? "MNG" : "Managed") : stateText == "Completed" ? (compactText ? "CMP" : "Completed") : ""
+    stateText == "Active" ? (compactText ? "ACT" : "Active") : stateText == "Armed" ? (compactText ? "ARM" : "Armed") : stateText == "Managed" ? (compactText ? "MNG" : "Managed") : stateText == "Ambiguous" ? (compactText ? "AMB" : "Ambiguous") : stateText == "Completed" ? (compactText ? "CMP" : "Completed") : ""
 
 f_executionSelectedFillAlpha(string stateText) =>
     stateText == "Active" ? 62 : stateText == "Armed" ? 70 : stateText == "Managed" ? 84 : stateText == "Completed" ? 88 : 78
@@ -686,7 +675,7 @@ htfContextReady = executionTfValid and not na(effectiveHtfSeconds) and effective
 narrativeHtfReady = executionTfValid and not na(narrativeHtfSeconds) and narrativeHtfSeconds > effectiveHtfSeconds
 tfPairInvalid = not executionTfValid
 
-if stopOnInvalidTf and tfPairInvalid
+if tfPairInvalid
     runtime.error("Invalid ICT execution timeframe: " + chartTfLabel + ". Use M1, M5, M15, or M30.")
 
 f_trimFvg() =>
@@ -844,7 +833,7 @@ f_ensureObVisual(int index) =>
         createdBar = f_safeBarIndexX(array.get(obCreatedBars, index))
         baseFill = zoneBreaker ? (zoneBull ? bbBullColor : bbBearColor) : (zoneBull ? obBullColor : obBearColor)
         baseBorder = zoneFailed ? (zoneBull ? color.new(bearColor, 35) : color.new(bullColor, 35)) : (zoneBull ? bullColor : bearColor)
-        baseLabel = zoneFailed ? (compactMode and mobileCompactLabels ? "OB?" : "Failed OB") : f_obLabelText(zoneBull, zoneBreaker)
+        baseLabel = zoneFailed ? (compactMode ? "OB?" : "Failed OB") : f_obLabelText(zoneBull, zoneBreaker)
         if na(zoneBox)
             zoneBox := box.new(left=leftBar, top=zoneTop, right=createdBar, bottom=zoneBottom, xloc=xloc.bar_index, extend=extend.right, bgcolor=baseFill, border_color=baseBorder)
             array.set(obBoxes, index, zoneBox)
@@ -1523,7 +1512,7 @@ if array.size(obBoxes) > 0
                     line.set_color(zoneLine, color.new(bearColor, 20))
                     line.set_style(zoneLine, line.style_dotted)
                 if not na(zoneLabel)
-                    label.set_text(zoneLabel, compactMode and mobileCompactLabels ? "OB?" : "Failed OB")
+                    label.set_text(zoneLabel, compactMode ? "OB?" : "Failed OB")
                     label.set_color(zoneLabel, color.new(bearColor, 20))
             else if not zoneBreaker and zoneFailed and not na(zoneFailureBar) and bar_index > zoneFailureBar and trendBias == -1 and high >= zoneBottom
                 array.set(obBull, i, false)
@@ -1559,7 +1548,7 @@ if array.size(obBoxes) > 0
                     line.set_color(zoneLine, color.new(bullColor, 20))
                     line.set_style(zoneLine, line.style_dotted)
                 if not na(zoneLabel)
-                    label.set_text(zoneLabel, compactMode and mobileCompactLabels ? "OB?" : "Failed OB")
+                    label.set_text(zoneLabel, compactMode ? "OB?" : "Failed OB")
                     label.set_color(zoneLabel, color.new(bullColor, 20))
             else if not zoneBreaker and zoneFailed and not na(zoneFailureBar) and bar_index > zoneFailureBar and trendBias == 1 and low <= zoneTop
                 array.set(obBull, i, true)
@@ -2067,12 +2056,14 @@ bool longManagedHit = tradeLongTouched and not na(longRisk) and high >= tradeLon
 if longManagedHit
     longManagedLatched := true
 bool longManagedLatchedState = currentLongSetupTag != "" and longManagedLatched
+bool longStopHit = not na(tradeLongStop) and low <= tradeLongStop
 bool longTpHit = tradeLongTouched and not na(activeLongTarget) and high >= activeLongTarget
-if longTpHit
+bool longAmbiguous = currentLongSetupTag != "" and tradeLongTouched and not longCompletedLatched and longStopHit and longTpHit
+if longTpHit and not longAmbiguous
     longCompletedLatched := true
 bool longCompleted = currentLongSetupTag != "" and longCompletedLatched
 lastLongSetupTag := currentLongSetupTag
-bool longInvalidated = (not na(tradeLongStop) and low <= tradeLongStop) or longStructureInvalidated
+bool longInvalidated = (longStopHit and not longAmbiguous) or longStructureInvalidated
 bool longManagedStale = longManagedLatchedState and not longCompleted and not na(longSetupAge) and longSetupAge > expiryBarsEffective
 bool longManaged = longManagedLatchedState and not longManagedStale
 bool longTouchedStale = tradeLongTouched and not longManagedLatchedState and not longCompleted and not na(longSetupAge) and longSetupAge > expiryBarsEffective
@@ -2117,12 +2108,14 @@ bool shortManagedHit = tradeShortTouched and not na(shortRisk) and low <= tradeS
 if shortManagedHit
     shortManagedLatched := true
 bool shortManagedLatchedState = currentShortSetupTag != "" and shortManagedLatched
+bool shortStopHit = not na(tradeShortStop) and high >= tradeShortStop
 bool shortTpHit = tradeShortTouched and not na(activeShortTarget) and low <= activeShortTarget
-if shortTpHit
+bool shortAmbiguous = currentShortSetupTag != "" and tradeShortTouched and not shortCompletedLatched and shortStopHit and shortTpHit
+if shortTpHit and not shortAmbiguous
     shortCompletedLatched := true
 bool shortCompleted = currentShortSetupTag != "" and shortCompletedLatched
 lastShortSetupTag := currentShortSetupTag
-bool shortInvalidated = (not na(tradeShortStop) and high >= tradeShortStop) or shortStructureInvalidated
+bool shortInvalidated = (shortStopHit and not shortAmbiguous) or shortStructureInvalidated
 bool shortManagedStale = shortManagedLatchedState and not shortCompleted and not na(shortSetupAge) and shortSetupAge > expiryBarsEffective
 bool shortManaged = currentShortSetupTag != "" and shortManagedLatched and not shortManagedStale
 bool shortTouchedStale = tradeShortTouched and not shortManagedLatchedState and not shortCompleted and not na(shortSetupAge) and shortSetupAge > expiryBarsEffective
@@ -2174,8 +2167,8 @@ else if currentShortSetupTag != lastShortQualityTag
     shortAtrExpansionScoreSnapshot := f_zoneAtrExpansionScore(shortDepartureRange, atr)
     shortQualityTierSnapshot := f_zoneQualityTier(true, shortResponseScoreSnapshot, shortDisplacementScoreSnapshot, shortAtrExpansionScoreSnapshot)
     lastShortQualityTag := currentShortSetupTag
-string longExecutionState = f_setupExecutionState(not na(tradeLongEntry), longInvalidated, longExpired, longChased, longCompleted, longManaged, longBaseContextPass, longConfirmationPass, longExecutionFreshPass, longDisplacementSeen, longPriceInZone, longPriceNearZone)
-string shortExecutionState = f_setupExecutionState(not na(tradeShortEntry), shortInvalidated, shortExpired, shortChased, shortCompleted, shortManaged, shortBaseContextPass, shortConfirmationPass, shortExecutionFreshPass, shortDisplacementSeen, shortPriceInZone, shortPriceNearZone)
+string longExecutionState = f_setupExecutionState(not na(tradeLongEntry), longAmbiguous, longInvalidated, longExpired, longChased, longCompleted, longManaged, longBaseContextPass, longConfirmationPass, longExecutionFreshPass, longDisplacementSeen, longPriceInZone, longPriceNearZone)
+string shortExecutionState = f_setupExecutionState(not na(tradeShortEntry), shortAmbiguous, shortInvalidated, shortExpired, shortChased, shortCompleted, shortManaged, shortBaseContextPass, shortConfirmationPass, shortExecutionFreshPass, shortDisplacementSeen, shortPriceInZone, shortPriceNearZone)
 int longResponseScore = not na(tradeLongEntry) ? longResponseScoreSnapshot : 0
 int shortResponseScore = not na(tradeShortEntry) ? shortResponseScoreSnapshot : 0
 int longDisplacementScore = not na(tradeLongEntry) ? longDisplacementScoreSnapshot : 0
@@ -2250,7 +2243,7 @@ if array.size(fvgBoxes) > 0
                 box.set_bgcolor(zoneBox, isSelected ? selectedFill : zoneTouched ? touchedFill : baseFill)
             if not na(zoneLabel)
                 string selectedExecutionState = zoneBull ? longExecutionState : shortExecutionState
-                string selectedBadge = f_executionStateBadge(selectedExecutionState, compactMode and mobileCompactLabels)
+                string selectedBadge = f_executionStateBadge(selectedExecutionState, compactMode)
                 string baseLabel = f_fvgLabelText(zoneBull)
                 if isSelected
                     label.set_x(zoneLabel, bar_index)
@@ -2361,8 +2354,8 @@ if array.size(obBoxes) > 0
                 line.set_width(zoneLine, isSelected ? f_executionSelectedLineWidth(selectedExecutionState) : 1)
             if not na(zoneLabel)
                 string selectedExecutionState = zoneBull ? longExecutionState : shortExecutionState
-                string baseLabel = zoneFailed ? (compactMode and mobileCompactLabels ? "OB?" : "Failed OB") : f_obLabelText(zoneBull, zoneBreaker)
-                string selectedBadge = zoneFailed ? "" : f_executionStateBadge(selectedExecutionState, compactMode and mobileCompactLabels)
+                string baseLabel = zoneFailed ? (compactMode ? "OB?" : "Failed OB") : f_obLabelText(zoneBull, zoneBreaker)
+                string selectedBadge = zoneFailed ? "" : f_executionStateBadge(selectedExecutionState, compactMode)
                 if isSelected
                     label.set_x(zoneLabel, bar_index)
                 label.set_text(zoneLabel, isSelected ? (selectedBadge != "" ? baseLabel + " | " + selectedBadge : baseLabel) : "")
@@ -2372,21 +2365,34 @@ if array.size(obBoxes) > 0
 string preferredDirection = "Wait"
 bool longPreferredReady = f_executionRiskVisible(longExecutionState)
 bool shortPreferredReady = f_executionRiskVisible(shortExecutionState)
+bool longPriorityCandidate = not na(tradeLongEntry) and not f_dashboardRetired(longExecutionState, longSetupAge, tradeLongTouched, expiryBarsEffective)
+bool shortPriorityCandidate = not na(tradeShortEntry) and not f_dashboardRetired(shortExecutionState, shortSetupAge, tradeShortTouched, expiryBarsEffective)
 if longPreferredReady and not shortPreferredReady
     preferredDirection := "Long"
 else if shortPreferredReady and not longPreferredReady
     preferredDirection := "Short"
 else if longPreferredReady and shortPreferredReady
-    if na(shortConfidence) or (not na(longConfidence) and longConfidence > shortConfidence + 3.0)
+    if na(shortConfidence) or (not na(longConfidence) and longConfidence > shortConfidence + 8.0)
         preferredDirection := "Long"
-    else if na(longConfidence) or shortConfidence > longConfidence + 3.0
+    else if na(longConfidence) or shortConfidence > longConfidence + 8.0
         preferredDirection := "Short"
     else
         preferredDirection := "Balanced"
 
-bool compactUseLong = preferredDirection == "Long" or ((preferredDirection == "Balanced" or preferredDirection == "Wait") and not na(longConfidence) and (na(shortConfidence) or longConfidence >= shortConfidence))
-if preferredDirection == "Wait" and na(longConfidence) and not na(shortConfidence)
+bool compactUseLong = preferredDirection == "Long"
+if preferredDirection == "Short"
     compactUseLong := false
+else if preferredDirection == "Balanced"
+    compactUseLong := na(shortConfidence) or (not na(longConfidence) and longConfidence >= shortConfidence)
+else
+    if longPriorityCandidate and not shortPriorityCandidate
+        compactUseLong := true
+    else if shortPriorityCandidate and not longPriorityCandidate
+        compactUseLong := false
+    else if not na(tradeLongCreatedBar) and not na(tradeShortCreatedBar)
+        compactUseLong := tradeLongCreatedBar >= tradeShortCreatedBar
+    else if na(tradeLongCreatedBar) and not na(tradeShortCreatedBar)
+        compactUseLong := false
 
 if effectiveZoneDisplayMode != "Full"
     if array.size(fvgBoxes) > 0
@@ -2667,7 +2673,7 @@ if barstate.islast and showDashboard and not compactDashboardMode
 else if barstate.islast and showDashboard and compactDashboardMode
     table.clear(dashboard, 0, 0, 3, 10)
     f_setCell(dashboardCompact, 0, 0, "SMC Compact", color.white, panelHeaderBg)
-    f_setCell(dashboardCompact, 1, 0, compactPreferredSummary + " | " + effectiveModeSummary, color.white, compactAccent)
+    f_setCell(dashboardCompact, 1, 0, compactPreferredSummary, color.white, compactAccent)
     f_setCell(dashboardCompact, 0, 1, "Biases", color.white, panelCellBg)
     f_setCell(dashboardCompact, 1, 1, f_biasShort(activeBias) + "/" + (htfContextReady ? f_biasShort(htfBias) : "Guard") + "/" + f_biasShort(narrativeRegimeBias), color.white, panelCellBg)
     f_setCell(dashboardCompact, 0, 2, "Setup", color.white, panelCellBg)
