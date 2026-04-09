@@ -2368,13 +2368,17 @@ if array.size(obBoxes) > 0
 string preferredDirection = "Wait"
 bool longPreferredReady = f_executionRiskVisible(longExecutionState)
 bool shortPreferredReady = f_executionRiskVisible(shortExecutionState)
-if not na(longConfidence) or not na(shortConfidence)
+if longPreferredReady and not shortPreferredReady
+    preferredDirection := "Long"
+else if shortPreferredReady and not longPreferredReady
+    preferredDirection := "Short"
+else if longPreferredReady and shortPreferredReady
     if na(shortConfidence) or (not na(longConfidence) and longConfidence > shortConfidence + 3.0)
-        preferredDirection := longPreferredReady ? "Long" : "Wait"
+        preferredDirection := "Long"
     else if na(longConfidence) or shortConfidence > longConfidence + 3.0
-        preferredDirection := shortPreferredReady ? "Short" : "Wait"
+        preferredDirection := "Short"
     else
-        preferredDirection := longPreferredReady and shortPreferredReady ? "Balanced" : longPreferredReady ? "Long" : shortPreferredReady ? "Short" : "Wait"
+        preferredDirection := "Balanced"
 
 bool compactUseLong = preferredDirection == "Long" or ((preferredDirection == "Balanced" or preferredDirection == "Wait") and not na(longConfidence) and (na(shortConfidence) or longConfidence >= shortConfidence))
 if preferredDirection == "Wait" and na(longConfidence) and not na(shortConfidence)
