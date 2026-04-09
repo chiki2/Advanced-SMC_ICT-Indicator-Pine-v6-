@@ -101,7 +101,7 @@ Jika salah satu dari tiga hal ini belum jelas, `wait`:
 | `Q3` | kualitas terbaik |
 
 `Q` = `Quality tier` zona, dibentuk dari:
-- response
+- response / confirm pada POI terpilih
 - displacement
 - ATR expansion
 

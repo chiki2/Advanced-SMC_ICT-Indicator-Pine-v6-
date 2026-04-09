@@ -295,15 +295,13 @@ f_formatRr(float rr) =>
 f_targetModeText(bool hasActiveTarget, bool usesExternalDolTarget, bool liquidityTarget) =>
     not hasActiveTarget ? "-" : usesExternalDolTarget ? "DOL" : liquidityTarget ? "Liq" : "2R"
 
-f_zoneResponseScore(bool hasSetup, float rr, bool confirmPass) =>
+f_zoneResponseScore(bool hasSetup, bool confirmPass) =>
     if not hasSetup
         0
-    else if confirmPass and not na(rr) and rr >= 1.2
+    else if confirmPass
         2
-    else if confirmPass or (not na(rr) and rr >= 1.0)
-        1
     else
-        0
+        1
 
 f_zoneDisplacementScore(bool displacementSeen) =>
     displacementSeen ? 2 : 0
@@ -642,15 +640,13 @@ f_executionSelectedLineWidth(string stateText) =>
 f_preferredExecutionText(string preferredDirection, string longExecutionState, string shortExecutionState, bool compactText) =>
     preferredDirection == "Long" ? "Long | " + (compactText ? f_executionStateCompact(longExecutionState) : longExecutionState) : preferredDirection == "Short" ? "Short | " + (compactText ? f_executionStateCompact(shortExecutionState) : shortExecutionState) : preferredDirection == "Balanced" ? (compactText ? "Bal | L " + f_executionStateCompact(longExecutionState) + " / S " + f_executionStateCompact(shortExecutionState) : "Balanced | L " + longExecutionState + " / S " + shortExecutionState) : compactText ? "Wait | Scan" : "Wait | Scan"
 
-f_setupScore(bool hasSetup, bool biasAligned, bool htfAligned, bool sweepSeen, bool displacementSeen, bool priceInZone, bool priceNearZone, float rr, bool fresh, bool replaced, bool chased, bool expired, bool invalidated) =>
+f_setupScore(bool hasSetup, bool biasAligned, bool htfAligned, bool priceInZone, bool priceNearZone, float rr, bool fresh, bool replaced, bool chased, bool expired, bool invalidated) =>
     float score = na
     if hasSetup
         float points = 1.0
-        float maxPoints = 10.0
+        float maxPoints = 8.0
         points += biasAligned ? 2.0 : 0.0
         points += htfAligned ? 1.0 : 0.0
-        points += sweepSeen ? 1.0 : 0.0
-        points += displacementSeen ? 1.0 : 0.0
         points += priceInZone ? 2.0 : priceNearZone ? 1.0 : 0.0
         points += f_rrPoints(rr)
         points += fresh ? 1.0 : 0.0
@@ -2153,7 +2149,7 @@ if currentLongSetupTag == ""
     longAtrExpansionScoreSnapshot := 0
     longQualityTierSnapshot := "-"
 else if currentLongSetupTag != lastLongQualityTag
-    longResponseScoreSnapshot := f_zoneResponseScore(true, longRr, longPoiConfirmPass)
+    longResponseScoreSnapshot := f_zoneResponseScore(true, longPoiConfirmPass)
     longDisplacementScoreSnapshot := f_zoneDisplacementScore(longDisplacementSeen)
     longAtrExpansionScoreSnapshot := f_zoneAtrExpansionScore(longDepartureRange, atr)
     longQualityTierSnapshot := f_zoneQualityTier(true, longResponseScoreSnapshot, longDisplacementScoreSnapshot, longAtrExpansionScoreSnapshot)
@@ -2165,7 +2161,7 @@ if currentShortSetupTag == ""
     shortAtrExpansionScoreSnapshot := 0
     shortQualityTierSnapshot := "-"
 else if currentShortSetupTag != lastShortQualityTag
-    shortResponseScoreSnapshot := f_zoneResponseScore(true, shortRr, shortPoiConfirmPass)
+    shortResponseScoreSnapshot := f_zoneResponseScore(true, shortPoiConfirmPass)
     shortDisplacementScoreSnapshot := f_zoneDisplacementScore(shortDisplacementSeen)
     shortAtrExpansionScoreSnapshot := f_zoneAtrExpansionScore(shortDepartureRange, atr)
     shortQualityTierSnapshot := f_zoneQualityTier(true, shortResponseScoreSnapshot, shortDisplacementScoreSnapshot, shortAtrExpansionScoreSnapshot)
@@ -2183,9 +2179,9 @@ string shortQualityTier = not na(tradeShortEntry) ? shortQualityTierSnapshot : "
 string longSetupDisplay = f_setupQualityText(tradeLongSetup, longQualityTier, not na(tradeLongEntry))
 string shortSetupDisplay = f_setupQualityText(tradeShortSetup, shortQualityTier, not na(tradeShortEntry))
 
-float longConfidence = f_setupScore(not na(tradeLongEntry), longBiasAligned, longHtfAligned, bullLegHasSweep, longDisplacementSeen, longPriceInZone, longPriceNearZone, longRr, longFresh, longReplaced, longChased, longExpired, longInvalidated)
+float longConfidence = f_setupScore(not na(tradeLongEntry), longBiasAligned, longHtfAligned, longPriceInZone, longPriceNearZone, longRr, longFresh, longReplaced, longChased, longExpired, longInvalidated)
 
-float shortConfidence = f_setupScore(not na(tradeShortEntry), shortBiasAligned, shortHtfAligned, bearLegHasSweep, shortDisplacementSeen, shortPriceInZone, shortPriceNearZone, shortRr, shortFresh, shortReplaced, shortChased, shortExpired, shortInvalidated)
+float shortConfidence = f_setupScore(not na(tradeShortEntry), shortBiasAligned, shortHtfAligned, shortPriceInZone, shortPriceNearZone, shortRr, shortFresh, shortReplaced, shortChased, shortExpired, shortInvalidated)
 
 int selectedBullFvgBar = tradeLongIsFvg ? tradeLongCreatedBar : na
 int selectedBearFvgBar = tradeShortIsFvg ? tradeShortCreatedBar : na

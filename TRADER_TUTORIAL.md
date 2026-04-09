@@ -174,7 +174,7 @@ itu berarti `Quality tier` zona:
 - `Q3` = kualitas terbaik
 
 Tier ini dibangun dari:
-- response zona
+- response / confirm pada POI terpilih
 - displacement
 - ATR expansion
 
