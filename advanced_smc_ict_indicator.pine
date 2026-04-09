@@ -464,7 +464,7 @@ f_biasSummary(int currentBias, bool htfReady, int higherBias, int regimeBias, st
     f_biasShort(currentBias) + "/" + (htfReady ? f_biasShort(higherBias) : "G") + "/R" + f_biasShort(regimeBias) + " " + f_regimeStrengthShort(regimeStrength)
 
 f_zoneVisibleByMode(string mode, bool isSelected, bool isBull, string preferredDirection, bool useLongPreference) =>
-    mode == "Full" ? true : mode == "Focused" or preferredDirection == "Balanced" ? isSelected : preferredDirection == "Wait" ? isSelected : useLongPreference ? (isBull and isSelected) : (not isBull and isSelected)
+    mode == "Full" ? true : preferredDirection == "Wait" ? isSelected : useLongPreference ? (isBull and isSelected) : (not isBull and isSelected)
 
 f_executionVisualByMode(string mode, bool riskVisible, string preferredDirection, bool isLong, bool useLongPreference) =>
     if not riskVisible
@@ -641,7 +641,20 @@ f_executionSelectedLineWidth(string stateText) =>
     stateText == "Active" ? 3 : stateText == "Armed" ? 2 : 1
 
 f_preferredExecutionText(string preferredDirection, string longExecutionState, string shortExecutionState, bool compactText) =>
-    preferredDirection == "Long" ? "Long | " + (compactText ? f_executionStateCompact(longExecutionState) : longExecutionState) : preferredDirection == "Short" ? "Short | " + (compactText ? f_executionStateCompact(shortExecutionState) : shortExecutionState) : preferredDirection == "Balanced" ? (compactText ? "Bal | L " + f_executionStateCompact(longExecutionState) + " / S " + f_executionStateCompact(shortExecutionState) : "Balanced | L " + longExecutionState + " / S " + shortExecutionState) : compactText ? "Wait | Scan" : "Wait | Scan"
+    string longStateText = compactText ? f_executionStateCompact(longExecutionState) : longExecutionState
+    string shortStateText = compactText ? f_executionStateCompact(shortExecutionState) : shortExecutionState
+    if preferredDirection == "Long"
+        "Long | " + longStateText
+    else if preferredDirection == "Short"
+        "Short | " + shortStateText
+    else if preferredDirection == "Balanced"
+        compactText ? "Bal | L " + longStateText + " / S " + shortStateText : "Balanced | L " + longExecutionState + " / S " + shortExecutionState
+    else if longExecutionState == "Ambiguous" and shortExecutionState != "Ambiguous"
+        "Long | " + longStateText
+    else if shortExecutionState == "Ambiguous" and longExecutionState != "Ambiguous"
+        "Short | " + shortStateText
+    else
+        "Wait | Scan"
 
 f_setupScore(bool hasSetup, bool biasAligned, bool htfAligned, bool priceInZone, bool priceNearZone, float rr, bool chased, bool expired, bool invalidated) =>
     float score = na
@@ -2373,9 +2386,9 @@ if longPreferredReady and not shortPreferredReady
 else if shortPreferredReady and not longPreferredReady
     preferredDirection := "Short"
 else if longPreferredReady and shortPreferredReady
-    if na(shortConfidence) or (not na(longConfidence) and longConfidence > shortConfidence + 8.0)
+    if na(shortConfidence) or (not na(longConfidence) and longConfidence > shortConfidence + 15.0)
         preferredDirection := "Long"
-    else if na(longConfidence) or shortConfidence > longConfidence + 8.0
+    else if na(longConfidence) or shortConfidence > longConfidence + 15.0
         preferredDirection := "Short"
     else
         preferredDirection := "Balanced"
@@ -2384,7 +2397,14 @@ bool compactUseLong = preferredDirection == "Long"
 if preferredDirection == "Short"
     compactUseLong := false
 else if preferredDirection == "Balanced"
-    compactUseLong := na(shortConfidence) or (not na(longConfidence) and longConfidence >= shortConfidence)
+    if longPriorityCandidate and not shortPriorityCandidate
+        compactUseLong := true
+    else if shortPriorityCandidate and not longPriorityCandidate
+        compactUseLong := false
+    else if not na(tradeLongCreatedBar) and not na(tradeShortCreatedBar)
+        compactUseLong := tradeLongCreatedBar >= tradeShortCreatedBar
+    else if na(tradeLongCreatedBar) and not na(tradeShortCreatedBar)
+        compactUseLong := false
 else
     if longPriorityCandidate and not shortPriorityCandidate
         compactUseLong := true
@@ -2461,14 +2481,15 @@ string compactCandidateSetup = compactUseLong ? f_dashboardSetupText(compactSetu
 bool compactHasIfvgContext = compactUseLong ? longHasIfvgContext : shortHasIfvgContext
 bool compactIfvgSupportContext = compactUseLong ? longIfvgSupportContext : shortIfvgSupportContext
 string compactContextTag = compactHasIfvgContext ? (compactIfvgSupportContext ? " | Ctx+i+" : " | Ctx+i") : " | Ctx"
-string compactSetupDisplay = compactBalanced ? "Both active" : compactWaiting and compactContextOnly and compactCandidateHasSetup and not compactCandidateRetired ? compactCandidateSetup + compactContextTag : compactWaiting ? "Scan both" : compactCandidateSetup
+bool compactCandidateAmbiguous = compactExecutionState == "Ambiguous"
+string compactSetupDisplay = compactBalanced ? "Both active" : compactWaiting and compactCandidateAmbiguous ? compactCandidateSetup + " | Ambg" : compactWaiting and compactContextOnly and compactCandidateHasSetup and not compactCandidateRetired ? compactCandidateSetup + compactContextTag : compactWaiting ? "Scan both" : compactCandidateSetup
 string compactZoneDisplay = compactNeutral ? "-" : compactUseLong ? f_dashboardDetail(f_formatRange(compactZoneTop, compactZoneBottom), longDashboardRetired) : f_dashboardDetail(f_formatRange(compactZoneTop, compactZoneBottom), shortDashboardRetired)
 string compactEntryTriplet = compactNeutral ? "-" : compactUseLong ? f_dashboardDetail(f_formatLevel(compactEntry) + " | " + f_formatLevel(compactStop) + " | " + f_formatLevel(compactTarget), longDashboardRetired) : f_dashboardDetail(f_formatLevel(compactEntry) + " | " + f_formatLevel(compactStop) + " | " + f_formatLevel(compactTarget), shortDashboardRetired)
-string compactStatusDisplay = compactBalanced ? "Mixed" : compactWaiting and compactContextOnly and compactCandidateHasSetup and not compactCandidateRetired ? "Ctx" : compactWaiting ? "Scan" : f_executionStateCompact(compactExecutionState)
-string compactConfTpLabel = compactNeutral ? (compactContextOnly ? "Ctx L/S" : "Conf L/S") : "Conf"
+string compactStatusDisplay = compactBalanced ? "Mixed" : compactWaiting and compactCandidateAmbiguous ? f_executionStateCompact(compactExecutionState) : compactWaiting and compactContextOnly and compactCandidateHasSetup and not compactCandidateRetired ? "Ctx" : compactWaiting ? "Scan" : f_executionStateCompact(compactExecutionState)
+string compactMetricLabel = compactNeutral ? (compactContextOnly ? "Ctx L/S" : "Conf L/S") : "Conf"
 string compactNeutralLongConfidence = f_dashboardDetail(f_formatPercent(longConfidence), longDashboardRetired)
 string compactNeutralShortConfidence = f_dashboardDetail(f_formatPercent(shortConfidence), shortDashboardRetired)
-string compactConfTpDisplay = compactNeutral ? "L " + compactNeutralLongConfidence + " / S " + compactNeutralShortConfidence : compactUseLong ? f_dashboardDetail(f_formatPercent(compactConfidence), longDashboardRetired) : f_dashboardDetail(f_formatPercent(compactConfidence), shortDashboardRetired)
+string compactMetricDisplay = compactNeutral ? "L " + compactNeutralLongConfidence + " / S " + compactNeutralShortConfidence : compactUseLong ? f_dashboardDetail(f_formatPercent(compactConfidence), longDashboardRetired) : f_dashboardDetail(f_formatPercent(compactConfidence), shortDashboardRetired)
 string compactLifecycleValue = f_compactLifecycleText(compactUseLong, longSetupAge, tradeLongTouched, shortSetupAge, tradeShortTouched)
 string compactLifecycleDisplay = compactBalanced ? "Mixed" : compactWaiting and compactContextOnly and compactCandidateHasSetup and not compactCandidateRetired ? (compactUseLong ? f_dashboardLifeText(compactLifecycleValue, longDashboardRetired) : f_dashboardLifeText(compactLifecycleValue, shortDashboardRetired)) : compactWaiting ? "Scan" : compactUseLong ? f_dashboardLifeText(compactLifecycleValue, longDashboardRetired) : f_dashboardLifeText(compactLifecycleValue, shortDashboardRetired)
 string compactRrDrawDisplay = "-"
@@ -2685,8 +2706,8 @@ else if barstate.islast and showDashboard and compactDashboardMode
     f_setCell(dashboardCompact, 1, 4, compactEntryTriplet, color.white, compactAccent)
     f_setCell(dashboardCompact, 0, 5, "Exec", color.white, panelCellBg)
     f_setCell(dashboardCompact, 1, 5, compactStatusDisplay, color.white, compactAccent)
-    f_setCell(dashboardCompact, 0, 6, compactConfTpLabel, color.white, panelCellBg)
-    f_setCell(dashboardCompact, 1, 6, compactConfTpDisplay, color.white, compactAccent)
+    f_setCell(dashboardCompact, 0, 6, compactMetricLabel, color.white, panelCellBg)
+    f_setCell(dashboardCompact, 1, 6, compactMetricDisplay, color.white, compactAccent)
     f_setCell(dashboardCompact, 0, 7, "R / DOL", color.white, panelCellBg)
     f_setCell(dashboardCompact, 1, 7, compactRrDrawDisplay, color.white, compactAccent)
     f_setCell(dashboardCompact, 0, 8, "Life", color.white, panelCellBg)

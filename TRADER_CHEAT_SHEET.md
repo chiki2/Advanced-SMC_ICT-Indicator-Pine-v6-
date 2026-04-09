@@ -89,10 +89,10 @@ Jika salah satu dari tiga hal ini belum jelas, `wait`:
 | `Z / E` | `POI` dan entry | lokasi setup |
 | `SL / TP` | stop dan target | risk plan |
 | `RR / Cf` | reward/risk dan confidence | pembanding, bukan alasan tunggal |
-| `Draw / TP` | `DOL` dan peluang model | arah tarikan external liquidity utama |
+| `Draw` | `DOL` utama | arah tarikan external liquidity utama |
 | `Next` | aksi berikutnya | baca ini paling akhir |
 
-### Baca `Q`
+### Baca `Setup Grade`
 
 | Tag | Arti |
 |---|---|
@@ -100,7 +100,7 @@ Jika salah satu dari tiga hal ini belum jelas, `wait`:
 | `Q2` | kualitas menengah |
 | `Q3` | kualitas terbaik |
 
-`Q` = `Quality tier` zona, dibentuk dari:
+`Q` = `Setup Grade`, dibentuk dari snapshot kualitas setup:
 - response / confirm pada POI terpilih
 - displacement
 - ATR expansion
@@ -139,7 +139,7 @@ Catatan:
 - `RR` = reward / risk
 - `Cf` = confidence
 - jika compact menulis `Ctx L/S`, itu masih `context strength`, belum setup siap entry
-- jika compact menulis setup seperti `Bullish OB | Q2 | Ctx`, itu berarti setup kandidat sudah ada tetapi masih `context-only`
+- jika compact menulis setup seperti `Bullish OB | Q2 | Ctx`, itu berarti setup kandidat dengan `Setup Grade Q2` sudah ada tetapi masih `context-only`
 - selama `Zone` dan `E / SL / TP` masih `-`, trader tetap membaca kondisi itu sebagai `scan`, bukan entry
 
 ### Baca `Next`
