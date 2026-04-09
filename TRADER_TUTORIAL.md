@@ -168,12 +168,12 @@ Jika nama setup di dashboard diikuti:
 - `Q2`
 - `Q3`
 
-itu berarti `Quality tier` zona:
+itu berarti `Setup Grade`:
 - `Q1` = kualitas dasar
 - `Q2` = kualitas menengah
 - `Q3` = kualitas terbaik
 
-Tier ini dibangun dari:
+Grade ini dibangun dari snapshot kualitas setup:
 - response / confirm pada POI terpilih
 - displacement
 - ATR expansion
@@ -314,7 +314,7 @@ Cara baca:
 - jika sisi tertentu sudah `Invalidated` atau `Completed`, detail ini bisa diredam menjadi `-`
 - pada compact mode, label `Ctx L/S` berarti angka yang tampil masih context strength, belum setup yang actionable
 
-### Draw / TP
+### Draw
 
 Menunjukkan:
 - `Draw` = `DOL` / external liquidity target utama
@@ -419,7 +419,7 @@ Prinsip pakai:
 - jika butuh detail penuh, lihat dashboard full
 
 Catatan penting:
-- jika compact menulis setup seperti `Bullish OB | Q2 | Ctx`, artinya ada kandidat setup yang sedang terbentuk
+- jika compact menulis setup seperti `Bullish OB | Q2 | Ctx`, itu berarti ada kandidat dengan `Setup Grade Q2` yang masih sedang terbentuk
 - `Ctx` berarti setup itu masih `context-only`, belum actionable untuk entry
 - selama `Zone` dan `E / SL / TP` masih `-`, trader sebaiknya tetap membaca itu sebagai fase scan
 - `R / DOL` berarti `Reward / Draw on Liquidity`
@@ -456,7 +456,7 @@ Gunakan indikator dengan urutan ini:
 - `Active` = entry bisa valid
 - `Managed` = kelola trade, bukan cari entry baru
 
-7. Lihat `SL / TP`, `RR / Cf`, dan `Draw / TP`
+7. Lihat `SL / TP`, `RR / Cf`, dan `Draw`
 - pastikan jarak stop dan target masih masuk akal
 
 ## Cara Pakai yang Sehat
