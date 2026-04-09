@@ -103,7 +103,7 @@ decisionPremiumFillColor = color.new(color.rgb(177, 58, 58), 92)
 decisionDiscountFillColor = color.new(color.rgb(33, 140, 96), 92)
 decisionEqColor = color.new(color.rgb(65, 126, 214), 10)
 overlayLineDisplay = display.all - display.price_scale - display.status_line
-int maxSessionVisuals = 6
+int maxSessionVisuals = 4
 
 atr = ta.atr(14)
 bodyHigh = math.max(open, close)
@@ -115,7 +115,9 @@ presetLabel = usagePreset
 strictModeEnabled = profileStrict
 compactMode = profileCompact
 compactDashboardMode = profileCompact or (not profileCompact and compactDashboardInput)
-displayStructureLabels = showStructureLabels and not compactMode
+effectiveZoneDisplayMode = profileCompact ? "Minimal" : zoneDisplayMode
+displayStructureLabels = showStructureLabels and not compactMode and effectiveZoneDisplayMode == "Full"
+displayStructureEvents = showBosMss and effectiveZoneDisplayMode == "Full"
 displayInternalRange = showInternalRange and not compactMode
 displayEqLiquidity = showLiquidity and not compactMode
 displaySweepMarkers = showLiquidity and showSweeps
@@ -125,10 +127,9 @@ displayDealingRange = displayInternalRange
 displayLiquidityRightLabels = showLiquidityRightLabels and not compactMode
 displayHtfLines = showHtf and not compactMode
 displayRiskLines = showRisk and not compactMode
-displaySessionVisuals = showSessionVisuals and not compactMode
-effectiveZoneDisplayMode = profileCompact ? "Minimal" : zoneDisplayMode
-maxStructureEventObjects = 80
-maxPivotLabelObjects = 160
+displaySessionVisuals = showSessionVisuals and not compactMode and effectiveZoneDisplayMode == "Full"
+maxStructureEventObjects = 40
+maxPivotLabelObjects = 80
 
 //------------------------------------------------------------------------------
 // Stateful arrays for FVG / OB tracking
@@ -436,6 +437,26 @@ f_syncRightEdgeLabel(label currentLabel, float level, string labelText, color la
         updatedLabel := na
     updatedLabel
 
+f_levelsClose(float levelA, float levelB, float tolerance) =>
+    not na(levelA) and not na(levelB) and not na(tolerance) and math.abs(levelA - levelB) <= tolerance
+
+f_fvgLabelStyle() =>
+    label.style_label_left
+
+f_obLabelStyle() =>
+    label.style_label_right
+
+f_ifvgLabelStyle(bool isBull) =>
+    isBull ? label.style_label_up : label.style_label_down
+
+f_hasActiveLine(line[] lineArray) =>
+    bool hasActive = false
+    if array.size(lineArray) > 0
+        for i = 0 to array.size(lineArray) - 1
+            if not na(array.get(lineArray, i))
+                hasActive := true
+    hasActive
+
 f_sessionVisualLabel(string sessionName) =>
     compactMode ? (sessionName == "New York" ? "NY" : f_sessionCode(sessionName)) : sessionName
 
@@ -449,7 +470,7 @@ f_sessionTextColor(string sessionName) =>
     color.new(f_sessionBorderColor(sessionName), compactMode ? 32 : 46)
 
 f_sessionLineColor(string sessionName, bool isHigh) =>
-    color.new(f_sessionBorderColor(sessionName), isHigh ? 8 : 18)
+    color.new(f_sessionBorderColor(sessionName), isHigh ? 24 : 34)
 
 f_setCell(table targetTable, int col, int row, string cellText, color textClr, color bgClr) =>
     table.cell(targetTable, col, row, cellText, text_color=textClr, bgcolor=bgClr, text_size=compactDashboardMode ? size.small : size.normal)
@@ -523,7 +544,7 @@ f_executionStateCompact(string stateText) =>
     stateText == "Ambiguous" ? "Ambg" : stateText == "Invalidated" ? "Invalid" : stateText == "Expired" ? "Exp" : stateText == "Managed" ? "Mngd" : stateText == "Completed" ? "Done" : stateText == "Confirming" ? "Cfm" : stateText
 
 f_executionRiskVisible(string stateText) =>
-    stateText == "Armed" or stateText == "Active" or stateText == "Managed"
+    stateText == "Armed" or stateText == "Active" or stateText == "Managed" or stateText == "Ambiguous"
 
 f_entryActionText(string statusText) =>
     statusText == "Active" ? "Entry active" : statusText == "Armed" ? "Monitor retest" : statusText == "Confirming" ? "Wait confirm" : statusText == "Managed" ? "Manage trade" : statusText == "Ambiguous" ? "Review candle" : statusText == "Completed" ? "Wait next setup" : statusText == "Expired" or statusText == "Invalidated" ? "Stand down" : "Wait confirmation"
@@ -598,8 +619,8 @@ f_addSessionVisual(string sessionName, int leftBar, float sessionHigh, float ses
     color borderColor = f_sessionBorderColor(sessionName)
     box newBox = box.new(left=safeLeftBar, top=sessionHigh, right=bar_index, bottom=sessionLow, xloc=xloc.bar_index, bgcolor=fillColor, border_color=borderColor)
     label newLabel = label.new(x=f_safeBarIndexX(int(math.floor((safeLeftBar + bar_index) * 0.5))), y=f_zoneMid(sessionHigh, sessionLow), xloc=xloc.bar_index, text=f_sessionVisualLabel(sessionName), style=label.style_none, color=color.new(color.black, 100), textcolor=f_sessionTextColor(sessionName), size=compactMode ? size.small : size.normal)
-    line newHighLine = line.new(x1=safeLeftBar, y1=sessionHigh, x2=bar_index, y2=sessionHigh, xloc=xloc.bar_index, color=f_sessionLineColor(sessionName, true), width=1, style=line.style_dotted)
-    line newLowLine = line.new(x1=safeLeftBar, y1=sessionLow, x2=bar_index, y2=sessionLow, xloc=xloc.bar_index, color=f_sessionLineColor(sessionName, false), width=1, style=line.style_dotted)
+    line newHighLine = line.new(x1=safeLeftBar, y1=sessionHigh, x2=bar_index, y2=sessionHigh, xloc=xloc.bar_index, color=f_sessionLineColor(sessionName, true), width=1, style=line.style_solid)
+    line newLowLine = line.new(x1=safeLeftBar, y1=sessionLow, x2=bar_index, y2=sessionLow, xloc=xloc.bar_index, color=f_sessionLineColor(sessionName, false), width=1, style=line.style_solid)
     array.push(sessionRangeBoxes, newBox)
     array.push(sessionRangeLabels, newLabel)
     array.push(sessionRangeNames, sessionName)
@@ -619,10 +640,12 @@ f_syncSessionVisual(box currentBox, label currentLabel, line currentHighLine, li
         int safeHighLineLeftBar = f_safeBarIndexX(leftBar)
         line.set_xy1(currentHighLine, safeHighLineLeftBar, sessionHigh)
         line.set_xy2(currentHighLine, bar_index, sessionHigh)
+        line.set_style(currentHighLine, line.style_solid)
     if not na(currentLowLine) and not na(sessionLow)
         int safeLowLineLeftBar = f_safeBarIndexX(leftBar)
         line.set_xy1(currentLowLine, safeLowLineLeftBar, sessionLow)
         line.set_xy2(currentLowLine, bar_index, sessionLow)
+        line.set_style(currentLowLine, line.style_solid)
     if not na(currentLabel) and not na(sessionHigh) and not na(sessionLow)
         label.set_x(currentLabel, f_safeBarIndexX(int(math.floor((leftBar + bar_index) * 0.5))))
         label.set_y(currentLabel, f_zoneMid(sessionHigh, sessionLow))
@@ -740,12 +763,52 @@ f_trimStructureEvents() =>
         if not na(oldLabel)
             label.delete(oldLabel)
 
+f_clearStructureEvents() =>
+    while array.size(structureEventLines) > 0
+        oldLine = array.shift(structureEventLines)
+        if not na(oldLine)
+            line.delete(oldLine)
+        oldLabel = array.shift(structureEventLabels)
+        if not na(oldLabel)
+            label.delete(oldLabel)
+
 f_trimPivotLabels() =>
     while array.size(pivotStructureIsHigh) > maxPivotLabelObjects
         oldLabel = array.shift(pivotStructureLabels)
         if not na(oldLabel)
             label.delete(oldLabel)
         array.shift(pivotStructureIsHigh)
+
+f_clearPivotLabels() =>
+    while array.size(pivotStructureLabels) > 0
+        oldLabel = array.shift(pivotStructureLabels)
+        if not na(oldLabel)
+            label.delete(oldLabel)
+        array.shift(pivotStructureIsHigh)
+
+f_deleteFvgVisual(int index) =>
+    zoneBox = array.get(fvgBoxes, index)
+    zoneLabel = array.get(fvgLabels, index)
+    if not na(zoneBox)
+        box.delete(zoneBox)
+        array.set(fvgBoxes, index, na)
+    if not na(zoneLabel)
+        label.delete(zoneLabel)
+        array.set(fvgLabels, index, na)
+
+f_deleteObVisual(int index) =>
+    zoneBox = array.get(obBoxes, index)
+    zoneLine = array.get(obEntryLines, index)
+    zoneLabel = array.get(obLabels, index)
+    if not na(zoneBox)
+        box.delete(zoneBox)
+        array.set(obBoxes, index, na)
+    if not na(zoneLine)
+        line.delete(zoneLine)
+        array.set(obEntryLines, index, na)
+    if not na(zoneLabel)
+        label.delete(zoneLabel)
+        array.set(obLabels, index, na)
 
 f_addPivotLabel(int pivotBar, float pivotPrice, string pivotText, bool isHigh) =>
     if displayStructureLabels
@@ -755,7 +818,7 @@ f_addPivotLabel(int pivotBar, float pivotPrice, string pivotText, bool isHigh) =
         f_trimPivotLabels()
 
 f_drawStructureEvent(int fromBar, float level, string eventText, bool isBull) =>
-    if showBosMss and not na(fromBar)
+    if displayStructureEvents and not na(fromBar)
         eventLineStyle = eventText == "MSS" ? line.style_dashed : line.style_dotted
         fromShift = math.max(bar_index - fromBar, 0)
         if fromShift <= 5000
@@ -829,7 +892,7 @@ f_ensureFvgVisual(int index) =>
             zoneBox := box.new(left=leftBar, top=zoneTop, right=safeCreatedBar, bottom=zoneBottom, xloc=xloc.bar_index, extend=extend.right, bgcolor=fillClr, border_color=borderClr)
             array.set(fvgBoxes, index, zoneBox)
         if na(zoneLabel)
-            zoneLabel := label.new(x=leftBar, y=f_zoneMid(zoneTop, zoneBottom), xloc=xloc.bar_index, text=f_fvgLabelText(zoneBull), style=label.style_label_left, color=color.new(borderClr, 0), textcolor=color.white, size=size.tiny)
+            zoneLabel := label.new(x=leftBar, y=f_zoneMid(zoneTop, zoneBottom), xloc=xloc.bar_index, text=f_fvgLabelText(zoneBull), style=f_fvgLabelStyle(), color=color.new(borderClr, 0), textcolor=color.white, size=size.tiny)
             array.set(fvgLabels, index, zoneLabel)
 
 f_ensureObVisual(int index) =>
@@ -852,10 +915,10 @@ f_ensureObVisual(int index) =>
             zoneBox := box.new(left=leftBar, top=zoneTop, right=createdBar, bottom=zoneBottom, xloc=xloc.bar_index, extend=extend.right, bgcolor=baseFill, border_color=baseBorder)
             array.set(obBoxes, index, zoneBox)
         if na(zoneLine)
-            zoneLine := line.new(x1=leftBar, y1=zoneEntry, x2=createdBar, y2=zoneEntry, xloc=xloc.bar_index, extend=extend.right, color=baseBorder, style=zoneBreaker or zoneFailed ? line.style_dotted : line.style_dashed)
+            zoneLine := line.new(x1=leftBar, y1=zoneEntry, x2=createdBar, y2=zoneEntry, xloc=xloc.bar_index, extend=extend.right, color=color.new(baseBorder, 100), width=1, style=zoneBreaker or zoneFailed ? line.style_dotted : line.style_dashed)
             array.set(obEntryLines, index, zoneLine)
         if na(zoneLabel)
-            zoneLabel := label.new(x=leftBar, y=f_zoneMid(zoneTop, zoneBottom), xloc=xloc.bar_index, text=baseLabel, style=label.style_label_left, color=color.new(baseBorder, 0), textcolor=color.white, size=size.tiny)
+            zoneLabel := label.new(x=leftBar, y=f_zoneMid(zoneTop, zoneBottom), xloc=xloc.bar_index, text=baseLabel, style=f_obLabelStyle(), color=color.new(baseBorder, 0), textcolor=color.white, size=size.tiny)
             array.set(obLabels, index, zoneLabel)
 
 f_addFvg(bool isBull, float zoneTop, float zoneBottom) =>
@@ -865,7 +928,7 @@ f_addFvg(bool isBull, float zoneTop, float zoneBottom) =>
     label newLabel = na
     if showFvg
         newBox := box.new(left=bar_index - 2, top=zoneTop, right=bar_index, bottom=zoneBottom, xloc=xloc.bar_index, extend=extend.right, bgcolor=fillClr, border_color=borderClr)
-        newLabel := label.new(x=bar_index - 2, y=f_zoneMid(zoneTop, zoneBottom), xloc=xloc.bar_index, text=f_fvgLabelText(isBull), style=label.style_label_left, color=color.new(borderClr, 0), textcolor=color.white, size=size.tiny)
+        newLabel := label.new(x=bar_index - 2, y=f_zoneMid(zoneTop, zoneBottom), xloc=xloc.bar_index, text=f_fvgLabelText(isBull), style=f_fvgLabelStyle(), color=color.new(borderClr, 0), textcolor=color.white, size=size.tiny)
     array.push(fvgBoxes, newBox)
     array.push(fvgLabels, newLabel)
     array.push(fvgTops, zoneTop)
@@ -886,8 +949,8 @@ f_addOb(bool isBull, int shift) =>
     label newLabel = na
     if showOb
         newBox := box.new(left=leftBar, top=zoneTop, right=bar_index, bottom=zoneBottom, xloc=xloc.bar_index, extend=extend.right, bgcolor=zoneColor, border_color=borderClr)
-        newLine := line.new(x1=leftBar, y1=entry, x2=bar_index, y2=entry, xloc=xloc.bar_index, extend=extend.right, color=borderClr, style=line.style_dashed)
-        newLabel := label.new(x=leftBar, y=f_zoneMid(zoneTop, zoneBottom), xloc=xloc.bar_index, text=f_obLabelText(isBull, false), style=label.style_label_left, color=color.new(borderClr, 0), textcolor=color.white, size=size.tiny)
+        newLine := line.new(x1=leftBar, y1=entry, x2=bar_index, y2=entry, xloc=xloc.bar_index, extend=extend.right, color=color.new(borderClr, 100), width=1, style=line.style_dashed)
+        newLabel := label.new(x=leftBar, y=f_zoneMid(zoneTop, zoneBottom), xloc=xloc.bar_index, text=f_obLabelText(isBull, false), style=f_obLabelStyle(), color=color.new(borderClr, 0), textcolor=color.white, size=size.tiny)
     array.push(obBoxes, newBox)
     array.push(obEntryLines, newLine)
     array.push(obLabels, newLabel)
@@ -2059,28 +2122,34 @@ string longConfirmationSummary = not na(tradeLongEntry) ? f_appendIfvgContext(f_
 var string lastLongSetupTag = ""
 var bool longManagedLatched = false
 var bool longCompletedLatched = false
+var bool longAmbiguousLatched = false
 string currentLongSetupTag = not na(tradeLongCreatedBar) ? tradeLongSetup + "|" + str.tostring(tradeLongCreatedBar) : ""
 if currentLongSetupTag == ""
     longManagedLatched := false
     longCompletedLatched := false
+    longAmbiguousLatched := false
 else if currentLongSetupTag != lastLongSetupTag
     longManagedLatched := false
     longCompletedLatched := false
+    longAmbiguousLatched := false
 bool longManagedHit = tradeLongTouched and not na(longRisk) and high >= tradeLongEntry + longRisk * setupManagedR
 if longManagedHit
     longManagedLatched := true
 bool longManagedLatchedState = currentLongSetupTag != "" and longManagedLatched
 bool longStopHit = not na(tradeLongStop) and low <= tradeLongStop
 bool longTpHit = tradeLongTouched and not na(activeLongTarget) and high >= activeLongTarget
-bool longAmbiguous = currentLongSetupTag != "" and tradeLongTouched and not longCompletedLatched and longStopHit and longTpHit
-if longTpHit and not longAmbiguous
+bool longAmbiguousNow = currentLongSetupTag != "" and tradeLongTouched and not longCompletedLatched and not longAmbiguousLatched and longStopHit and longTpHit
+if longAmbiguousNow
+    longAmbiguousLatched := true
+if longTpHit and not longAmbiguousNow and not longAmbiguousLatched
     longCompletedLatched := true
-bool longCompleted = currentLongSetupTag != "" and longCompletedLatched
+bool longAmbiguous = currentLongSetupTag != "" and longAmbiguousLatched
+bool longCompleted = currentLongSetupTag != "" and longCompletedLatched and not longAmbiguous
 lastLongSetupTag := currentLongSetupTag
-bool longInvalidated = (longStopHit and not longAmbiguous) or longStructureInvalidated
-bool longManagedStale = longManagedLatchedState and not longCompleted and not na(longSetupAge) and longSetupAge > expiryBarsEffective
-bool longManaged = longManagedLatchedState and not longManagedStale
-bool longTouchedStale = tradeLongTouched and not longManagedLatchedState and not longCompleted and not na(longSetupAge) and longSetupAge > expiryBarsEffective
+bool longInvalidated = not longAmbiguous and ((longStopHit and not longAmbiguousNow) or longStructureInvalidated)
+bool longManagedStale = longManagedLatchedState and not longCompleted and not longAmbiguous and not na(longSetupAge) and longSetupAge > expiryBarsEffective
+bool longManaged = longManagedLatchedState and not longManagedStale and not longAmbiguous
+bool longTouchedStale = tradeLongTouched and not longManagedLatchedState and not longCompleted and not longAmbiguous and not na(longSetupAge) and longSetupAge > expiryBarsEffective
 bool longExpired = longExpiredUntouched or longTouchedStale
 longExpired := longExpired or longManagedStale
 
@@ -2111,28 +2180,34 @@ string shortConfirmationSummary = not na(tradeShortEntry) ? f_appendIfvgContext(
 var string lastShortSetupTag = ""
 var bool shortManagedLatched = false
 var bool shortCompletedLatched = false
+var bool shortAmbiguousLatched = false
 string currentShortSetupTag = not na(tradeShortCreatedBar) ? tradeShortSetup + "|" + str.tostring(tradeShortCreatedBar) : ""
 if currentShortSetupTag == ""
     shortManagedLatched := false
     shortCompletedLatched := false
+    shortAmbiguousLatched := false
 else if currentShortSetupTag != lastShortSetupTag
     shortManagedLatched := false
     shortCompletedLatched := false
+    shortAmbiguousLatched := false
 bool shortManagedHit = tradeShortTouched and not na(shortRisk) and low <= tradeShortEntry - shortRisk * setupManagedR
 if shortManagedHit
     shortManagedLatched := true
 bool shortManagedLatchedState = currentShortSetupTag != "" and shortManagedLatched
 bool shortStopHit = not na(tradeShortStop) and high >= tradeShortStop
 bool shortTpHit = tradeShortTouched and not na(activeShortTarget) and low <= activeShortTarget
-bool shortAmbiguous = currentShortSetupTag != "" and tradeShortTouched and not shortCompletedLatched and shortStopHit and shortTpHit
-if shortTpHit and not shortAmbiguous
+bool shortAmbiguousNow = currentShortSetupTag != "" and tradeShortTouched and not shortCompletedLatched and not shortAmbiguousLatched and shortStopHit and shortTpHit
+if shortAmbiguousNow
+    shortAmbiguousLatched := true
+if shortTpHit and not shortAmbiguousNow and not shortAmbiguousLatched
     shortCompletedLatched := true
-bool shortCompleted = currentShortSetupTag != "" and shortCompletedLatched
+bool shortAmbiguous = currentShortSetupTag != "" and shortAmbiguousLatched
+bool shortCompleted = currentShortSetupTag != "" and shortCompletedLatched and not shortAmbiguous
 lastShortSetupTag := currentShortSetupTag
-bool shortInvalidated = (shortStopHit and not shortAmbiguous) or shortStructureInvalidated
-bool shortManagedStale = shortManagedLatchedState and not shortCompleted and not na(shortSetupAge) and shortSetupAge > expiryBarsEffective
-bool shortManaged = currentShortSetupTag != "" and shortManagedLatched and not shortManagedStale
-bool shortTouchedStale = tradeShortTouched and not shortManagedLatchedState and not shortCompleted and not na(shortSetupAge) and shortSetupAge > expiryBarsEffective
+bool shortInvalidated = not shortAmbiguous and ((shortStopHit and not shortAmbiguousNow) or shortStructureInvalidated)
+bool shortManagedStale = shortManagedLatchedState and not shortCompleted and not shortAmbiguous and not na(shortSetupAge) and shortSetupAge > expiryBarsEffective
+bool shortManaged = currentShortSetupTag != "" and shortManagedLatched and not shortManagedStale and not shortAmbiguous
+bool shortTouchedStale = tradeShortTouched and not shortManagedLatchedState and not shortCompleted and not shortAmbiguous and not na(shortSetupAge) and shortSetupAge > expiryBarsEffective
 bool shortExpired = shortExpiredUntouched or shortTouchedStale
 shortExpired := shortExpired or shortManagedStale
 
@@ -2204,47 +2279,82 @@ int selectedBullObBar = tradeLongIsOb ? tradeLongCreatedBar : na
 int selectedBearObBar = tradeShortIsOb ? tradeShortCreatedBar : na
 string longTargetModeSummary = f_targetModeText(not na(activeLongTarget), longUsesExternalDolTarget, longTargetIsLiquidity)
 string shortTargetModeSummary = f_targetModeText(not na(activeShortTarget), shortUsesExternalDolTarget, shortTargetIsLiquidity)
+string preferredDirection = "Wait"
+bool longPreferredReady = f_executionRiskVisible(longExecutionState)
+bool shortPreferredReady = f_executionRiskVisible(shortExecutionState)
+bool longPriorityCandidate = not na(tradeLongEntry) and not f_dashboardRetired(longExecutionState, longSetupAge, tradeLongTouched, expiryBarsEffective)
+bool shortPriorityCandidate = not na(tradeShortEntry) and not f_dashboardRetired(shortExecutionState, shortSetupAge, tradeShortTouched, expiryBarsEffective)
+if longPreferredReady and not shortPreferredReady
+    preferredDirection := "Long"
+else if shortPreferredReady and not longPreferredReady
+    preferredDirection := "Short"
+else if longPreferredReady and shortPreferredReady
+    preferredDirection := "Balanced"
+
+bool compactUseLong = preferredDirection == "Long"
+if preferredDirection == "Short"
+    compactUseLong := false
+else if preferredDirection == "Balanced"
+    if longPriorityCandidate and not shortPriorityCandidate
+        compactUseLong := true
+    else if shortPriorityCandidate and not longPriorityCandidate
+        compactUseLong := false
+    else if not na(tradeLongCreatedBar) and not na(tradeShortCreatedBar)
+        compactUseLong := tradeLongCreatedBar >= tradeShortCreatedBar
+    else if na(tradeLongCreatedBar) and not na(tradeShortCreatedBar)
+        compactUseLong := false
+else
+    if longPriorityCandidate and not shortPriorityCandidate
+        compactUseLong := true
+    else if shortPriorityCandidate and not longPriorityCandidate
+        compactUseLong := false
+    else if not na(tradeLongCreatedBar) and not na(tradeShortCreatedBar)
+        compactUseLong := tradeLongCreatedBar >= tradeShortCreatedBar
+    else if na(tradeLongCreatedBar) and not na(tradeShortCreatedBar)
+        compactUseLong := false
 
 if array.size(pivotStructureLabels) > 0
-    for idx = 0 to array.size(pivotStructureLabels) - 1
-        i = array.size(pivotStructureLabels) - 1 - idx
-        pivotLabel = array.get(pivotStructureLabels, i)
-        pivotIsHigh = array.get(pivotStructureIsHigh, i)
-        if not na(pivotLabel)
-            label.set_color(pivotLabel, color.new(color.black, 100))
-            label.set_textcolor(pivotLabel, displayStructureLabels ? color.new(pivotIsHigh ? liqHighColor : liqLowColor, 12) : na)
-            label.set_style(pivotLabel, label.style_none)
+    if not displayStructureLabels
+        f_clearPivotLabels()
+    else
+        for idx = 0 to array.size(pivotStructureLabels) - 1
+            i = array.size(pivotStructureLabels) - 1 - idx
+            pivotLabel = array.get(pivotStructureLabels, i)
+            pivotIsHigh = array.get(pivotStructureIsHigh, i)
+            if not na(pivotLabel)
+                label.set_color(pivotLabel, color.new(color.black, 100))
+                label.set_textcolor(pivotLabel, color.new(pivotIsHigh ? liqHighColor : liqLowColor, 12))
+                label.set_style(pivotLabel, label.style_none)
 
 if array.size(structureEventLines) > 0
-    for idx = 0 to array.size(structureEventLines) - 1
-        i = array.size(structureEventLines) - 1 - idx
-        eventLine = array.get(structureEventLines, i)
-        eventLabel = array.get(structureEventLabels, i)
-        if not na(eventLine)
-            line.set_color(eventLine, showBosMss ? structureEventColor : na)
-        if not na(eventLabel)
-            label.set_color(eventLabel, color.new(color.black, 100))
-            label.set_textcolor(eventLabel, showBosMss ? structureTextColor : na)
-            label.set_style(eventLabel, label.style_none)
+    if not displayStructureEvents
+        f_clearStructureEvents()
+    else
+        for idx = 0 to array.size(structureEventLines) - 1
+            i = array.size(structureEventLines) - 1 - idx
+            eventLine = array.get(structureEventLines, i)
+            eventLabel = array.get(structureEventLabels, i)
+            if not na(eventLine)
+                line.set_color(eventLine, structureEventColor)
+            if not na(eventLabel)
+                label.set_color(eventLabel, color.new(color.black, 100))
+                label.set_textcolor(eventLabel, structureTextColor)
+                label.set_style(eventLabel, label.style_none)
 
 if array.size(fvgBoxes) > 0
     for idx = 0 to array.size(fvgBoxes) - 1
         i = array.size(fvgBoxes) - 1 - idx
-        f_ensureFvgVisual(i)
-        zoneBox = array.get(fvgBoxes, i)
-        zoneLabel = array.get(fvgLabels, i)
         zoneBull = array.get(fvgBull, i)
         zoneCreatedBar = array.get(fvgCreatedBars, i)
         zoneTouched = array.get(fvgTouched, i)
         isSelected = (zoneBull and not na(selectedBullFvgBar) and zoneCreatedBar == selectedBullFvgBar) or (not zoneBull and not na(selectedBearFvgBar) and zoneCreatedBar == selectedBearFvgBar)
-        if not showFvg
-            if not na(zoneBox)
-                box.set_border_color(zoneBox, na)
-                box.set_bgcolor(zoneBox, na)
-            if not na(zoneLabel)
-                label.set_color(zoneLabel, na)
-                label.set_textcolor(zoneLabel, na)
+        bool showZone = showFvg and f_zoneVisibleByMode(effectiveZoneDisplayMode, isSelected, zoneBull, preferredDirection, compactUseLong)
+        if not showZone
+            f_deleteFvgVisual(i)
         else
+            f_ensureFvgVisual(i)
+            zoneBox = array.get(fvgBoxes, i)
+            zoneLabel = array.get(fvgLabels, i)
             if not na(zoneBox)
                 string selectedExecutionState = zoneBull ? longExecutionState : shortExecutionState
                 baseBorder = zoneBull ? color.new(bullColor, 30) : color.new(bearColor, 30)
@@ -2262,6 +2372,7 @@ if array.size(fvgBoxes) > 0
                 if isSelected
                     label.set_x(zoneLabel, bar_index)
                 label.set_text(zoneLabel, isSelected ? (selectedBadge != "" ? baseLabel + " | " + selectedBadge : baseLabel) : "")
+                label.set_style(zoneLabel, f_fvgLabelStyle())
                 label.set_color(zoneLabel, color.new(color.black, 100))
                 label.set_textcolor(zoneLabel, isSelected ? color.white : color.new(color.white, 100))
 
@@ -2282,12 +2393,12 @@ if showBullIfvgVisual
         box.set_bgcolor(bullIfvgBox, bullIfvgFill)
         box.set_border_color(bullIfvgBox, bullIfvgBorder)
     if na(bullIfvgLabel)
-        bullIfvgLabel := label.new(x=bar_index, y=f_zoneMid(bullIfvgTop, bullIfvgBottom), xloc=xloc.bar_index, text=f_ifvgLabelText(true), style=label.style_label_left, color=color.new(bullIfvgBorder, 0), textcolor=color.white, size=size.tiny)
+        bullIfvgLabel := label.new(x=bar_index, y=f_zoneMid(bullIfvgTop, bullIfvgBottom), xloc=xloc.bar_index, text=f_ifvgLabelText(true), style=f_ifvgLabelStyle(true), color=color.new(bullIfvgBorder, 0), textcolor=color.white, size=size.tiny)
     else
         label.set_x(bullIfvgLabel, bar_index)
         label.set_y(bullIfvgLabel, f_zoneMid(bullIfvgTop, bullIfvgBottom))
         label.set_text(bullIfvgLabel, f_ifvgLabelText(true))
-        label.set_style(bullIfvgLabel, label.style_label_left)
+        label.set_style(bullIfvgLabel, f_ifvgLabelStyle(true))
         label.set_color(bullIfvgLabel, color.new(bullIfvgBorder, 0))
         label.set_textcolor(bullIfvgLabel, color.white)
 else
@@ -2312,12 +2423,12 @@ if showBearIfvgVisual
         box.set_bgcolor(bearIfvgBox, bearIfvgFill)
         box.set_border_color(bearIfvgBox, bearIfvgBorder)
     if na(bearIfvgLabel)
-        bearIfvgLabel := label.new(x=bar_index, y=f_zoneMid(bearIfvgTop, bearIfvgBottom), xloc=xloc.bar_index, text=f_ifvgLabelText(false), style=label.style_label_left, color=color.new(bearIfvgBorder, 0), textcolor=color.white, size=size.tiny)
+        bearIfvgLabel := label.new(x=bar_index, y=f_zoneMid(bearIfvgTop, bearIfvgBottom), xloc=xloc.bar_index, text=f_ifvgLabelText(false), style=f_ifvgLabelStyle(false), color=color.new(bearIfvgBorder, 0), textcolor=color.white, size=size.tiny)
     else
         label.set_x(bearIfvgLabel, bar_index)
         label.set_y(bearIfvgLabel, f_zoneMid(bearIfvgTop, bearIfvgBottom))
         label.set_text(bearIfvgLabel, f_ifvgLabelText(false))
-        label.set_style(bearIfvgLabel, label.style_label_left)
+        label.set_style(bearIfvgLabel, f_ifvgLabelStyle(false))
         label.set_color(bearIfvgLabel, color.new(bearIfvgBorder, 0))
         label.set_textcolor(bearIfvgLabel, color.white)
 else
@@ -2331,25 +2442,19 @@ else
 if array.size(obBoxes) > 0
     for idx = 0 to array.size(obBoxes) - 1
         i = array.size(obBoxes) - 1 - idx
-        f_ensureObVisual(i)
-        zoneBox = array.get(obBoxes, i)
-        zoneLine = array.get(obEntryLines, i)
-        zoneLabel = array.get(obLabels, i)
         zoneBull = array.get(obBull, i)
         zoneBreaker = array.get(obBreaker, i)
         zoneFailed = array.get(obFailed, i)
         zoneCreatedBar = array.get(obCreatedBars, i)
         isSelected = (zoneBull and not zoneBreaker and not na(selectedBullObBar) and zoneCreatedBar == selectedBullObBar) or (not zoneBull and not zoneBreaker and not na(selectedBearObBar) and zoneCreatedBar == selectedBearObBar) or (zoneBull and zoneBreaker and not na(selectedBullObBar) and zoneCreatedBar == selectedBullObBar) or (not zoneBull and zoneBreaker and not na(selectedBearObBar) and zoneCreatedBar == selectedBearObBar)
-        if not showOb
-            if not na(zoneBox)
-                box.set_border_color(zoneBox, na)
-                box.set_bgcolor(zoneBox, na)
-            if not na(zoneLine)
-                line.set_color(zoneLine, na)
-            if not na(zoneLabel)
-                label.set_color(zoneLabel, na)
-                label.set_textcolor(zoneLabel, na)
+        bool showZone = showOb and f_zoneVisibleByMode(effectiveZoneDisplayMode, isSelected, zoneBull, preferredDirection, compactUseLong)
+        if not showZone
+            f_deleteObVisual(i)
         else
+            f_ensureObVisual(i)
+            zoneBox = array.get(obBoxes, i)
+            zoneLine = array.get(obEntryLines, i)
+            zoneLabel = array.get(obLabels, i)
             if not na(zoneBox)
                 string selectedExecutionState = zoneBull ? longExecutionState : shortExecutionState
                 normalFill = zoneBreaker ? (zoneBull ? bbBullColor : bbBearColor) : (zoneBull ? obBullColor : obBearColor)
@@ -2362,10 +2467,10 @@ if array.size(obBoxes) > 0
                 box.set_border_color(zoneBox, zoneFailed ? failedBorder : isSelected ? selectedBorder : color.new(normalBorder, 0))
             if not na(zoneLine)
                 string selectedExecutionState = zoneBull ? longExecutionState : shortExecutionState
-                lineColor = zoneFailed ? (zoneBull ? color.new(bearColor, 20) : color.new(bullColor, 20)) : (zoneBull ? bullColor : bearColor)
-                line.set_color(zoneLine, lineColor)
+                lineColor = zoneFailed ? (zoneBull ? color.new(bearColor, 28) : color.new(bullColor, 28)) : (zoneBull ? bullColor : bearColor)
+                line.set_color(zoneLine, isSelected ? lineColor : na)
                 line.set_style(zoneLine, zoneBreaker or zoneFailed ? line.style_dotted : line.style_dashed)
-                line.set_width(zoneLine, isSelected ? f_executionSelectedLineWidth(selectedExecutionState) : 1)
+                line.set_width(zoneLine, zoneFailed ? 1 : isSelected ? f_executionSelectedLineWidth(selectedExecutionState) : 1)
             if not na(zoneLabel)
                 string selectedExecutionState = zoneBull ? longExecutionState : shortExecutionState
                 string baseLabel = zoneFailed ? (compactMode ? "OB?" : "Failed OB") : f_obLabelText(zoneBull, zoneBreaker)
@@ -2373,89 +2478,9 @@ if array.size(obBoxes) > 0
                 if isSelected
                     label.set_x(zoneLabel, bar_index)
                 label.set_text(zoneLabel, isSelected ? (selectedBadge != "" ? baseLabel + " | " + selectedBadge : baseLabel) : "")
+                label.set_style(zoneLabel, f_obLabelStyle())
                 label.set_color(zoneLabel, color.new(color.black, 100))
                 label.set_textcolor(zoneLabel, isSelected ? color.white : color.new(color.white, 100))
-
-string preferredDirection = "Wait"
-bool longPreferredReady = f_executionRiskVisible(longExecutionState)
-bool shortPreferredReady = f_executionRiskVisible(shortExecutionState)
-bool longPriorityCandidate = not na(tradeLongEntry) and not f_dashboardRetired(longExecutionState, longSetupAge, tradeLongTouched, expiryBarsEffective)
-bool shortPriorityCandidate = not na(tradeShortEntry) and not f_dashboardRetired(shortExecutionState, shortSetupAge, tradeShortTouched, expiryBarsEffective)
-if longPreferredReady and not shortPreferredReady
-    preferredDirection := "Long"
-else if shortPreferredReady and not longPreferredReady
-    preferredDirection := "Short"
-else if longPreferredReady and shortPreferredReady
-    if na(shortConfidence) or (not na(longConfidence) and longConfidence > shortConfidence + 15.0)
-        preferredDirection := "Long"
-    else if na(longConfidence) or shortConfidence > longConfidence + 15.0
-        preferredDirection := "Short"
-    else
-        preferredDirection := "Balanced"
-
-bool compactUseLong = preferredDirection == "Long"
-if preferredDirection == "Short"
-    compactUseLong := false
-else if preferredDirection == "Balanced"
-    if longPriorityCandidate and not shortPriorityCandidate
-        compactUseLong := true
-    else if shortPriorityCandidate and not longPriorityCandidate
-        compactUseLong := false
-    else if not na(tradeLongCreatedBar) and not na(tradeShortCreatedBar)
-        compactUseLong := tradeLongCreatedBar >= tradeShortCreatedBar
-    else if na(tradeLongCreatedBar) and not na(tradeShortCreatedBar)
-        compactUseLong := false
-else
-    if longPriorityCandidate and not shortPriorityCandidate
-        compactUseLong := true
-    else if shortPriorityCandidate and not longPriorityCandidate
-        compactUseLong := false
-    else if not na(tradeLongCreatedBar) and not na(tradeShortCreatedBar)
-        compactUseLong := tradeLongCreatedBar >= tradeShortCreatedBar
-    else if na(tradeLongCreatedBar) and not na(tradeShortCreatedBar)
-        compactUseLong := false
-
-if effectiveZoneDisplayMode != "Full"
-    if array.size(fvgBoxes) > 0
-        for idx = 0 to array.size(fvgBoxes) - 1
-            i = array.size(fvgBoxes) - 1 - idx
-            zoneBox = array.get(fvgBoxes, i)
-            zoneLabel = array.get(fvgLabels, i)
-            zoneBull = array.get(fvgBull, i)
-            zoneCreatedBar = array.get(fvgCreatedBars, i)
-            isSelected = (zoneBull and not na(selectedBullFvgBar) and zoneCreatedBar == selectedBullFvgBar) or (not zoneBull and not na(selectedBearFvgBar) and zoneCreatedBar == selectedBearFvgBar)
-            showZone = showFvg and f_zoneVisibleByMode(effectiveZoneDisplayMode, isSelected, zoneBull, preferredDirection, compactUseLong)
-            if not showZone
-                if not na(zoneBox)
-                    box.set_border_color(zoneBox, na)
-                    box.set_bgcolor(zoneBox, na)
-                if not na(zoneLabel)
-                    label.set_color(zoneLabel, na)
-                    label.set_textcolor(zoneLabel, na)
-            else if not na(zoneLabel)
-                label.set_textcolor(zoneLabel, color.white)
-
-    if array.size(obBoxes) > 0
-        for idx = 0 to array.size(obBoxes) - 1
-            i = array.size(obBoxes) - 1 - idx
-            zoneBox = array.get(obBoxes, i)
-            zoneLine = array.get(obEntryLines, i)
-            zoneLabel = array.get(obLabels, i)
-            zoneBull = array.get(obBull, i)
-            zoneCreatedBar = array.get(obCreatedBars, i)
-            isSelected = (zoneBull and not na(selectedBullObBar) and zoneCreatedBar == selectedBullObBar) or (not zoneBull and not na(selectedBearObBar) and zoneCreatedBar == selectedBearObBar)
-            showZone = showOb and f_zoneVisibleByMode(effectiveZoneDisplayMode, isSelected, zoneBull, preferredDirection, compactUseLong)
-            if not showZone
-                if not na(zoneBox)
-                    box.set_border_color(zoneBox, na)
-                    box.set_bgcolor(zoneBox, na)
-                if not na(zoneLine)
-                    line.set_color(zoneLine, na)
-                if not na(zoneLabel)
-                    label.set_color(zoneLabel, na)
-                    label.set_textcolor(zoneLabel, na)
-            else if not na(zoneLabel)
-                label.set_textcolor(zoneLabel, color.white)
 
 string compactSetup = compactUseLong ? longSetupDisplay : shortSetupDisplay
 string compactExecutionState = compactUseLong ? longExecutionState : shortExecutionState
@@ -2497,6 +2522,12 @@ string preferredExecutionSummary = f_preferredExecutionText(preferredDirection, 
 string compactPreferredSummary = f_preferredExecutionText(preferredDirection, longExecutionState, shortExecutionState, true)
 string sessionConfirmMarketSummary = liquiditySessionSummary + " | " + timezoneSummary + (strictModeEnabled ? " | Strict" : "")
 string effectiveModeSummary = "Eff " + effectiveZoneDisplayMode
+bool sessionLineActive = sessionVisualsEnabled and array.size(sessionRangeHighLines) > 0
+bool structureDashActive = displayStructureEvents and f_hasActiveLine(structureEventLines)
+bool longObLineVisible = showOb and tradeLongIsOb and not longDashboardRetired and f_zoneVisibleByMode(effectiveZoneDisplayMode, true, true, preferredDirection, compactUseLong)
+bool shortObLineVisible = showOb and tradeShortIsOb and not shortDashboardRetired and f_zoneVisibleByMode(effectiveZoneDisplayMode, true, false, preferredDirection, compactUseLong)
+bool obDashActive = longObLineVisible or shortObLineVisible
+string visualLineSummary = sessionLineActive or structureDashActive or obDashActive ? "Vis " + (sessionLineActive ? "SesLn" : "") + (structureDashActive ? (sessionLineActive ? "/StrDash" : "StrDash") : "") + (obDashActive ? ((sessionLineActive or structureDashActive) ? "/ObDash" : "ObDash") : "") : "Vis -"
 string longDashboardSetupDisplay = f_dashboardSetupText(longSetupDisplay, longDashboardRetired)
 string shortDashboardSetupDisplay = f_dashboardSetupText(shortSetupDisplay, shortDashboardRetired)
 string longZoneEntrySummary = f_dashboardDetail(f_formatRange(tradeLongValidTop, tradeLongValidBottom) + " | " + f_formatLevel(tradeLongEntry), longDashboardRetired)
@@ -2532,7 +2563,7 @@ bearStop = not na(tradeShortStop) ? tradeShortStop : not na(lastSwingHigh) ? las
 //   Chart uses session range boxes + extended H/L lines instead
 // Context ranges:
 //   Full / Focused: show
-//   Minimal: hide except protected level and active OTE
+//   Minimal: keep only protected levels
 //------------------------------------------------------------------------------
 longExternalDraw = longPreferredReady ? longDolExternal : na
 shortExternalDraw = shortPreferredReady ? shortDolExternal : na
@@ -2549,11 +2580,13 @@ drawHtfLow = f_preferredLevelMatch(htfStructureLow, compactBalanced, compactUseL
 
 showEqHighVisual = showLiquidity and displayEqLiquidity and f_targetVisualByMode(effectiveZoneDisplayMode, targetEqHigh)
 showEqLowVisual = showLiquidity and displayEqLiquidity and f_targetVisualByMode(effectiveZoneDisplayMode, targetEqLow)
-showProtectedHighVisual = displayProtectedLevels and f_contextVisualByMode(effectiveZoneDisplayMode)
-showProtectedLowVisual = displayProtectedLevels and f_contextVisualByMode(effectiveZoneDisplayMode)
+showProtectedHighVisual = displayProtectedLevels and (effectiveZoneDisplayMode != "Minimal" or not na(activeProtectedHigh))
+showProtectedLowVisual = displayProtectedLevels and (effectiveZoneDisplayMode != "Minimal" or not na(activeProtectedLow))
 showRangeVisual = showLiquidity and displayDealingRange and f_contextVisualByMode(effectiveZoneDisplayMode)
-showOteVisual = strictShowOte and f_contextVisualByMode(effectiveZoneDisplayMode)
+showOteVisual = strictShowOte and effectiveZoneDisplayMode != "Minimal"
 oteActiveSummary = not na(oteLongTop) ? "OTE:L" : not na(oteShortTop) ? "OTE:S" : "OTE:-"
+string desktopModeStatus = effectiveModeSummary + " | " + mtfSummary + " | " + oteActiveSummary + " | " + visualLineSummary
+string compactModeStatus = presetLabel + " | " + effectiveModeSummary + " | " + mtfSummary + " | " + oteActiveSummary + " | " + visualLineSummary
 showHtfHighVisual = displayHtfLines and htfContextReady and f_targetVisualByMode(effectiveZoneDisplayMode, drawHtfHigh)
 showHtfLowVisual = displayHtfLines and htfContextReady and f_targetVisualByMode(effectiveZoneDisplayMode, drawHtfLow)
 showLongRiskVisual = displayRiskLines and f_executionVisualByMode(effectiveZoneDisplayMode, f_executionRiskVisible(longExecutionState), preferredDirection, true, compactUseLong)
@@ -2589,6 +2622,13 @@ oteLongMid = not na(oteLongTop) and not na(oteLongBottom) ? f_zoneMid(oteLongTop
 oteShortMid = not na(oteShortTop) and not na(oteShortBottom) ? f_zoneMid(oteShortTop, oteShortBottom) : na
 oteLongMidLevel = not na(oteLongTopLevel) and not na(oteLongBottomLevel) ? f_zoneMid(oteLongTopLevel, oteLongBottomLevel) : na
 oteShortMidLevel = not na(oteShortTopLevel) and not na(oteShortBottomLevel) ? f_zoneMid(oteShortTopLevel, oteShortBottomLevel) : na
+rightEdgeLabelTolerance = atr * 0.15
+showShortStopRightLabel = showShortRiskVisual and not na(riskBearStopLevel)
+showLongStopRightLabel = showLongRiskVisual and not na(riskBullStopLevel)
+showHtfHighRightLabel = displayLiquidityRightLabels and showHtfHighVisual and not f_levelsClose(htfStructureHighLevel, riskBearStopLevel, rightEdgeLabelTolerance)
+showHtfLowRightLabel = displayLiquidityRightLabels and showHtfLowVisual and not f_levelsClose(htfStructureLowLevel, riskBullStopLevel, rightEdgeLabelTolerance)
+showProtectedHighRightLabel = displayLiquidityRightLabels and showProtectedHighVisual and not f_levelsClose(protectedHighLevel, riskBearStopLevel, rightEdgeLabelTolerance) and not f_levelsClose(protectedHighLevel, htfStructureHighLevel, rightEdgeLabelTolerance)
+showProtectedLowRightLabel = displayLiquidityRightLabels and showProtectedLowVisual and not f_levelsClose(protectedLowLevel, riskBullStopLevel, rightEdgeLabelTolerance) and not f_levelsClose(protectedLowLevel, htfStructureLowLevel, rightEdgeLabelTolerance)
 
 plotEqHigh = plot(eqHighLevel, "EQH Liquidity", color=color.new(liqHighColor, 12), linewidth=1, style=plot.style_linebr, display=overlayLineDisplay)
 plotEqLow = plot(eqLowLevel, "EQL Liquidity", color=color.new(liqLowColor, 12), linewidth=1, style=plot.style_linebr, display=overlayLineDisplay)
@@ -2603,12 +2643,12 @@ fill(internalHighPlot, internalEqPlot, color=showRangeVisual ? decisionPremiumFi
 fill(internalEqPlot, internalLowPlot, color=showRangeVisual ? decisionDiscountFillColor : na)
 
 if barstate.islast
-    protectedHighLabel := f_syncRightEdgeLabel(protectedHighLabel, protectedHighLevel, "Prot H", color.new(liqHighColor, 8), color.white, displayLiquidityRightLabels and showProtectedHighVisual)
-    protectedLowLabel := f_syncRightEdgeLabel(protectedLowLabel, protectedLowLevel, "Prot L", color.new(liqLowColor, 8), color.white, displayLiquidityRightLabels and showProtectedLowVisual)
-    htfHighLabel := f_syncRightEdgeLabel(htfHighLabel, htfStructureHighLevel, "HTF H", color.new(color.fuchsia, 15), color.white, displayLiquidityRightLabels and showHtfHighVisual)
-    htfLowLabel := f_syncRightEdgeLabel(htfLowLabel, htfStructureLowLevel, "HTF L", color.new(color.fuchsia, 15), color.white, displayLiquidityRightLabels and showHtfLowVisual)
-    longStopLabel := f_syncRightEdgeLabel(longStopLabel, riskBullStopLevel, "SL L", color.new(bearColor, 0), color.white, showLongRiskVisual and not na(riskBullStopLevel))
-    shortStopLabel := f_syncRightEdgeLabel(shortStopLabel, riskBearStopLevel, "SL S", color.new(bullColor, 0), color.white, showShortRiskVisual and not na(riskBearStopLevel))
+    protectedHighLabel := f_syncRightEdgeLabel(protectedHighLabel, protectedHighLevel, "Prot H", color.new(liqHighColor, 8), color.white, showProtectedHighRightLabel)
+    protectedLowLabel := f_syncRightEdgeLabel(protectedLowLabel, protectedLowLevel, "Prot L", color.new(liqLowColor, 8), color.white, showProtectedLowRightLabel)
+    htfHighLabel := f_syncRightEdgeLabel(htfHighLabel, htfStructureHighLevel, "HTF H", color.new(color.fuchsia, 15), color.white, showHtfHighRightLabel)
+    htfLowLabel := f_syncRightEdgeLabel(htfLowLabel, htfStructureLowLevel, "HTF L", color.new(color.fuchsia, 15), color.white, showHtfLowRightLabel)
+    longStopLabel := f_syncRightEdgeLabel(longStopLabel, riskBullStopLevel, "SL L", color.new(bearColor, 0), color.white, showLongStopRightLabel)
+    shortStopLabel := f_syncRightEdgeLabel(shortStopLabel, riskBearStopLevel, "SL S", color.new(bullColor, 0), color.white, showShortStopRightLabel)
 
 oteLongTopPlot = plot(oteLongTopLevel, "OTE Long Top", color=color.new(bullColor, 40), linewidth=1, style=plot.style_linebr, display=overlayLineDisplay)
 oteLongBottomPlot = plot(oteLongBottomLevel, "OTE Long Bottom", color=color.new(bullColor, 40), linewidth=1, style=plot.style_linebr, display=overlayLineDisplay)
@@ -2689,7 +2729,7 @@ if barstate.islast and showDashboard and not compactDashboardMode
     f_setCell(dashboard, 3, 9, shortSessionConfirmSummary, color.white, panelBearBg)
 
     f_setCell(dashboard, 0, 10, "Next", color.white, panelCellBg)
-    f_setCell(dashboard, 1, 10, effectiveModeSummary + " | " + mtfSummary + " | " + oteActiveSummary, color.white, panelCellBg)
+    f_setCell(dashboard, 1, 10, desktopModeStatus, color.white, panelCellBg)
     f_setCell(dashboard, 2, 10, f_entryActionText(longExecutionState), color.white, panelBullBg)
     f_setCell(dashboard, 3, 10, f_entryActionText(shortExecutionState), color.white, panelBearBg)
 else if barstate.islast and showDashboard and compactDashboardMode
@@ -2713,7 +2753,7 @@ else if barstate.islast and showDashboard and compactDashboardMode
     f_setCell(dashboardCompact, 0, 8, "Life", color.white, panelCellBg)
     f_setCell(dashboardCompact, 1, 8, compactLifecycleDisplay, color.white, panelCellBg)
     f_setCell(dashboardCompact, 0, 9, "Mode", color.white, panelCellBg)
-    f_setCell(dashboardCompact, 1, 9, presetLabel + " | " + effectiveModeSummary + " | " + mtfSummary + " | " + oteActiveSummary, color.white, panelCellBg)
+    f_setCell(dashboardCompact, 1, 9, compactModeStatus, color.white, panelCellBg)
     f_setCell(dashboardCompact, 0, 10, "Sessions", color.white, panelCellBg)
     f_setCell(dashboardCompact, 1, 10, sessionConfirmMarketSummary, color.white, panelCellBg)
 else if barstate.islast and not showDashboard
