@@ -124,8 +124,8 @@ profileCompact = usagePreset == "Compact"
 profileStrict = usagePreset == "Strict Confirm"
 presetLabel = usagePreset
 strictModeEnabled = profileStrict
-compactMode = profileCompact or compactDashboardInput
-compactDashboardMode = compactMode and mobileCompactDashboard
+compactMode = profileCompact
+compactDashboardMode = (profileCompact and mobileCompactDashboard) or (not profileCompact and compactDashboardInput)
 displayStructureLabels = showStructureLabels and not (compactMode and mobileHideStructureLabels)
 displayInternalRange = showInternalRange and not (compactMode and mobileHideInternalRange)
 displayEqLiquidity = showLiquidity and not (compactMode and mobileHideEqLiquidity)
@@ -137,7 +137,7 @@ displayLiquidityRightLabels = showLiquidityRightLabels and not (compactMode and 
 displayHtfLines = showHtf and not (compactMode and mobileHideHtfLines)
 displayRiskLines = showRisk and not (compactMode and mobileHideRiskLines)
 displaySessionVisuals = showSessionVisuals and not (compactMode and mobileHideSessionVisuals)
-effectiveZoneDisplayMode = profileCompact ? "Minimal" : profileStrict ? "Focused" : zoneDisplayMode
+effectiveZoneDisplayMode = profileCompact ? "Minimal" : zoneDisplayMode
 maxStructureEventObjects = 80
 maxPivotLabelObjects = 160
 
@@ -485,15 +485,21 @@ f_targetVisualByMode(string mode, bool isTarget) =>
 f_contextVisualByMode(string mode) =>
     mode != "Minimal"
 
-f_confirmationStateText(bool strictEnabled, bool contextPass, bool killzonePass, bool compactText) =>
+f_confirmationStateText(bool strictEnabled, bool sweepPass, bool mssPass, bool pdPass, bool otePass, bool dolPass, bool killzonePass, bool compactText) =>
     if not strictEnabled
         compactText ? "Std" : "Standard"
-    else if contextPass and killzonePass
-        compactText ? "Rdy" : "Ready"
-    else if contextPass
+    else if not sweepPass
+        compactText ? "ERL" : "Need ERL"
+    else if not mssPass
+        compactText ? "MSS" : "Need MSS"
+    else if not (pdPass and otePass)
+        compactText ? "PD" : "Need PD"
+    else if not dolPass
+        compactText ? "DOL" : "Need DOL"
+    else if not killzonePass
         compactText ? "KZ" : "KZ Wait"
     else
-        compactText ? "Ref" : "Refine"
+        compactText ? "Rdy" : "Ready"
 
 f_setupPathText(bool hasSetup, bool isFvg, bool isOb, bool usesDolTarget, bool compactText) =>
     if not hasSetup
@@ -2039,7 +2045,7 @@ bool longConfirmationPass = not strictModeEnabled or (strictLongContextPass and 
 bool longExecutionFreshPass = strictModeEnabled ? strictLongMssFresh : bullLegHasMss
 bool longHasIfvgContext = not na(bullIfvgCreatedBar)
 bool longIfvgSupportContext = longHasIfvgContext and not na(tradeLongEntry) and (f_zoneIntersects(bullIfvgTop, bullIfvgBottom, tradeLongValidTop, tradeLongValidBottom) or f_zoneMid(bullIfvgTop, bullIfvgBottom) <= tradeLongEntry)
-string longConfirmationSummary = not na(tradeLongEntry) ? f_appendIfvgContext(f_confirmationStateText(strictModeEnabled, strictLongContextPass, strictLongKillzonePass, false) + " | " + f_setupPathText(true, tradeLongIsFvg, tradeLongIsOb, longUsesExternalDolTarget, false), longHasIfvgContext, longIfvgSupportContext, false) : "-"
+string longConfirmationSummary = not na(tradeLongEntry) ? f_appendIfvgContext(f_confirmationStateText(strictModeEnabled, strictLongSweepPass, strictLongMssPass, strictLongPdPass, strictLongOtePass, strictLongDolPass, strictLongKillzonePass, false) + " | " + f_setupPathText(true, tradeLongIsFvg, tradeLongIsOb, longUsesExternalDolTarget, false), longHasIfvgContext, longIfvgSupportContext, false) : "-"
 var string lastLongSetupTag = ""
 var bool longManagedLatched = false
 var bool longCompletedLatched = false
@@ -2091,7 +2097,7 @@ bool shortConfirmationPass = not strictModeEnabled or (strictShortContextPass an
 bool shortExecutionFreshPass = strictModeEnabled ? strictShortMssFresh : bearLegHasMss
 bool shortHasIfvgContext = not na(bearIfvgCreatedBar)
 bool shortIfvgSupportContext = shortHasIfvgContext and not na(tradeShortEntry) and (f_zoneIntersects(bearIfvgTop, bearIfvgBottom, tradeShortValidTop, tradeShortValidBottom) or f_zoneMid(bearIfvgTop, bearIfvgBottom) >= tradeShortEntry)
-string shortConfirmationSummary = not na(tradeShortEntry) ? f_appendIfvgContext(f_confirmationStateText(strictModeEnabled, strictShortContextPass, strictShortKillzonePass, false) + " | " + f_setupPathText(true, tradeShortIsFvg, tradeShortIsOb, shortUsesExternalDolTarget, false), shortHasIfvgContext, shortIfvgSupportContext, false) : "-"
+string shortConfirmationSummary = not na(tradeShortEntry) ? f_appendIfvgContext(f_confirmationStateText(strictModeEnabled, strictShortSweepPass, strictShortMssPass, strictShortPdPass, strictShortOtePass, strictShortDolPass, strictShortKillzonePass, false) + " | " + f_setupPathText(true, tradeShortIsFvg, tradeShortIsOb, shortUsesExternalDolTarget, false), shortHasIfvgContext, shortIfvgSupportContext, false) : "-"
 var string lastShortSetupTag = ""
 var bool shortManagedLatched = false
 var bool shortCompletedLatched = false

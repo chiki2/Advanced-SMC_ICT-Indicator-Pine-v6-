@@ -31,6 +31,19 @@ Untuk pemakaian paling mudah:
 Jika ingin paling ketat ala ICT:
 - pilih profile `Strict Confirm`
 - biarkan `Show active OTE overlay` tetap hidup
+- `Zone display mode` tetap bebas Anda pilih, misalnya `Full`
+- `Compact dashboard mode` juga tetap bisa dipakai tanpa mengubah engine strict
+
+Formula baca `Strict Confirm` sekarang sengaja dibuat eksplisit:
+- `ERL sweep`
+- `displacement / MSS`
+- `PD-array / OTE`
+- `DOL`
+- `killzone`
+
+Catatan penting:
+- `volume tinggi` tidak dipakai sebagai syarat wajib
+- alasannya agar indikator tetap lean dan tidak overfit ke feed volume broker tertentu
 
 Timeframe eksekusi yang didukung:
 - `M1`
@@ -54,6 +67,18 @@ Panel input sekarang dibagi ringkas menjadi:
 Prinsipnya:
 - yang terlihat di panel adalah keputusan trader-facing
 - parameter engine internal sudah dibekukan di kode agar tidak mendorong bias dan overtuning
+
+Catatan penting tentang preset:
+- `Strict Confirm` = engine validasi setup
+- `Zone display mode` = gaya visual zona
+- `Compact dashboard mode` = gaya panel
+
+Jadi Anda bisa memakai kombinasi seperti:
+- `Strict Confirm + Full`
+- `Strict Confirm + Focused`
+- `Strict Confirm + Full + Compact dashboard`
+
+tanpa mengubah engine strict itu sendiri
 
 ## Cara Membaca Chart
 
@@ -342,6 +367,14 @@ Kolom Long/Short pada baris ini sekarang menunjukkan status konfirmasi:
 Dalam strict mode, ringkasan ini juga membawa jalur setup singkat:
 - `FVG > DOL` = flow paling dekat ke ICT yang dicari indikator
 - `OB > DOL` = setup masih valid, tetapi POI yang dipakai adalah order block fallback
+
+Status strict sekarang dibaca lebih eksplisit:
+- `Need ERL` = belum ada sweep external liquidity yang cukup
+- `Need MSS` = sweep sudah ada, tetapi displacement / MSS belum cukup
+- `Need PD` = sweep dan MSS sudah ada, tetapi lokasi POI / OTE belum rapi
+- `Need DOL` = context sudah rapi, tetapi external draw belum layak
+- `KZ Wait` = context lengkap, menunggu timing killzone
+- `Ready` = flow strict lengkap
 
 ### Next
 

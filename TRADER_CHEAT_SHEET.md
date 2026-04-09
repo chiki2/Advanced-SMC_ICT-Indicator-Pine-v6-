@@ -12,6 +12,12 @@ Panduan satu halaman yang ringkas, visual, dan siap dibagikan untuk trader `Adva
 | Layar kecil / cepat | `Compact` |
 | Validasi paling ketat | `Strict Confirm` |
 
+`Strict Confirm` sekarang tidak lagi memaksa `Focused`.
+Anda bebas memilih:
+- `Strict + Full`
+- `Strict + Focused`
+- `Strict + Compact dashboard`
+
 | Engine | Nilai |
 |---|---|
 | Gaya trading | `Intraday ICT` |
@@ -120,6 +126,13 @@ Jika salah satu dari tiga hal ini belum jelas, `wait`:
 
 Flow sehat indikator dalam `Strict Confirm`:
 - `ERL sweep -> FVG / POI -> DOL`
+
+Flow strict yang lebih eksplisit:
+- `ERL sweep -> displacement / MSS -> PD / OTE -> DOL -> killzone`
+
+Catatan:
+- `volume tinggi` tidak dipakai sebagai syarat wajib
+- indikator sengaja tidak memakai gate volume keras agar tetap robust lintas feed
 
 ### Baca `RR / Cf`
 
