@@ -658,10 +658,10 @@ f_setupScore(bool hasSetup, bool biasAligned, bool htfAligned, bool priceInZone,
     float score = na
     if hasSetup
         float points = 0.0
-        float maxPoints = 7.0
+        float maxPoints = 6.0
         points += biasAligned ? 2.0 : 0.0
         points += htfAligned ? 1.0 : 0.0
-        points += priceInZone ? 2.0 : priceNearZone ? 1.0 : 0.0
+        points += priceInZone or priceNearZone ? 1.0 : 0.0
         points += f_rrPoints(rr)
         points -= chased ? 2.0 : 0.0
         points -= expired ? 2.0 : 0.0
@@ -2459,7 +2459,9 @@ string compactZoneDisplay = compactNeutral ? "-" : compactUseLong ? f_dashboardD
 string compactEntryTriplet = compactNeutral ? "-" : compactUseLong ? f_dashboardDetail(f_formatLevel(compactEntry) + " | " + f_formatLevel(compactStop) + " | " + f_formatLevel(compactTarget), longDashboardRetired) : f_dashboardDetail(f_formatLevel(compactEntry) + " | " + f_formatLevel(compactStop) + " | " + f_formatLevel(compactTarget), shortDashboardRetired)
 string compactStatusDisplay = compactBalanced ? "Mixed" : compactWaiting and compactContextOnly and compactCandidateHasSetup and not compactCandidateRetired ? "Ctx" : compactWaiting ? "Scan" : f_executionStateCompact(compactExecutionState)
 string compactConfTpLabel = compactNeutral ? (compactContextOnly ? "Ctx L/S" : "Conf L/S") : "Conf"
-string compactConfTpDisplay = compactNeutral ? "L " + f_formatPercent(longConfidence) + " / S " + f_formatPercent(shortConfidence) : compactUseLong ? f_dashboardDetail(f_formatPercent(compactConfidence), longDashboardRetired) : f_dashboardDetail(f_formatPercent(compactConfidence), shortDashboardRetired)
+string compactNeutralLongConfidence = f_dashboardDetail(f_formatPercent(longConfidence), longDashboardRetired)
+string compactNeutralShortConfidence = f_dashboardDetail(f_formatPercent(shortConfidence), shortDashboardRetired)
+string compactConfTpDisplay = compactNeutral ? "L " + compactNeutralLongConfidence + " / S " + compactNeutralShortConfidence : compactUseLong ? f_dashboardDetail(f_formatPercent(compactConfidence), longDashboardRetired) : f_dashboardDetail(f_formatPercent(compactConfidence), shortDashboardRetired)
 string compactLifecycleValue = f_compactLifecycleText(compactUseLong, longSetupAge, tradeLongTouched, shortSetupAge, tradeShortTouched)
 string compactLifecycleDisplay = compactBalanced ? "Mixed" : compactWaiting and compactContextOnly and compactCandidateHasSetup and not compactCandidateRetired ? (compactUseLong ? f_dashboardLifeText(compactLifecycleValue, longDashboardRetired) : f_dashboardLifeText(compactLifecycleValue, shortDashboardRetired)) : compactWaiting ? "Scan" : compactUseLong ? f_dashboardLifeText(compactLifecycleValue, longDashboardRetired) : f_dashboardLifeText(compactLifecycleValue, shortDashboardRetired)
 string compactRrDrawDisplay = "-"
@@ -2519,10 +2521,10 @@ drawHtfLow = f_preferredLevelMatch(htfStructureLow, compactBalanced, compactUseL
 
 showEqHighVisual = showLiquidity and displayEqLiquidity and f_targetVisualByMode(effectiveZoneDisplayMode, targetEqHigh)
 showEqLowVisual = showLiquidity and displayEqLiquidity and f_targetVisualByMode(effectiveZoneDisplayMode, targetEqLow)
-showProtectedHighVisual = displayProtectedLevels
-showProtectedLowVisual = displayProtectedLevels
+showProtectedHighVisual = displayProtectedLevels and f_contextVisualByMode(effectiveZoneDisplayMode)
+showProtectedLowVisual = displayProtectedLevels and f_contextVisualByMode(effectiveZoneDisplayMode)
 showRangeVisual = showLiquidity and displayDealingRange and f_contextVisualByMode(effectiveZoneDisplayMode)
-showOteVisual = strictShowOte
+showOteVisual = strictShowOte and f_contextVisualByMode(effectiveZoneDisplayMode)
 oteActiveSummary = not na(oteLongTop) ? "OTE:L" : not na(oteShortTop) ? "OTE:S" : "OTE:-"
 showHtfHighVisual = displayHtfLines and htfContextReady and f_targetVisualByMode(effectiveZoneDisplayMode, drawHtfHigh)
 showHtfLowVisual = displayHtfLines and htfContextReady and f_targetVisualByMode(effectiveZoneDisplayMode, drawHtfLow)
