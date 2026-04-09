@@ -477,7 +477,7 @@ f_biasSummary(int currentBias, bool htfReady, int higherBias, int regimeBias, st
 f_zoneVisibleByMode(string mode, bool isSelected, bool isBull, string preferredDirection, bool useLongPreference) =>
     mode == "Full" ? true : mode == "Focused" or preferredDirection == "Balanced" ? isSelected : preferredDirection == "Wait" ? isSelected : useLongPreference ? (isBull and isSelected) : (not isBull and isSelected)
 
-f_executionVisualByMode(string mode, bool riskVisible, string preferredDirection, bool useLongPreference, bool isLong) =>
+f_executionVisualByMode(string mode, bool riskVisible, string preferredDirection, bool isLong) =>
     if not riskVisible
         false
     else if mode == "Full"
@@ -2460,7 +2460,8 @@ string compactEntryTriplet = compactNeutral ? "-" : compactUseLong ? f_dashboard
 string compactStatusDisplay = compactBalanced ? "Mixed" : compactWaiting and compactContextOnly and compactCandidateHasSetup and not compactCandidateRetired ? "Ctx" : compactWaiting ? "Scan" : f_executionStateCompact(compactExecutionState)
 string compactConfTpLabel = compactNeutral ? (compactContextOnly ? "Ctx L/S" : "Conf L/S") : "Conf"
 string compactConfTpDisplay = compactNeutral ? "L " + f_formatPercent(longConfidence) + " / S " + f_formatPercent(shortConfidence) : compactUseLong ? f_dashboardDetail(f_formatPercent(compactConfidence), longDashboardRetired) : f_dashboardDetail(f_formatPercent(compactConfidence), shortDashboardRetired)
-string compactLifecycleDisplay = compactBalanced ? "Mixed" : compactWaiting ? "Scan" : compactUseLong ? f_dashboardLifeText(f_compactLifecycleText(compactUseLong, longSetupAge, tradeLongTouched, shortSetupAge, tradeShortTouched), longDashboardRetired) : f_dashboardLifeText(f_compactLifecycleText(compactUseLong, longSetupAge, tradeLongTouched, shortSetupAge, tradeShortTouched), shortDashboardRetired)
+string compactLifecycleValue = f_compactLifecycleText(compactUseLong, longSetupAge, tradeLongTouched, shortSetupAge, tradeShortTouched)
+string compactLifecycleDisplay = compactBalanced ? "Mixed" : compactWaiting and compactContextOnly and compactCandidateHasSetup and not compactCandidateRetired ? (compactUseLong ? f_dashboardLifeText(compactLifecycleValue, longDashboardRetired) : f_dashboardLifeText(compactLifecycleValue, shortDashboardRetired)) : compactWaiting ? "Scan" : compactUseLong ? f_dashboardLifeText(compactLifecycleValue, longDashboardRetired) : f_dashboardLifeText(compactLifecycleValue, shortDashboardRetired)
 string compactRrDrawDisplay = "-"
 string preferredExecutionSummary = f_preferredExecutionText(preferredDirection, longExecutionState, shortExecutionState, false)
 string compactPreferredSummary = f_preferredExecutionText(preferredDirection, longExecutionState, shortExecutionState, true)
@@ -2525,8 +2526,8 @@ showOteVisual = strictShowOte
 oteActiveSummary = not na(oteLongTop) ? "OTE:L" : not na(oteShortTop) ? "OTE:S" : "OTE:-"
 showHtfHighVisual = displayHtfLines and htfContextReady and f_targetVisualByMode(effectiveZoneDisplayMode, drawHtfHigh)
 showHtfLowVisual = displayHtfLines and htfContextReady and f_targetVisualByMode(effectiveZoneDisplayMode, drawHtfLow)
-showLongRiskVisual = displayRiskLines and f_executionRiskVisible(longExecutionState)
-showShortRiskVisual = displayRiskLines and f_executionRiskVisible(shortExecutionState)
+showLongRiskVisual = displayRiskLines and f_executionVisualByMode(effectiveZoneDisplayMode, f_executionRiskVisible(longExecutionState), preferredDirection, true)
+showShortRiskVisual = displayRiskLines and f_executionVisualByMode(effectiveZoneDisplayMode, f_executionRiskVisible(shortExecutionState), preferredDirection, false)
 
 if effectiveZoneDisplayMode != "Full"
     showEqHighVisual := f_uniqueLevelVisual(showEqHighVisual, activeEqh, showHtfHighVisual, htfStructureHigh, false, na, false, na, false, na, false, na)
