@@ -466,13 +466,13 @@ f_biasSummary(int currentBias, bool htfReady, int higherBias, int regimeBias, st
 f_zoneVisibleByMode(string mode, bool isSelected, bool isBull, string preferredDirection, bool useLongPreference) =>
     mode == "Full" ? true : mode == "Focused" or preferredDirection == "Balanced" ? isSelected : preferredDirection == "Wait" ? isSelected : useLongPreference ? (isBull and isSelected) : (not isBull and isSelected)
 
-f_executionVisualByMode(string mode, bool riskVisible, string preferredDirection, bool isLong) =>
+f_executionVisualByMode(string mode, bool riskVisible, string preferredDirection, bool isLong, bool useLongPreference) =>
     if not riskVisible
         false
     else if mode == "Full"
         true
     else if preferredDirection == "Balanced"
-        true
+        useLongPreference ? isLong : not isLong
     else if preferredDirection == "Long"
         isLong
     else if preferredDirection == "Short"
@@ -529,7 +529,7 @@ f_entryActionText(string statusText) =>
     statusText == "Active" ? "Entry active" : statusText == "Armed" ? "Monitor retest" : statusText == "Confirming" ? "Wait confirm" : statusText == "Managed" ? "Manage trade" : statusText == "Ambiguous" ? "Review candle" : statusText == "Completed" ? "Wait next setup" : statusText == "Expired" or statusText == "Invalidated" ? "Stand down" : "Wait confirmation"
 
 f_dashboardRetired(string executionState, int setupAge, bool touched, int expiryBarsWindow) =>
-    executionState == "Ambiguous" or executionState == "Invalidated" or executionState == "Completed" or executionState == "Expired" or (touched and not na(setupAge) and setupAge > expiryBarsWindow and not f_executionRiskVisible(executionState) and executionState != "Confirming")
+    executionState == "Invalidated" or executionState == "Completed" or executionState == "Expired" or (touched and not na(setupAge) and setupAge > expiryBarsWindow and not f_executionRiskVisible(executionState) and executionState != "Confirming" and executionState != "Ambiguous")
 
 f_timeNormalizedBars(int baseBars, int baselineTfSeconds, int currentTfSeconds, int minBars) =>
     float baselineDurationSeconds = float(baseBars) * baselineTfSeconds
@@ -646,16 +646,17 @@ f_preferredExecutionText(string preferredDirection, string longExecutionState, s
 f_setupScore(bool hasSetup, bool biasAligned, bool htfAligned, bool priceInZone, bool priceNearZone, float rr, bool chased, bool expired, bool invalidated) =>
     float score = na
     if hasSetup
-        float points = 0.0
-        float maxPoints = 6.0
-        points += biasAligned ? 2.0 : 0.0
-        points += htfAligned ? 1.0 : 0.0
-        points += priceInZone or priceNearZone ? 1.0 : 0.0
-        points += f_rrPoints(rr)
-        points -= chased ? 2.0 : 0.0
-        points -= expired ? 2.0 : 0.0
-        points -= invalidated ? 4.0 : 0.0
-        score := f_clamp(points / maxPoints * 100.0, 0.0, 100.0)
+        if invalidated or expired
+            score := 0.0
+        else
+            float points = 0.0
+            float maxPoints = 4.0
+            points += biasAligned ? 1.5 : 0.0
+            points += htfAligned ? 1.0 : 0.0
+            points += priceInZone ? 1.0 : priceNearZone ? 0.5 : 0.0
+            points += na(rr) ? 0.0 : rr >= 2.0 ? 0.5 : rr >= 1.0 ? 0.25 : 0.0
+            points -= chased ? 1.0 : 0.0
+            score := f_clamp(points / maxPoints * 100.0, 0.0, 100.0)
     score
 
 chartTfLabel = timeframe.main_period
@@ -2534,8 +2535,8 @@ showOteVisual = strictShowOte and f_contextVisualByMode(effectiveZoneDisplayMode
 oteActiveSummary = not na(oteLongTop) ? "OTE:L" : not na(oteShortTop) ? "OTE:S" : "OTE:-"
 showHtfHighVisual = displayHtfLines and htfContextReady and f_targetVisualByMode(effectiveZoneDisplayMode, drawHtfHigh)
 showHtfLowVisual = displayHtfLines and htfContextReady and f_targetVisualByMode(effectiveZoneDisplayMode, drawHtfLow)
-showLongRiskVisual = displayRiskLines and f_executionVisualByMode(effectiveZoneDisplayMode, f_executionRiskVisible(longExecutionState), preferredDirection, true)
-showShortRiskVisual = displayRiskLines and f_executionVisualByMode(effectiveZoneDisplayMode, f_executionRiskVisible(shortExecutionState), preferredDirection, false)
+showLongRiskVisual = displayRiskLines and f_executionVisualByMode(effectiveZoneDisplayMode, f_executionRiskVisible(longExecutionState), preferredDirection, true, compactUseLong)
+showShortRiskVisual = displayRiskLines and f_executionVisualByMode(effectiveZoneDisplayMode, f_executionRiskVisible(shortExecutionState), preferredDirection, false, compactUseLong)
 
 if effectiveZoneDisplayMode != "Full"
     showEqHighVisual := f_uniqueLevelVisual(showEqHighVisual, activeEqh, showHtfHighVisual, htfStructureHigh, false, na, false, na, false, na, false, na)
