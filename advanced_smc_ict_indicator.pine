@@ -43,10 +43,10 @@ bool strictShowOte = input.bool(true, "Show active OTE overlay", group=groupZone
 string zoneDisplayMode = input.string("Full", "Zone display mode", options=["Full", "Focused", "Minimal"], group=groupZones)
 
 groupContext = "4. Context"
-bool showHtf = input.bool(true, "Show context HTF structure", group=groupContext)
-bool showProtectedLevels = input.bool(true, "Show protected high / low", group=groupContext)
-bool showSessionVisuals = input.bool(true, "Show trading sessions on chart", group=groupContext)
-bool showLiquidityRightLabels = input.bool(true, "Show right-edge liquidity labels", group=groupContext)
+bool showHtf = input.bool(true, "Show active HTF draw levels", group=groupContext)
+bool showProtectedLevels = input.bool(true, "Show active protected high / low", group=groupContext)
+bool showSessionVisuals = input.bool(true, "Show trading sessions on chart (Full / intraday)", group=groupContext)
+bool showLiquidityRightLabels = input.bool(true, "Show right-edge draw labels", group=groupContext)
 int htfSwingLen = 2
 int regimeMomentumLookbackBars = 20
 float regimeStrongAtrThreshold = 1.0
@@ -450,7 +450,7 @@ f_ifvgLabelStyle(bool isBull) =>
     isBull ? label.style_label_up : label.style_label_down
 
 f_sessionVisualLabel(string sessionName) =>
-    compactMode ? (sessionName == "New York" ? "NY" : f_sessionCode(sessionName)) : sessionName
+    sessionName
 
 f_sessionFillColor(string sessionName) =>
     sessionName == "Asia" ? asiaSessionFillColor : sessionName == "London" ? londonSessionFillColor : newYorkSessionFillColor
@@ -459,7 +459,7 @@ f_sessionBorderColor(string sessionName) =>
     sessionName == "Asia" ? asiaSessionBorderColor : sessionName == "London" ? londonSessionBorderColor : newYorkSessionBorderColor
 
 f_sessionTextColor(string sessionName) =>
-    color.new(f_sessionBorderColor(sessionName), compactMode ? 32 : 46)
+    color.new(f_sessionBorderColor(sessionName), 46)
 
 f_sessionLineColor(string sessionName, bool isHigh) =>
     color.new(f_sessionBorderColor(sessionName), isHigh ? 24 : 34)
@@ -610,7 +610,7 @@ f_addSessionVisual(string sessionName, int leftBar, float sessionHigh, float ses
     color fillColor = f_sessionFillColor(sessionName)
     color borderColor = f_sessionBorderColor(sessionName)
     box newBox = box.new(left=safeLeftBar, top=sessionHigh, right=bar_index, bottom=sessionLow, xloc=xloc.bar_index, bgcolor=fillColor, border_color=borderColor)
-    label newLabel = label.new(x=f_safeBarIndexX(int(math.floor((safeLeftBar + bar_index) * 0.5))), y=f_zoneMid(sessionHigh, sessionLow), xloc=xloc.bar_index, text=f_sessionVisualLabel(sessionName), style=label.style_none, color=color.new(color.black, 100), textcolor=f_sessionTextColor(sessionName), size=compactMode ? size.small : size.normal)
+    label newLabel = label.new(x=f_safeBarIndexX(int(math.floor((safeLeftBar + bar_index) * 0.5))), y=f_zoneMid(sessionHigh, sessionLow), xloc=xloc.bar_index, text=f_sessionVisualLabel(sessionName), style=label.style_none, color=color.new(color.black, 100), textcolor=f_sessionTextColor(sessionName), size=size.normal)
     line newHighLine = line.new(x1=safeLeftBar, y1=sessionHigh, x2=bar_index, y2=sessionHigh, xloc=xloc.bar_index, color=f_sessionLineColor(sessionName, true), width=1, style=line.style_solid)
     line newLowLine = line.new(x1=safeLeftBar, y1=sessionLow, x2=bar_index, y2=sessionLow, xloc=xloc.bar_index, color=f_sessionLineColor(sessionName, false), width=1, style=line.style_solid)
     array.push(sessionRangeBoxes, newBox)
@@ -644,7 +644,7 @@ f_syncSessionVisual(box currentBox, label currentLabel, line currentHighLine, li
         label.set_text(currentLabel, f_sessionVisualLabel(sessionName))
         label.set_style(currentLabel, label.style_none)
         label.set_color(currentLabel, color.new(color.black, 100))
-        label.set_size(currentLabel, compactMode ? size.small : size.normal)
+        label.set_size(currentLabel, size.normal)
 
 f_executionStateBadge(string stateText, bool compactText) =>
     stateText == "Active" ? (compactText ? "ACT" : "Active") : stateText == "Armed" ? (compactText ? "ARM" : "Armed") : stateText == "Managed" ? (compactText ? "MNG" : "Managed") : stateText == "Ambiguous" ? (compactText ? "AMB" : "Ambiguous") : stateText == "Completed" ? (compactText ? "CMP" : "Completed") : ""
@@ -2609,8 +2609,8 @@ oteShortMid = not na(oteShortTop) and not na(oteShortBottom) ? f_zoneMid(oteShor
 oteLongMidLevel = not na(oteLongTopLevel) and not na(oteLongBottomLevel) ? f_zoneMid(oteLongTopLevel, oteLongBottomLevel) : na
 oteShortMidLevel = not na(oteShortTopLevel) and not na(oteShortBottomLevel) ? f_zoneMid(oteShortTopLevel, oteShortBottomLevel) : na
 rightEdgeLabelTolerance = atr * 0.15
-showShortStopRightLabel = showShortRiskVisual and not na(riskBearStopLevel)
-showLongStopRightLabel = showLongRiskVisual and not na(riskBullStopLevel)
+showShortStopRightLabel = displayLiquidityRightLabels and showShortRiskVisual and not na(riskBearStopLevel)
+showLongStopRightLabel = displayLiquidityRightLabels and showLongRiskVisual and not na(riskBullStopLevel)
 showHtfHighRightLabel = displayLiquidityRightLabels and showHtfHighVisual and not f_levelsClose(htfStructureHighLevel, riskBearStopLevel, rightEdgeLabelTolerance)
 showHtfLowRightLabel = displayLiquidityRightLabels and showHtfLowVisual and not f_levelsClose(htfStructureLowLevel, riskBullStopLevel, rightEdgeLabelTolerance)
 showProtectedHighRightLabel = displayLiquidityRightLabels and showProtectedHighVisual and not f_levelsClose(protectedHighLevel, riskBearStopLevel, rightEdgeLabelTolerance) and not f_levelsClose(protectedHighLevel, htfStructureHighLevel, rightEdgeLabelTolerance)
