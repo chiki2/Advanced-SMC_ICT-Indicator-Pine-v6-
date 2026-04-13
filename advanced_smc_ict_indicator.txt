@@ -449,6 +449,14 @@ f_obLabelStyle() =>
 f_ifvgLabelStyle(bool isBull) =>
     isBull ? label.style_label_up : label.style_label_down
 
+f_hasActiveLine(line[] lineArray) =>
+    bool hasActive = false
+    if array.size(lineArray) > 0
+        for i = 0 to array.size(lineArray) - 1
+            if not na(array.get(lineArray, i))
+                hasActive := true
+    hasActive
+
 f_sessionVisualLabel(string sessionName) =>
     compactMode ? (sessionName == "New York" ? "NY" : f_sessionCode(sessionName)) : sessionName
 
@@ -2514,6 +2522,12 @@ string preferredExecutionSummary = f_preferredExecutionText(preferredDirection, 
 string compactPreferredSummary = f_preferredExecutionText(preferredDirection, longExecutionState, shortExecutionState, true)
 string sessionConfirmMarketSummary = liquiditySessionSummary + " | " + timezoneSummary + (strictModeEnabled ? " | Strict" : "")
 string effectiveModeSummary = "Eff " + effectiveZoneDisplayMode
+bool sessionLineActive = sessionVisualsEnabled and array.size(sessionRangeHighLines) > 0
+bool structureDashActive = displayStructureEvents and f_hasActiveLine(structureEventLines)
+bool longObLineVisible = showOb and tradeLongIsOb and not longDashboardRetired and f_zoneVisibleByMode(effectiveZoneDisplayMode, true, true, preferredDirection, compactUseLong)
+bool shortObLineVisible = showOb and tradeShortIsOb and not shortDashboardRetired and f_zoneVisibleByMode(effectiveZoneDisplayMode, true, false, preferredDirection, compactUseLong)
+bool obDashActive = longObLineVisible or shortObLineVisible
+string visualLineSummary = sessionLineActive or structureDashActive or obDashActive ? "Vis " + (sessionLineActive ? "SesLn" : "") + (structureDashActive ? (sessionLineActive ? "/StrDash" : "StrDash") : "") + (obDashActive ? ((sessionLineActive or structureDashActive) ? "/ObDash" : "ObDash") : "") : "Vis -"
 string longDashboardSetupDisplay = f_dashboardSetupText(longSetupDisplay, longDashboardRetired)
 string shortDashboardSetupDisplay = f_dashboardSetupText(shortSetupDisplay, shortDashboardRetired)
 string longZoneEntrySummary = f_dashboardDetail(f_formatRange(tradeLongValidTop, tradeLongValidBottom) + " | " + f_formatLevel(tradeLongEntry), longDashboardRetired)
@@ -2571,8 +2585,8 @@ showProtectedLowVisual = displayProtectedLevels and (effectiveZoneDisplayMode !=
 showRangeVisual = showLiquidity and displayDealingRange and f_contextVisualByMode(effectiveZoneDisplayMode)
 showOteVisual = strictShowOte and effectiveZoneDisplayMode != "Minimal"
 oteActiveSummary = not na(oteLongTop) ? "OTE:L" : not na(oteShortTop) ? "OTE:S" : "OTE:-"
-string desktopModeStatus = effectiveModeSummary + " | " + mtfSummary + " | " + oteActiveSummary
-string compactModeStatus = presetLabel + " | " + effectiveModeSummary + " | " + mtfSummary + " | " + oteActiveSummary
+string desktopModeStatus = effectiveModeSummary + " | " + mtfSummary + " | " + oteActiveSummary + " | " + visualLineSummary
+string compactModeStatus = presetLabel + " | " + effectiveModeSummary + " | " + mtfSummary + " | " + oteActiveSummary + " | " + visualLineSummary
 showHtfHighVisual = displayHtfLines and htfContextReady and f_targetVisualByMode(effectiveZoneDisplayMode, drawHtfHigh)
 showHtfLowVisual = displayHtfLines and htfContextReady and f_targetVisualByMode(effectiveZoneDisplayMode, drawHtfLow)
 showLongRiskVisual = displayRiskLines and f_executionVisualByMode(effectiveZoneDisplayMode, f_executionRiskVisible(longExecutionState), preferredDirection, true, compactUseLong)
