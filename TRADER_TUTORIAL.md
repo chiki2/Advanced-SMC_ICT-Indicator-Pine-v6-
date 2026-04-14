@@ -31,6 +31,19 @@ Untuk pemakaian paling mudah:
 Jika ingin paling ketat ala ICT:
 - pilih profile `Strict Confirm`
 - biarkan `Show active OTE overlay` tetap hidup
+- `Zone display mode` tetap bebas Anda pilih, misalnya `Full`
+- `Compact dashboard mode` juga tetap bisa dipakai tanpa mengubah engine strict
+
+Formula baca `Strict Confirm` sekarang sengaja dibuat eksplisit:
+- `ERL sweep`
+- `displacement / MSS`
+- `PD-array / OTE`
+- `DOL`
+- `killzone`
+
+Catatan penting:
+- `volume tinggi` tidak dipakai sebagai syarat wajib
+- alasannya agar indikator tetap lean dan tidak overfit ke feed volume broker tertentu
 
 Timeframe eksekusi yang didukung:
 - `M1`
@@ -54,6 +67,18 @@ Panel input sekarang dibagi ringkas menjadi:
 Prinsipnya:
 - yang terlihat di panel adalah keputusan trader-facing
 - parameter engine internal sudah dibekukan di kode agar tidak mendorong bias dan overtuning
+
+Catatan penting tentang preset:
+- `Strict Confirm` = engine validasi setup
+- `Zone display mode` = gaya visual zona
+- `Compact dashboard mode` = gaya panel
+
+Jadi Anda bisa memakai kombinasi seperti:
+- `Strict Confirm + Full`
+- `Strict Confirm + Focused`
+- `Strict Confirm + Full + Compact dashboard`
+
+tanpa mengubah engine strict itu sendiri
 
 ## Cara Membaca Chart
 
@@ -149,13 +174,13 @@ Jika nama setup di dashboard diikuti:
 - `Q2`
 - `Q3`
 
-itu berarti `Quality tier` zona:
+itu berarti `Setup Grade`:
 - `Q1` = kualitas dasar
 - `Q2` = kualitas menengah
 - `Q3` = kualitas terbaik
 
-Tier ini dibangun dari:
-- response zona
+Grade ini dibangun dari snapshot kualitas setup:
+- response / confirm pada POI terpilih
 - displacement
 - ATR expansion
 
@@ -295,7 +320,7 @@ Cara baca:
 - jika sisi tertentu sudah `Invalidated` atau `Completed`, detail ini bisa diredam menjadi `-`
 - pada compact mode, label `Ctx L/S` berarti angka yang tampil masih context strength, belum setup yang actionable
 
-### Draw / TP
+### Draw
 
 Menunjukkan:
 - `Draw` = `DOL` / external liquidity target utama
@@ -355,6 +380,14 @@ Jika sisi `Long` atau `Short` sudah tidak actionable lagi:
 - baris `Sess/Cfm` untuk sisi itu akan ditulis `Retired`
 - ini sengaja supaya dashboard tidak terus membahas konfirmasi untuk setup yang sudah selesai, invalid, atau basi
 
+Status strict sekarang dibaca lebih eksplisit:
+- `Need ERL` = belum ada sweep external liquidity yang cukup
+- `Need MSS` = sweep sudah ada, tetapi displacement / MSS belum cukup
+- `Need PD` = sweep dan MSS sudah ada, tetapi lokasi POI / OTE belum rapi
+- `Need DOL` = context sudah rapi, tetapi external draw belum layak
+- `KZ Wait` = context lengkap, menunggu timing killzone
+- `Ready` = flow strict lengkap
+
 ### Next
 
 Menunjukkan:
@@ -398,7 +431,7 @@ Prinsip pakai:
 - jika butuh detail penuh, lihat dashboard full
 
 Catatan penting:
-- jika compact menulis setup seperti `Bullish OB | Q2 | Ctx`, artinya ada kandidat setup yang sedang terbentuk
+- jika compact menulis setup seperti `Bullish OB | Q2 | Ctx`, itu berarti ada kandidat dengan `Setup Grade Q2` yang masih sedang terbentuk
 - `Ctx` berarti setup itu masih `context-only`, belum actionable untuk entry
 - `Ctx+i` berarti ada kandidat setup context-only dan `iFVG` aktif sedang menambah konteks
 - `Ctx+i+` berarti `iFVG` aktif itu juga selaras dengan setup kandidat yang sedang terbaca
@@ -437,7 +470,7 @@ Gunakan indikator dengan urutan ini:
 - `Active` = entry bisa valid
 - `Managed` = kelola trade, bukan cari entry baru
 
-7. Lihat `SL / TP`, `RR / Cf`, dan `Draw / TP`
+7. Lihat `SL / TP`, `RR / Cf`, dan `Draw`
 - pastikan jarak stop dan target masih masuk akal
 
 ## Cara Pakai yang Sehat
