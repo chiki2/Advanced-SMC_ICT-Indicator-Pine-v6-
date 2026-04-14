@@ -12,6 +12,12 @@ Panduan satu halaman yang ringkas, visual, dan siap dibagikan untuk trader `Adva
 | Layar kecil / cepat | `Compact` |
 | Validasi paling ketat | `Strict Confirm` |
 
+`Strict Confirm` sekarang tidak lagi memaksa `Focused`.
+Anda bebas memilih:
+- `Strict + Full`
+- `Strict + Focused`
+- `Strict + Compact dashboard`
+
 | Engine | Nilai |
 |---|---|
 | Gaya trading | `Intraday ICT` |
@@ -83,10 +89,10 @@ Jika salah satu dari tiga hal ini belum jelas, `wait`:
 | `Z / E` | `POI` dan entry | lokasi setup |
 | `SL / TP` | stop dan target | risk plan |
 | `RR / Cf` | reward/risk dan confidence | pembanding, bukan alasan tunggal |
-| `Draw / TP` | `DOL` dan peluang model | arah tarikan external liquidity utama |
+| `Draw` | `DOL` utama | arah tarikan external liquidity utama |
 | `Next` | aksi berikutnya | baca ini paling akhir |
 
-### Baca `Q`
+### Baca `Setup Grade`
 
 | Tag | Arti |
 |---|---|
@@ -94,8 +100,8 @@ Jika salah satu dari tiga hal ini belum jelas, `wait`:
 | `Q2` | kualitas menengah |
 | `Q3` | kualitas terbaik |
 
-`Q` = `Quality tier` zona, dibentuk dari:
-- response
+`Q` = `Setup Grade`, dibentuk dari snapshot kualitas setup:
+- response / confirm pada POI terpilih
 - displacement
 - ATR expansion
 
@@ -122,15 +128,26 @@ Jika salah satu dari tiga hal ini belum jelas, `wait`:
 Flow sehat indikator dalam `Strict Confirm`:
 - `ERL sweep -> FVG / POI -> DOL`
 
+Flow strict yang lebih eksplisit:
+- `ERL sweep -> displacement / MSS -> PD / OTE -> DOL -> killzone`
+
+Catatan:
+- `volume tinggi` tidak dipakai sebagai syarat wajib
+- indikator sengaja tidak memakai gate volume keras agar tetap robust lintas feed
+
 ### Baca `RR / Cf`
 
 - `RR` = reward / risk
 - `Cf` = confidence
 - jika compact menulis `Ctx L/S`, itu masih `context strength`, belum setup siap entry
+<<<<<<< HEAD
 - jika compact menulis setup seperti `Bullish OB | Q2 | Ctx`, itu berarti setup kandidat sudah ada tetapi masih `context-only`
 - jika compact menulis `Ctx+i`, itu berarti ada `iFVG` aktif yang sedang menambah konteks
 - jika compact menulis `Ctx+i+`, itu berarti `iFVG` aktif itu juga selaras dengan setup kandidat
 - jika sisi dashboard full sudah `Retired`, maka `Sess/Cfm` sisi itu juga ikut `Retired`
+=======
+- jika compact menulis setup seperti `Bullish OB | Q2 | Ctx`, itu berarti setup kandidat dengan `Setup Grade Q2` sudah ada tetapi masih `context-only`
+>>>>>>> 7157f07044b3a3b41f3b982a9e6c480702bf60a5
 - selama `Zone` dan `E / SL / TP` masih `-`, trader tetap membaca kondisi itu sebagai `scan`, bukan entry
 
 ### Baca `Next`
