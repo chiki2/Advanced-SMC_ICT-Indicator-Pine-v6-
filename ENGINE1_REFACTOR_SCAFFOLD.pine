@@ -1,0 +1,581 @@
+//@version=6
+indicator("ENGINE 1 Refactor Scaffold", overlay=true, max_lines_count=1, max_labels_count=1, max_boxes_count=1)
+
+//------------------------------------------------------------------------------
+// ENGINE 1 REFACTOR SCAFFOLD
+// Closed-candle MTF buffer + snapshot contract.
+// This file is a standalone scaffold meant to be copied into the main script
+// during the refactor. It is intentionally limited to Engine 1 only.
+//------------------------------------------------------------------------------
+
+//------------------------------------------------------------------------------
+// Shared TF contract
+//------------------------------------------------------------------------------
+string TF_M1 = "1"
+string TF_M5 = "5"
+string TF_M15 = "15"
+string TF_M30 = "30"
+string TF_H1 = "60"
+string TF_H4 = "240"
+string TF_D1 = "1D"
+
+int BUF_CAP = 300
+int SWING_LEN = 3
+
+f_ictContextHtf(float chartSeconds) =>
+    na(chartSeconds) ? "" :
+         chartSeconds == timeframe.in_seconds("1") ? TF_M15 :
+         chartSeconds == timeframe.in_seconds("5") ? TF_M15 :
+         chartSeconds == timeframe.in_seconds("15") ? TF_H1 :
+         chartSeconds == timeframe.in_seconds("30") ? TF_H4 : ""
+
+f_ictNarrativeHtf(float chartSeconds) =>
+    na(chartSeconds) ? "" :
+         chartSeconds == timeframe.in_seconds("1") ? TF_H1 :
+         chartSeconds == timeframe.in_seconds("5") ? TF_H4 :
+         chartSeconds == timeframe.in_seconds("15") ? TF_H4 :
+         chartSeconds == timeframe.in_seconds("30") ? TF_D1 : ""
+
+string eng_exec_tf = timeframe.main_period
+string eng_ctx_tf = f_ictContextHtf(timeframe.in_seconds())
+string eng_narr_tf = f_ictNarrativeHtf(timeframe.in_seconds())
+bool eng_exec_valid = eng_ctx_tf != "" and eng_narr_tf != ""
+
+//------------------------------------------------------------------------------
+// Generic buffer helpers
+//------------------------------------------------------------------------------
+f_buf_push_int(array<int> buf, int value, int cap) =>
+    if not na(value)
+        array.unshift(buf, value)
+        while array.size(buf) > cap
+            array.pop(buf)
+
+f_buf_push_float(array<float> buf, float value, int cap) =>
+    if not na(value)
+        array.unshift(buf, value)
+        while array.size(buf) > cap
+            array.pop(buf)
+
+f_buf_get_float(array<float> buf, int idx) =>
+    array.size(buf) > idx ? array.get(buf, idx) : na
+
+f_buf_get_int(array<int> buf, int idx) =>
+    array.size(buf) > idx ? array.get(buf, idx) : na
+
+f_tf_closed_ohlc(string tf) =>
+    int t = request.security(syminfo.tickerid, tf, time[1], lookahead=barmerge.lookahead_off)
+    float o = request.security(syminfo.tickerid, tf, open[1], lookahead=barmerge.lookahead_off)
+    float h = request.security(syminfo.tickerid, tf, high[1], lookahead=barmerge.lookahead_off)
+    float l = request.security(syminfo.tickerid, tf, low[1], lookahead=barmerge.lookahead_off)
+    float c = request.security(syminfo.tickerid, tf, close[1], lookahead=barmerge.lookahead_off)
+    [t, o, h, l, c]
+
+f_tf_update_ohlc_buffer(string tf, int lastClosedTime, array<int> arrT, array<float> arrO, array<float> arrH, array<float> arrL, array<float> arrC, int cap) =>
+    [closedTime, closedOpen, closedHigh, closedLow, closedClose] = f_tf_closed_ohlc(tf)
+    bool newClosed = not na(closedTime) and closedTime != lastClosedTime
+    int nextLastClosedTime = lastClosedTime
+    if newClosed
+        f_buf_push_int(arrT, closedTime, cap)
+        f_buf_push_float(arrO, closedOpen, cap)
+        f_buf_push_float(arrH, closedHigh, cap)
+        f_buf_push_float(arrL, closedLow, cap)
+        f_buf_push_float(arrC, closedClose, cap)
+        nextLastClosedTime := closedTime
+    [newClosed, nextLastClosedTime]
+
+//------------------------------------------------------------------------------
+// Structure / liquidity / zone skeleton helpers
+// These are compile-safe scaffolds. Replace internals during refactor.
+//------------------------------------------------------------------------------
+f_tf_build_structure(array<int> arrT, array<float> arrH, array<float> arrL, array<float> arrC, int swingLen) =>
+    float lastHigh = na
+    int lastHighBar = na
+    float prevHigh = na
+    int prevHighBar = na
+    float lastLow = na
+    int lastLowBar = na
+    float prevLow = na
+    int prevLowBar = na
+    bool bullBos = false
+    bool bearBos = false
+    bool bullChoch = false
+    bool bearChoch = false
+    int trendBias = 0
+    [lastHigh, lastHighBar, prevHigh, prevHighBar, lastLow, lastLowBar, prevLow, prevLowBar, bullBos, bearBos, bullChoch, bearChoch, trendBias]
+
+f_tf_build_liquidity(array<float> arrH, array<float> arrL, array<float> arrC) =>
+    float eqh = na
+    float eql = na
+    float erlHigh = na
+    float erlLow = na
+    float irlHigh = na
+    float irlLow = na
+    bool eqhActive = false
+    bool eqlActive = false
+    [eqh, eql, erlHigh, erlLow, irlHigh, irlLow, eqhActive, eqlActive]
+
+f_tf_build_pd_arrays(float lastHigh, float lastLow) =>
+    float rangeHigh = lastHigh
+    float rangeLow = lastLow
+    float equilibrium = not na(rangeHigh) and not na(rangeLow) ? (rangeHigh + rangeLow) * 0.5 : na
+    float oteLongTop = na
+    float oteLongBottom = na
+    float oteShortTop = na
+    float oteShortBottom = na
+    [rangeHigh, rangeLow, equilibrium, oteLongTop, oteLongBottom, oteShortTop, oteShortBottom]
+
+f_tf_build_fvg(array<float> arrH, array<float> arrL, array<float> arrC) =>
+    float bullTop = na
+    float bullBottom = na
+    int bullBar = na
+    float bearTop = na
+    float bearBottom = na
+    int bearBar = na
+    [bullTop, bullBottom, bullBar, bearTop, bearBottom, bearBar]
+
+f_tf_build_ob(array<float> arrO, array<float> arrH, array<float> arrL, array<float> arrC) =>
+    float bullTop = na
+    float bullBottom = na
+    float bullEntry = na
+    int bullBar = na
+    bool bullBreaker = false
+    float bearTop = na
+    float bearBottom = na
+    float bearEntry = na
+    int bearBar = na
+    bool bearBreaker = false
+    [bullTop, bullBottom, bullEntry, bullBar, bullBreaker, bearTop, bearBottom, bearEntry, bearBar, bearBreaker]
+
+f_tf_build_execution(float lastHigh, float lastLow, float protectedHigh, float protectedLow, array<float> arrH, array<float> arrL, array<float> arrC) =>
+    bool bullSweep = false
+    bool bearSweep = false
+    bool bullDisplacement = false
+    bool bearDisplacement = false
+    bool bullMss = false
+    bool bearMss = false
+    float nextProtectedHigh = protectedHigh
+    float nextProtectedLow = protectedLow
+    [bullSweep, bearSweep, bullDisplacement, bearDisplacement, bullMss, bearMss, nextProtectedHigh, nextProtectedLow]
+
+f_regime_bias(float closeValue, float refValue) =>
+    na(closeValue) or na(refValue) ? 0 : closeValue > refValue ? 1 : closeValue < refValue ? -1 : 0
+
+f_regime_strength_text(int bias, float closeValue, float refValue, float atrValue) =>
+    if bias == 0 or na(closeValue) or na(refValue) or na(atrValue) or atrValue <= 0
+        "Flat"
+    else
+        float distance = math.abs(closeValue - refValue)
+        distance >= atrValue ? "Strong" : "Normal"
+
+//------------------------------------------------------------------------------
+// Per-timeframe raw buffers
+//------------------------------------------------------------------------------
+var array<int>   buf_m1_time = array.new_int()
+var array<float> buf_m1_open = array.new_float()
+var array<float> buf_m1_high = array.new_float()
+var array<float> buf_m1_low = array.new_float()
+var array<float> buf_m1_close = array.new_float()
+var int m1_last_closed_time = na
+
+var array<int>   buf_m5_time = array.new_int()
+var array<float> buf_m5_open = array.new_float()
+var array<float> buf_m5_high = array.new_float()
+var array<float> buf_m5_low = array.new_float()
+var array<float> buf_m5_close = array.new_float()
+var int m5_last_closed_time = na
+
+var array<int>   buf_m15_time = array.new_int()
+var array<float> buf_m15_open = array.new_float()
+var array<float> buf_m15_high = array.new_float()
+var array<float> buf_m15_low = array.new_float()
+var array<float> buf_m15_close = array.new_float()
+var int m15_last_closed_time = na
+
+var array<int>   buf_m30_time = array.new_int()
+var array<float> buf_m30_open = array.new_float()
+var array<float> buf_m30_high = array.new_float()
+var array<float> buf_m30_low = array.new_float()
+var array<float> buf_m30_close = array.new_float()
+var int m30_last_closed_time = na
+
+var array<int>   buf_h1_time = array.new_int()
+var array<float> buf_h1_open = array.new_float()
+var array<float> buf_h1_high = array.new_float()
+var array<float> buf_h1_low = array.new_float()
+var array<float> buf_h1_close = array.new_float()
+var int h1_last_closed_time = na
+
+var array<int>   buf_h4_time = array.new_int()
+var array<float> buf_h4_open = array.new_float()
+var array<float> buf_h4_high = array.new_float()
+var array<float> buf_h4_low = array.new_float()
+var array<float> buf_h4_close = array.new_float()
+var int h4_last_closed_time = na
+
+var array<int>   buf_d1_time = array.new_int()
+var array<float> buf_d1_open = array.new_float()
+var array<float> buf_d1_high = array.new_float()
+var array<float> buf_d1_low = array.new_float()
+var array<float> buf_d1_close = array.new_float()
+var int d1_last_closed_time = na
+
+//------------------------------------------------------------------------------
+// Per-timeframe snapshot template
+//------------------------------------------------------------------------------
+var float m1_last_swing_high = na
+var float m1_last_swing_low = na
+var int m1_trend_bias = 0
+var float m1_bull_ob_top = na
+var float m1_bull_ob_bottom = na
+var float m1_bull_fvg_top = na
+var float m1_bull_fvg_bottom = na
+var float m1_bear_ob_top = na
+var float m1_bear_ob_bottom = na
+var float m1_bear_fvg_top = na
+var float m1_bear_fvg_bottom = na
+var float m1_eqh = na
+var float m1_eql = na
+var bool m1_eqh_active = false
+var bool m1_eql_active = false
+var float m1_protected_high = na
+var float m1_protected_low = na
+var bool m1_bull_sweep = false
+var bool m1_bear_sweep = false
+var bool m1_bull_mss = false
+var bool m1_bear_mss = false
+
+var float m5_last_swing_high = na
+var float m5_last_swing_low = na
+var int m5_trend_bias = 0
+var float m5_bull_ob_top = na
+var float m5_bull_ob_bottom = na
+var float m5_bull_fvg_top = na
+var float m5_bull_fvg_bottom = na
+var float m5_bear_ob_top = na
+var float m5_bear_ob_bottom = na
+var float m5_bear_fvg_top = na
+var float m5_bear_fvg_bottom = na
+var float m5_eqh = na
+var float m5_eql = na
+var bool m5_eqh_active = false
+var bool m5_eql_active = false
+var float m5_protected_high = na
+var float m5_protected_low = na
+var bool m5_bull_sweep = false
+var bool m5_bear_sweep = false
+var bool m5_bull_mss = false
+var bool m5_bear_mss = false
+
+var float m15_last_swing_high = na
+var float m15_last_swing_low = na
+var int m15_trend_bias = 0
+var float m15_bull_ob_top = na
+var float m15_bull_ob_bottom = na
+var float m15_bull_fvg_top = na
+var float m15_bull_fvg_bottom = na
+var float m15_bear_ob_top = na
+var float m15_bear_ob_bottom = na
+var float m15_bear_fvg_top = na
+var float m15_bear_fvg_bottom = na
+var float m15_eqh = na
+var float m15_eql = na
+var bool m15_eqh_active = false
+var bool m15_eql_active = false
+var float m15_protected_high = na
+var float m15_protected_low = na
+var bool m15_bull_sweep = false
+var bool m15_bear_sweep = false
+var bool m15_bull_mss = false
+var bool m15_bear_mss = false
+
+var float m30_last_swing_high = na
+var float m30_last_swing_low = na
+var int m30_trend_bias = 0
+var float m30_bull_ob_top = na
+var float m30_bull_ob_bottom = na
+var float m30_bull_fvg_top = na
+var float m30_bull_fvg_bottom = na
+var float m30_bear_ob_top = na
+var float m30_bear_ob_bottom = na
+var float m30_bear_fvg_top = na
+var float m30_bear_fvg_bottom = na
+var float m30_eqh = na
+var float m30_eql = na
+var bool m30_eqh_active = false
+var bool m30_eql_active = false
+var float m30_protected_high = na
+var float m30_protected_low = na
+var bool m30_bull_sweep = false
+var bool m30_bear_sweep = false
+var bool m30_bull_mss = false
+var bool m30_bear_mss = false
+
+var float h1_last_swing_high = na
+var float h1_last_swing_low = na
+var int h1_trend_bias = 0
+var float h1_bull_ob_top = na
+var float h1_bull_ob_bottom = na
+var float h1_bull_fvg_top = na
+var float h1_bull_fvg_bottom = na
+var float h1_bear_ob_top = na
+var float h1_bear_ob_bottom = na
+var float h1_bear_fvg_top = na
+var float h1_bear_fvg_bottom = na
+var float h1_eqh = na
+var float h1_eql = na
+var bool h1_eqh_active = false
+var bool h1_eql_active = false
+var float h1_protected_high = na
+var float h1_protected_low = na
+var bool h1_bull_sweep = false
+var bool h1_bear_sweep = false
+var bool h1_bull_mss = false
+var bool h1_bear_mss = false
+
+var float h4_last_swing_high = na
+var float h4_last_swing_low = na
+var int h4_trend_bias = 0
+var float h4_bull_ob_top = na
+var float h4_bull_ob_bottom = na
+var float h4_bull_fvg_top = na
+var float h4_bull_fvg_bottom = na
+var float h4_bear_ob_top = na
+var float h4_bear_ob_bottom = na
+var float h4_bear_fvg_top = na
+var float h4_bear_fvg_bottom = na
+var float h4_eqh = na
+var float h4_eql = na
+var bool h4_eqh_active = false
+var bool h4_eql_active = false
+var float h4_protected_high = na
+var float h4_protected_low = na
+var bool h4_bull_sweep = false
+var bool h4_bear_sweep = false
+var bool h4_bull_mss = false
+var bool h4_bear_mss = false
+
+var float d1_last_swing_high = na
+var float d1_last_swing_low = na
+var int d1_trend_bias = 0
+var float d1_bull_ob_top = na
+var float d1_bull_ob_bottom = na
+var float d1_bull_fvg_top = na
+var float d1_bull_fvg_bottom = na
+var float d1_bear_ob_top = na
+var float d1_bear_ob_bottom = na
+var float d1_bear_fvg_top = na
+var float d1_bear_fvg_bottom = na
+var float d1_eqh = na
+var float d1_eql = na
+var bool d1_eqh_active = false
+var bool d1_eql_active = false
+var float d1_protected_high = na
+var float d1_protected_low = na
+var bool d1_bull_sweep = false
+var bool d1_bear_sweep = false
+var bool d1_bull_mss = false
+var bool d1_bear_mss = false
+
+//------------------------------------------------------------------------------
+// Active narrative / context / execution aliases
+//------------------------------------------------------------------------------
+var int narr_bias = 0
+var string narr_strength = "Flat"
+var float narr_liq_high = na
+var float narr_liq_low = na
+var float narr_bull_sd_top = na
+var float narr_bull_sd_bottom = na
+var float narr_bear_sd_top = na
+var float narr_bear_sd_bottom = na
+
+var int ctx_trend_bias = 0
+var bool ctx_bull_breakout = false
+var bool ctx_bear_breakout = false
+var bool ctx_bull_reversal = false
+var bool ctx_bear_reversal = false
+var float ctx_bull_ob_top = na
+var float ctx_bull_ob_bottom = na
+var float ctx_bull_ob_entry = na
+var float ctx_bull_fvg_top = na
+var float ctx_bull_fvg_bottom = na
+var float ctx_bear_ob_top = na
+var float ctx_bear_ob_bottom = na
+var float ctx_bear_ob_entry = na
+var float ctx_bear_fvg_top = na
+var float ctx_bear_fvg_bottom = na
+var float ctx_liq_high = na
+var float ctx_liq_low = na
+
+var bool exe_bull_sweep = false
+var bool exe_bear_sweep = false
+var bool exe_bull_mss = false
+var bool exe_bear_mss = false
+var bool exe_bull_displacement = false
+var bool exe_bear_displacement = false
+var float exe_protected_high = na
+var float exe_protected_low = na
+
+f_select_narrative_snapshot(string tf) =>
+    if tf == TF_H1
+        narr_bias := h1_trend_bias
+        narr_liq_high := h1_eqh_active ? h1_eqh : h1_last_swing_high
+        narr_liq_low := h1_eql_active ? h1_eql : h1_last_swing_low
+        narr_bull_sd_top := h1_bull_ob_top
+        narr_bull_sd_bottom := h1_bull_ob_bottom
+        narr_bear_sd_top := h1_bear_ob_top
+        narr_bear_sd_bottom := h1_bear_ob_bottom
+    else if tf == TF_H4
+        narr_bias := h4_trend_bias
+        narr_liq_high := h4_eqh_active ? h4_eqh : h4_last_swing_high
+        narr_liq_low := h4_eql_active ? h4_eql : h4_last_swing_low
+        narr_bull_sd_top := h4_bull_ob_top
+        narr_bull_sd_bottom := h4_bull_ob_bottom
+        narr_bear_sd_top := h4_bear_ob_top
+        narr_bear_sd_bottom := h4_bear_ob_bottom
+    else if tf == TF_D1
+        narr_bias := d1_trend_bias
+        narr_liq_high := d1_eqh_active ? d1_eqh : d1_last_swing_high
+        narr_liq_low := d1_eql_active ? d1_eql : d1_last_swing_low
+        narr_bull_sd_top := d1_bull_ob_top
+        narr_bull_sd_bottom := d1_bull_ob_bottom
+        narr_bear_sd_top := d1_bear_ob_top
+        narr_bear_sd_bottom := d1_bear_ob_bottom
+    narr_strength := "Normal"
+
+f_select_context_snapshot(string tf) =>
+    if tf == TF_M15
+        ctx_trend_bias := m15_trend_bias
+        ctx_bull_ob_top := m15_bull_ob_top
+        ctx_bull_ob_bottom := m15_bull_ob_bottom
+        ctx_bull_fvg_top := m15_bull_fvg_top
+        ctx_bull_fvg_bottom := m15_bull_fvg_bottom
+        ctx_bear_ob_top := m15_bear_ob_top
+        ctx_bear_ob_bottom := m15_bear_ob_bottom
+        ctx_bear_fvg_top := m15_bear_fvg_top
+        ctx_bear_fvg_bottom := m15_bear_fvg_bottom
+        ctx_liq_high := m15_eqh_active ? m15_eqh : m15_last_swing_high
+        ctx_liq_low := m15_eql_active ? m15_eql : m15_last_swing_low
+    else if tf == TF_H1
+        ctx_trend_bias := h1_trend_bias
+        ctx_bull_ob_top := h1_bull_ob_top
+        ctx_bull_ob_bottom := h1_bull_ob_bottom
+        ctx_bull_fvg_top := h1_bull_fvg_top
+        ctx_bull_fvg_bottom := h1_bull_fvg_bottom
+        ctx_bear_ob_top := h1_bear_ob_top
+        ctx_bear_ob_bottom := h1_bear_ob_bottom
+        ctx_bear_fvg_top := h1_bear_fvg_top
+        ctx_bear_fvg_bottom := h1_bear_fvg_bottom
+        ctx_liq_high := h1_eqh_active ? h1_eqh : h1_last_swing_high
+        ctx_liq_low := h1_eql_active ? h1_eql : h1_last_swing_low
+    else if tf == TF_H4
+        ctx_trend_bias := h4_trend_bias
+        ctx_bull_ob_top := h4_bull_ob_top
+        ctx_bull_ob_bottom := h4_bull_ob_bottom
+        ctx_bull_fvg_top := h4_bull_fvg_top
+        ctx_bull_fvg_bottom := h4_bull_fvg_bottom
+        ctx_bear_ob_top := h4_bear_ob_top
+        ctx_bear_ob_bottom := h4_bear_ob_bottom
+        ctx_bear_fvg_top := h4_bear_fvg_top
+        ctx_bear_fvg_bottom := h4_bear_fvg_bottom
+        ctx_liq_high := h4_eqh_active ? h4_eqh : h4_last_swing_high
+        ctx_liq_low := h4_eql_active ? h4_eql : h4_last_swing_low
+    ctx_bull_breakout := ctx_trend_bias == 1
+    ctx_bear_breakout := ctx_trend_bias == -1
+    ctx_bull_reversal := false
+    ctx_bear_reversal := false
+
+f_select_execution_snapshot(string tf) =>
+    if tf == TF_M1
+        exe_bull_sweep := m1_bull_sweep
+        exe_bear_sweep := m1_bear_sweep
+        exe_bull_mss := m1_bull_mss
+        exe_bear_mss := m1_bear_mss
+        exe_protected_high := m1_protected_high
+        exe_protected_low := m1_protected_low
+    else if tf == TF_M5
+        exe_bull_sweep := m5_bull_sweep
+        exe_bear_sweep := m5_bear_sweep
+        exe_bull_mss := m5_bull_mss
+        exe_bear_mss := m5_bear_mss
+        exe_protected_high := m5_protected_high
+        exe_protected_low := m5_protected_low
+    else if tf == TF_M15
+        exe_bull_sweep := m15_bull_sweep
+        exe_bear_sweep := m15_bear_sweep
+        exe_bull_mss := m15_bull_mss
+        exe_bear_mss := m15_bear_mss
+        exe_protected_high := m15_protected_high
+        exe_protected_low := m15_protected_low
+    else if tf == TF_M30
+        exe_bull_sweep := m30_bull_sweep
+        exe_bear_sweep := m30_bear_sweep
+        exe_bull_mss := m30_bull_mss
+        exe_bear_mss := m30_bear_mss
+        exe_protected_high := m30_protected_high
+        exe_protected_low := m30_protected_low
+    exe_bull_displacement := false
+    exe_bear_displacement := false
+
+//------------------------------------------------------------------------------
+// Update buffers
+//------------------------------------------------------------------------------
+[m1_new_closed, m1_last_closed_time] := f_tf_update_ohlc_buffer(TF_M1, m1_last_closed_time, buf_m1_time, buf_m1_open, buf_m1_high, buf_m1_low, buf_m1_close, BUF_CAP)
+[m5_new_closed, m5_last_closed_time] := f_tf_update_ohlc_buffer(TF_M5, m5_last_closed_time, buf_m5_time, buf_m5_open, buf_m5_high, buf_m5_low, buf_m5_close, BUF_CAP)
+[m15_new_closed, m15_last_closed_time] := f_tf_update_ohlc_buffer(TF_M15, m15_last_closed_time, buf_m15_time, buf_m15_open, buf_m15_high, buf_m15_low, buf_m15_close, BUF_CAP)
+[m30_new_closed, m30_last_closed_time] := f_tf_update_ohlc_buffer(TF_M30, m30_last_closed_time, buf_m30_time, buf_m30_open, buf_m30_high, buf_m30_low, buf_m30_close, BUF_CAP)
+[h1_new_closed, h1_last_closed_time] := f_tf_update_ohlc_buffer(TF_H1, h1_last_closed_time, buf_h1_time, buf_h1_open, buf_h1_high, buf_h1_low, buf_h1_close, BUF_CAP)
+[h4_new_closed, h4_last_closed_time] := f_tf_update_ohlc_buffer(TF_H4, h4_last_closed_time, buf_h4_time, buf_h4_open, buf_h4_high, buf_h4_low, buf_h4_close, BUF_CAP)
+[d1_new_closed, d1_last_closed_time] := f_tf_update_ohlc_buffer(TF_D1, d1_last_closed_time, buf_d1_time, buf_d1_open, buf_d1_high, buf_d1_low, buf_d1_close, BUF_CAP)
+
+//------------------------------------------------------------------------------
+// Build snapshots
+//------------------------------------------------------------------------------
+[m1_last_swing_high, _, _, _, m1_last_swing_low, _, _, _, _, _, _, _, m1_trend_bias] = f_tf_build_structure(buf_m1_time, buf_m1_high, buf_m1_low, buf_m1_close, SWING_LEN)
+[m5_last_swing_high, _, _, _, m5_last_swing_low, _, _, _, _, _, _, _, m5_trend_bias] = f_tf_build_structure(buf_m5_time, buf_m5_high, buf_m5_low, buf_m5_close, SWING_LEN)
+[m15_last_swing_high, _, _, _, m15_last_swing_low, _, _, _, _, _, _, _, m15_trend_bias] = f_tf_build_structure(buf_m15_time, buf_m15_high, buf_m15_low, buf_m15_close, SWING_LEN)
+[m30_last_swing_high, _, _, _, m30_last_swing_low, _, _, _, _, _, _, _, m30_trend_bias] = f_tf_build_structure(buf_m30_time, buf_m30_high, buf_m30_low, buf_m30_close, SWING_LEN)
+[h1_last_swing_high, _, _, _, h1_last_swing_low, _, _, _, _, _, _, _, h1_trend_bias] = f_tf_build_structure(buf_h1_time, buf_h1_high, buf_h1_low, buf_h1_close, SWING_LEN)
+[h4_last_swing_high, _, _, _, h4_last_swing_low, _, _, _, _, _, _, _, h4_trend_bias] = f_tf_build_structure(buf_h4_time, buf_h4_high, buf_h4_low, buf_h4_close, SWING_LEN)
+[d1_last_swing_high, _, _, _, d1_last_swing_low, _, _, _, _, _, _, _, d1_trend_bias] = f_tf_build_structure(buf_d1_time, buf_d1_high, buf_d1_low, buf_d1_close, SWING_LEN)
+
+[m1_eqh, m1_eql, _, _, _, _, m1_eqh_active, m1_eql_active] := f_tf_build_liquidity(buf_m1_high, buf_m1_low, buf_m1_close)
+[m5_eqh, m5_eql, _, _, _, _, m5_eqh_active, m5_eql_active] := f_tf_build_liquidity(buf_m5_high, buf_m5_low, buf_m5_close)
+[m15_eqh, m15_eql, _, _, _, _, m15_eqh_active, m15_eql_active] := f_tf_build_liquidity(buf_m15_high, buf_m15_low, buf_m15_close)
+[m30_eqh, m30_eql, _, _, _, _, m30_eqh_active, m30_eql_active] := f_tf_build_liquidity(buf_m30_high, buf_m30_low, buf_m30_close)
+[h1_eqh, h1_eql, _, _, _, _, h1_eqh_active, h1_eql_active] := f_tf_build_liquidity(buf_h1_high, buf_h1_low, buf_h1_close)
+[h4_eqh, h4_eql, _, _, _, _, h4_eqh_active, h4_eql_active] := f_tf_build_liquidity(buf_h4_high, buf_h4_low, buf_h4_close)
+[d1_eqh, d1_eql, _, _, _, _, d1_eqh_active, d1_eql_active] := f_tf_build_liquidity(buf_d1_high, buf_d1_low, buf_d1_close)
+
+[m1_bull_ob_top, m1_bull_ob_bottom, _, _, _, m1_bear_ob_top, m1_bear_ob_bottom, _, _, _] = f_tf_build_ob(buf_m1_open, buf_m1_high, buf_m1_low, buf_m1_close)
+[m5_bull_ob_top, m5_bull_ob_bottom, _, _, _, m5_bear_ob_top, m5_bear_ob_bottom, _, _, _] = f_tf_build_ob(buf_m5_open, buf_m5_high, buf_m5_low, buf_m5_close)
+[m15_bull_ob_top, m15_bull_ob_bottom, _, _, _, m15_bear_ob_top, m15_bear_ob_bottom, _, _, _] = f_tf_build_ob(buf_m15_open, buf_m15_high, buf_m15_low, buf_m15_close)
+[m30_bull_ob_top, m30_bull_ob_bottom, _, _, _, m30_bear_ob_top, m30_bear_ob_bottom, _, _, _] = f_tf_build_ob(buf_m30_open, buf_m30_high, buf_m30_low, buf_m30_close)
+[h1_bull_ob_top, h1_bull_ob_bottom, _, _, _, h1_bear_ob_top, h1_bear_ob_bottom, _, _, _] = f_tf_build_ob(buf_h1_open, buf_h1_high, buf_h1_low, buf_h1_close)
+[h4_bull_ob_top, h4_bull_ob_bottom, _, _, _, h4_bear_ob_top, h4_bear_ob_bottom, _, _, _] = f_tf_build_ob(buf_h4_open, buf_h4_high, buf_h4_low, buf_h4_close)
+[d1_bull_ob_top, d1_bull_ob_bottom, _, _, _, d1_bear_ob_top, d1_bear_ob_bottom, _, _, _] = f_tf_build_ob(buf_d1_open, buf_d1_high, buf_d1_low, buf_d1_close)
+
+[m1_bull_fvg_top, m1_bull_fvg_bottom, _, m1_bear_fvg_top, m1_bear_fvg_bottom, _] = f_tf_build_fvg(buf_m1_high, buf_m1_low, buf_m1_close)
+[m5_bull_fvg_top, m5_bull_fvg_bottom, _, m5_bear_fvg_top, m5_bear_fvg_bottom, _] = f_tf_build_fvg(buf_m5_high, buf_m5_low, buf_m5_close)
+[m15_bull_fvg_top, m15_bull_fvg_bottom, _, m15_bear_fvg_top, m15_bear_fvg_bottom, _] = f_tf_build_fvg(buf_m15_high, buf_m15_low, buf_m15_close)
+[m30_bull_fvg_top, m30_bull_fvg_bottom, _, m30_bear_fvg_top, m30_bear_fvg_bottom, _] = f_tf_build_fvg(buf_m30_high, buf_m30_low, buf_m30_close)
+[h1_bull_fvg_top, h1_bull_fvg_bottom, _, h1_bear_fvg_top, h1_bear_fvg_bottom, _] = f_tf_build_fvg(buf_h1_high, buf_h1_low, buf_h1_close)
+[h4_bull_fvg_top, h4_bull_fvg_bottom, _, h4_bear_fvg_top, h4_bear_fvg_bottom, _] = f_tf_build_fvg(buf_h4_high, buf_h4_low, buf_h4_close)
+[d1_bull_fvg_top, d1_bull_fvg_bottom, _, d1_bear_fvg_top, d1_bear_fvg_bottom, _] = f_tf_build_fvg(buf_d1_high, buf_d1_low, buf_d1_close)
+
+[m1_bull_sweep, m1_bear_sweep, _, _, m1_bull_mss, m1_bear_mss, m1_protected_high, m1_protected_low] = f_tf_build_execution(m1_last_swing_high, m1_last_swing_low, m1_protected_high, m1_protected_low, buf_m1_high, buf_m1_low, buf_m1_close)
+[m5_bull_sweep, m5_bear_sweep, _, _, m5_bull_mss, m5_bear_mss, m5_protected_high, m5_protected_low] = f_tf_build_execution(m5_last_swing_high, m5_last_swing_low, m5_protected_high, m5_protected_low, buf_m5_high, buf_m5_low, buf_m5_close)
+[m15_bull_sweep, m15_bear_sweep, _, _, m15_bull_mss, m15_bear_mss, m15_protected_high, m15_protected_low] = f_tf_build_execution(m15_last_swing_high, m15_last_swing_low, m15_protected_high, m15_protected_low, buf_m15_high, buf_m15_low, buf_m15_close)
+[m30_bull_sweep, m30_bear_sweep, _, _, m30_bull_mss, m30_bear_mss, m30_protected_high, m30_protected_low] = f_tf_build_execution(m30_last_swing_high, m30_last_swing_low, m30_protected_high, m30_protected_low, buf_m30_high, buf_m30_low, buf_m30_close)
+[h1_bull_sweep, h1_bear_sweep, _, _, h1_bull_mss, h1_bear_mss, h1_protected_high, h1_protected_low] = f_tf_build_execution(h1_last_swing_high, h1_last_swing_low, h1_protected_high, h1_protected_low, buf_h1_high, buf_h1_low, buf_h1_close)
+[h4_bull_sweep, h4_bear_sweep, _, _, h4_bull_mss, h4_bear_mss, h4_protected_high, h4_protected_low] = f_tf_build_execution(h4_last_swing_high, h4_last_swing_low, h4_protected_high, h4_protected_low, buf_h4_high, buf_h4_low, buf_h4_close)
+[d1_bull_sweep, d1_bear_sweep, _, _, d1_bull_mss, d1_bear_mss, d1_protected_high, d1_protected_low] = f_tf_build_execution(d1_last_swing_high, d1_last_swing_low, d1_protected_high, d1_protected_low, buf_d1_high, buf_d1_low, buf_d1_close)
+
+//------------------------------------------------------------------------------
+// Resolve active layer aliases
+//------------------------------------------------------------------------------
+if eng_exec_valid
+    f_select_narrative_snapshot(eng_narr_tf)
+    f_select_context_snapshot(eng_ctx_tf)
+    f_select_execution_snapshot(eng_exec_tf)
+
+plot(na)
