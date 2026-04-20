@@ -61,8 +61,6 @@ int setupFreshBars = 6
 int setupExpiryBars = 25
 float setupChaseAtr = 1.50
 float setupManagedR = 1.00
-float zoneExpansionNormalAtr = 0.75
-float zoneExpansionStrongAtr = 1.50
 
 string strictKillzoneSession = "0200-0500,0700-1000,1300-1600"
 int strictMssLookback = 10
@@ -2543,12 +2541,10 @@ if not na(pivotLow)
 //------------------------------------------------------------------------------
 // Liquidity sweeps, inducement, BOS / MSS
 //------------------------------------------------------------------------------
-activeEqh = latestEqhActive ? latestEqh : na
-activeEql = latestEqlActive ? latestEql : na
 float legacyExecLiqHigh = eng1_exec_valid ? eng1_exe_liq_high : lastSwingHigh
 float legacyExecLiqLow = eng1_exec_valid ? eng1_exe_liq_low : lastSwingLow
-float effectiveSweepEqHigh = eng1_exec_valid and eng1_exe_eqh_active ? eng1_exe_eqh : activeEqh
-float effectiveSweepEqLow = eng1_exec_valid and eng1_exe_eql_active ? eng1_exe_eql : activeEql
+float effectiveSweepEqHigh = eng1_exec_valid and eng1_exe_eqh_active ? eng1_exe_eqh : latestEqhActive ? latestEqh : na
+float effectiveSweepEqLow = eng1_exec_valid and eng1_exe_eql_active ? eng1_exe_eql : latestEqlActive ? latestEql : na
 
 sellSideSweep = (not na(legacyExecLiqLow) and low < legacyExecLiqLow and not f_breakDown(legacyExecLiqLow)) or
      (not na(prevSessionLow) and low < prevSessionLow and close > prevSessionLow) or
@@ -2644,10 +2640,8 @@ legSearchBars = obSearchBars + obValidationLookback + 2
 //------------------------------------------------------------------------------
 // FVG detection and mitigation tracking
 //------------------------------------------------------------------------------
-bullDisplacementFvg = close[1] > open[1] and close[1] > high[2] and (high[1] - low[1]) >= atr * math.max(fvgMinAtr * 2.0, obImpulseAtr * 0.75) and f_bodyShare(1) >= 0.60
-bearDisplacementFvg = close[1] < open[1] and close[1] < low[2] and (high[1] - low[1]) >= atr * math.max(fvgMinAtr * 2.0, obImpulseAtr * 0.75) and f_bodyShare(1) >= 0.60
-bullFvg = low > high[2] and bullDisplacementFvg and (low - high[2]) >= atr * fvgMinAtr
-bearFvg = high < low[2] and bearDisplacementFvg and (low[2] - high) >= atr * fvgMinAtr
+bullFvg = low > high[2] and close[1] > open[1] and close[1] > high[2] and (high[1] - low[1]) >= atr * math.max(fvgMinAtr * 2.0, obImpulseAtr * 0.75) and f_bodyShare(1) >= 0.60 and (low - high[2]) >= atr * fvgMinAtr
+bearFvg = high < low[2] and close[1] < open[1] and close[1] < low[2] and (high[1] - low[1]) >= atr * math.max(fvgMinAtr * 2.0, obImpulseAtr * 0.75) and f_bodyShare(1) >= 0.60 and (low[2] - high) >= atr * fvgMinAtr
 
 if bullFvg
     if not na(bullSequenceSweepBar) and (bar_index - bullSequenceSweepBar) <= obValidationLookback
@@ -2801,8 +2795,9 @@ if bullMss or bullBos
     if resetBullLeg
         bullLegLow := f_legLowSince(bullLegStartBar, bar_index + 1)
         bullLegHigh := f_legHighSince(bullLegStartBar, bar_index + 1)
-        bullNarrativeStartBar := not na(bullSequenceSweepBar) ? bullSequenceSweepBar : bullLegStartBar
-        bullNarrativeEndBar := bar_index
+        if not eng1_exec_valid
+            bullNarrativeStartBar := not na(bullSequenceSweepBar) ? bullSequenceSweepBar : bullLegStartBar
+            bullNarrativeEndBar := bar_index
         protectedLow := bullLegLow
         protectedLowBar := bullLegStartBar
         bullRangeHighState := bullLegHigh
@@ -2832,8 +2827,9 @@ if bearMss or bearBos
     if resetBearLeg
         bearLegHigh := f_legHighSince(bearLegStartBar, bar_index + 1)
         bearLegLow := f_legLowSince(bearLegStartBar, bar_index + 1)
-        bearNarrativeStartBar := not na(bearSequenceSweepBar) ? bearSequenceSweepBar : bearLegStartBar
-        bearNarrativeEndBar := bar_index
+        if not eng1_exec_valid
+            bearNarrativeStartBar := not na(bearSequenceSweepBar) ? bearSequenceSweepBar : bearLegStartBar
+            bearNarrativeEndBar := bar_index
         protectedHigh := bearLegHigh
         protectedHighBar := bearLegStartBar
         bearRangeHighState := bearLegHigh
@@ -2851,12 +2847,14 @@ if bearMss or bearBos
 if not na(bullLegStartBar) and trendBias == 1
     bullLegLow := na(bullLegLow) ? low : math.min(bullLegLow, low)
     bullLegHigh := na(bullLegHigh) ? high : math.max(bullLegHigh, high)
-    bullNarrativeEndBar := bar_index
+    if not eng1_exec_valid
+        bullNarrativeEndBar := bar_index
 
 if not na(bearLegStartBar) and trendBias == -1
     bearLegHigh := na(bearLegHigh) ? high : math.max(bearLegHigh, high)
     bearLegLow := na(bearLegLow) ? low : math.min(bearLegLow, low)
-    bearNarrativeEndBar := bar_index
+    if not eng1_exec_valid
+        bearNarrativeEndBar := bar_index
 
 if eng1_exec_valid
     lastBullMssBar := na
@@ -2867,6 +2865,10 @@ if eng1_exec_valid
     bearLegHasSweep := false
     bearLegHasDisplacement := false
     bearLegHasMss := false
+    bullNarrativeStartBar := na
+    bullNarrativeEndBar := na
+    bearNarrativeStartBar := na
+    bearNarrativeEndBar := na
 
 //------------------------------------------------------------------------------
 // Order block qualification from a single strict leg: sweep -> displacement/FVG -> BOS
@@ -3016,12 +3018,10 @@ if array.size(obBoxes) > 0
 var float htfStructureHigh = na
 var float htfStructureLow = na
 var int htfBias = 0
-bool legacyNarrativeFallbackActive = not eng1_exec_valid and narrativeHtfReady
-bool legacyHtfFallbackActive = not eng1_exec_valid and htfContextReady
-int narrativeRegimeBias = legacyNarrativeFallbackActive ? f_regimeBias(narrativeClose, narrativeMomentumRef) : 0
-string regimeStrength = legacyNarrativeFallbackActive ? f_regimeStrengthText(narrativeRegimeBias, narrativeClose, narrativeMomentumRef, narrativeAtr) : "Flat"
+int narrativeRegimeBias = not eng1_exec_valid and narrativeHtfReady ? f_regimeBias(narrativeClose, narrativeMomentumRef) : 0
+string regimeStrength = not eng1_exec_valid and narrativeHtfReady ? f_regimeStrengthText(narrativeRegimeBias, narrativeClose, narrativeMomentumRef, narrativeAtr) : "Flat"
 
-if legacyHtfFallbackActive
+if not eng1_exec_valid and htfContextReady
     if not na(htfPivotHigh)
         htfStructureHigh := htfPivotHigh
     if not na(htfPivotLow)
@@ -3039,7 +3039,7 @@ int displayExecBias = eng1_exec_valid and eng1_ctx_trend_bias != 0 ? eng1_ctx_tr
 int displayCtxBias = eng1_exec_valid and eng1_ctx_trend_bias != 0 ? eng1_ctx_trend_bias : htfBias
 int displayNarrBias = eng1_exec_valid and eng1_narr_bias != 0 ? eng1_narr_bias : narrativeRegimeBias
 string displayRegimeStrength = eng1_exec_valid and eng1_narr_strength != "Flat" ? eng1_narr_strength : regimeStrength
-bool displayHigherBiasReady = eng1_exec_valid or legacyHtfFallbackActive
+bool displayHigherBiasReady = eng1_exec_valid or htfContextReady
 
 bool eng1CtxRangeReady = eng1_exec_valid and not na(eng1_ctx_liq_high) and not na(eng1_ctx_liq_low) and eng1_ctx_liq_high > eng1_ctx_liq_low
 float eng1CtxRangeHigh = eng1CtxRangeReady ? eng1_ctx_liq_high : na
@@ -3055,24 +3055,16 @@ strictKillzoneActive = timeframe.isintraday and not na(time(timeframe.period, st
 liquiditySessionSummary = "A-ICT " + f_sessionCode(currentSessionBlock) + ">" + f_sessionCode(liquiditySessionLabel)
 timezoneSummary = "NY TZ"
 mtfSummary = "TF " + chartTfLabel + "/" + effectiveHtfTf + "/" + narrativeHtfTf
-bullDealingRangeHigh = bullLegHigh
-bullDealingRangeLow = bullLegLow
-bearDealingRangeHigh = bearLegHigh
-bearDealingRangeLow = bearLegLow
-bullDealingRangeSize = not na(bullDealingRangeHigh) and not na(bullDealingRangeLow) ? bullDealingRangeHigh - bullDealingRangeLow : na
-bearDealingRangeSize = not na(bearDealingRangeHigh) and not na(bearDealingRangeLow) ? bearDealingRangeHigh - bearDealingRangeLow : na
-bullEquilibrium = not na(bullDealingRangeHigh) and not na(bullDealingRangeLow) ? (bullDealingRangeHigh + bullDealingRangeLow) * 0.5 : na
-bearEquilibrium = not na(bearDealingRangeHigh) and not na(bearDealingRangeLow) ? (bearDealingRangeHigh + bearDealingRangeLow) * 0.5 : na
-bullRangeHighActive = not na(bullRangeHighState) ? bullRangeHighState : bullDealingRangeHigh
-bullRangeLowActive = not na(bullRangeLowState) ? bullRangeLowState : bullDealingRangeLow
-bearRangeHighActive = not na(bearRangeHighState) ? bearRangeHighState : bearDealingRangeHigh
-bearRangeLowActive = not na(bearRangeLowState) ? bearRangeLowState : bearDealingRangeLow
-bullEquilibriumActive = not na(bullEquilibriumState) ? bullEquilibriumState : bullEquilibrium
-bearEquilibriumActive = not na(bearEquilibriumState) ? bearEquilibriumState : bearEquilibrium
-bullOteRawTop = not na(bullDealingRangeSize) and bullDealingRangeSize > 0 ? bullDealingRangeHigh - bullDealingRangeSize * 0.62 : na
-bullOteRawBottom = not na(bullDealingRangeSize) and bullDealingRangeSize > 0 ? bullDealingRangeHigh - bullDealingRangeSize * 0.79 : na
-bearOteRawTop = not na(bearDealingRangeSize) and bearDealingRangeSize > 0 ? bearDealingRangeLow + bearDealingRangeSize * 0.79 : na
-bearOteRawBottom = not na(bearDealingRangeSize) and bearDealingRangeSize > 0 ? bearDealingRangeLow + bearDealingRangeSize * 0.62 : na
+bullRangeHighActive = not na(bullRangeHighState) ? bullRangeHighState : bullLegHigh
+bullRangeLowActive = not na(bullRangeLowState) ? bullRangeLowState : bullLegLow
+bearRangeHighActive = not na(bearRangeHighState) ? bearRangeHighState : bearLegHigh
+bearRangeLowActive = not na(bearRangeLowState) ? bearRangeLowState : bearLegLow
+bullEquilibriumActive = not na(bullEquilibriumState) ? bullEquilibriumState : not na(bullLegHigh) and not na(bullLegLow) ? (bullLegHigh + bullLegLow) * 0.5 : na
+bearEquilibriumActive = not na(bearEquilibriumState) ? bearEquilibriumState : not na(bearLegHigh) and not na(bearLegLow) ? (bearLegHigh + bearLegLow) * 0.5 : na
+bullOteRawTop = not na(bullLegHigh) and not na(bullLegLow) and bullLegHigh > bullLegLow ? bullLegHigh - (bullLegHigh - bullLegLow) * 0.62 : na
+bullOteRawBottom = not na(bullLegHigh) and not na(bullLegLow) and bullLegHigh > bullLegLow ? bullLegHigh - (bullLegHigh - bullLegLow) * 0.79 : na
+bearOteRawTop = not na(bearLegHigh) and not na(bearLegLow) and bearLegHigh > bearLegLow ? bearLegLow + (bearLegHigh - bearLegLow) * 0.79 : na
+bearOteRawBottom = not na(bearLegHigh) and not na(bearLegLow) and bearLegHigh > bearLegLow ? bearLegLow + (bearLegHigh - bearLegLow) * 0.62 : na
 
 if eng1CtxRangeReady
     bullOteTopState := na
@@ -3116,24 +3108,21 @@ oteLongTop = trendBias == 1 and not bullOteMitigated and not bullOteInvalidated 
 oteLongBottom = trendBias == 1 and not bullOteMitigated and not bullOteInvalidated ? bullOteBottomState : na
 oteShortTop = trendBias == -1 and not bearOteMitigated and not bearOteInvalidated ? bearOteTopState : na
 oteShortBottom = trendBias == -1 and not bearOteMitigated and not bearOteInvalidated ? bearOteBottomState : na
-activeRangeHigh = trendBias == 1 ? bullRangeHighActive : trendBias == -1 ? bearRangeHighActive : na
-activeRangeLow = trendBias == 1 ? bullRangeLowActive : trendBias == -1 ? bearRangeLowActive : na
-activeRangeEquilibrium = trendBias == 1 ? bullEquilibriumActive : trendBias == -1 ? bearEquilibriumActive : na
 float effectiveProtectedHigh = not na(eng1_exe_protected_high) ? eng1_exe_protected_high : protectedHigh
 float effectiveProtectedLow = not na(eng1_exe_protected_low) ? eng1_exe_protected_low : protectedLow
 float effectiveExecLiqHigh = eng1_exec_valid ? eng1_exe_liq_high : lastSwingHigh
 float effectiveExecLiqLow = eng1_exec_valid ? eng1_exe_liq_low : lastSwingLow
-float effectiveExecEqHigh = eng1_exec_valid and eng1_exe_eqh_active ? eng1_exe_eqh : activeEqh
-float effectiveExecEqLow = eng1_exec_valid and eng1_exe_eql_active ? eng1_exe_eql : activeEql
+float effectiveExecEqHigh = eng1_exec_valid and eng1_exe_eqh_active ? eng1_exe_eqh : latestEqhActive ? latestEqh : na
+float effectiveExecEqLow = eng1_exec_valid and eng1_exe_eql_active ? eng1_exe_eql : latestEqlActive ? latestEql : na
 float effectiveContextHigh = eng1CtxRangeReady ? eng1CtxRangeHigh : htfStructureHigh
 float effectiveContextLow = eng1CtxRangeReady ? eng1CtxRangeLow : htfStructureLow
 bool effectiveContextHighReady = not na(effectiveContextHigh)
 bool effectiveContextLowReady = not na(effectiveContextLow)
 float effectiveBullEquilibrium = eng1CtxRangeReady ? eng1CtxEquilibrium : bullEquilibriumActive
 float effectiveBearEquilibrium = eng1CtxRangeReady ? eng1CtxEquilibrium : bearEquilibriumActive
-float effectiveRangeHigh = eng1CtxRangeReady ? eng1CtxRangeHigh : activeRangeHigh
-float effectiveRangeLow = eng1CtxRangeReady ? eng1CtxRangeLow : activeRangeLow
-float effectiveRangeEquilibrium = eng1CtxRangeReady ? eng1CtxEquilibrium : activeRangeEquilibrium
+float effectiveRangeHigh = eng1CtxRangeReady ? eng1CtxRangeHigh : trendBias == 1 ? bullRangeHighActive : trendBias == -1 ? bearRangeHighActive : na
+float effectiveRangeLow = eng1CtxRangeReady ? eng1CtxRangeLow : trendBias == 1 ? bullRangeLowActive : trendBias == -1 ? bearRangeLowActive : na
+float effectiveRangeEquilibrium = eng1CtxRangeReady ? eng1CtxEquilibrium : trendBias == 1 ? bullEquilibriumActive : trendBias == -1 ? bearEquilibriumActive : na
 bool eng1BullOteAllowed = eng1CtxRangeReady and eng1_narr_bias != -1 and (eng1_ctx_trend_bias == 1 or eng1_ctx_bull_breakout or eng1_ctx_bull_reversal)
 bool eng1BearOteAllowed = eng1CtxRangeReady and eng1_narr_bias != 1 and (eng1_ctx_trend_bias == -1 or eng1_ctx_bear_breakout or eng1_ctx_bear_reversal)
 float effectiveOteLongTop = eng1BullOteAllowed ? eng1CtxOteLongTop : oteLongTop
@@ -3458,19 +3447,16 @@ bool longPriceNearZone = not na(tradeLongEntry) and math.abs(close - tradeLongEn
 int longSetupAge = not na(tradeLongCreatedBar) ? bar_index - tradeLongCreatedBar : na
 bool longExpiredUntouched = not tradeLongTouched and not na(longSetupAge) and longSetupAge > expiryBarsEffective
 bool longChased = not tradeLongTouched and not na(tradeLongValidTop) and close > tradeLongValidTop + atr * setupChaseAtr
-bool legacyLongStructureInvalidated = not na(tradeLongCreatedBar) and not na(lastBearMssBar) and lastBearMssBar > tradeLongCreatedBar
 bool effectiveLongDirectional = displayExecBias == 1
 bool effectiveLongSweepSeen = eng1_exec_valid ? eng1_exe_bull_sweep : bullLegHasSweep
 bool effectiveLongMssSeen = eng1_exec_valid ? eng1_exe_bull_mss : bullLegHasMss
 bool effectiveLongDisplacementSeen = eng1_exec_valid ? eng1_exe_bull_displacement : bullLegHasDisplacement
-bool legacyLongMssFresh = not na(lastBullMssBar) and (bar_index - lastBullMssBar) <= strictMssLookbackEffective
-bool effectiveLongMssFresh = eng1_exec_valid ? eng1_exe_bull_mss : legacyLongMssFresh
+bool effectiveLongMssFresh = eng1_exec_valid ? eng1_exe_bull_mss : not na(lastBullMssBar) and (bar_index - lastBullMssBar) <= strictMssLookbackEffective
 bool effectiveLongConfirmSeen = effectiveLongDirectional and effectiveLongSweepSeen and effectiveLongMssSeen and effectiveLongDisplacementSeen
-bool effectiveLongStructureInvalidated = eng1_exec_valid ? (displayExecBias == -1 and (eng1_ctx_bear_breakout or eng1_ctx_bear_reversal or eng1_exe_bear_mss)) : legacyLongStructureInvalidated
+bool effectiveLongStructureInvalidated = eng1_exec_valid ? (displayExecBias == -1 and (eng1_ctx_bear_breakout or eng1_ctx_bear_reversal or eng1_exe_bear_mss)) : not na(tradeLongCreatedBar) and not na(lastBearMssBar) and lastBearMssBar > tradeLongCreatedBar
 bool strictLongBiasPass = not strictModeEnabled or (displayExecBias == 1 and displayCtxBias == 1 and displayNarrBias != -1)
 bool strictLongSweepPass = not strictModeEnabled or effectiveLongSweepSeen
-bool strictLongMssFresh = effectiveLongMssFresh
-bool strictLongMssPass = not strictModeEnabled or (effectiveLongMssSeen and strictLongMssFresh and effectiveLongDirectional)
+bool strictLongMssPass = not strictModeEnabled or (effectiveLongMssSeen and effectiveLongMssFresh and effectiveLongDirectional)
 bool strictLongPdPass = not strictModeEnabled or (not na(tradeLongValidTop) and not na(effectiveBullEquilibrium) and f_zoneMid(tradeLongValidTop, tradeLongValidBottom) < effectiveBullEquilibrium)
 bool strictLongOtePass = not strictModeEnabled or (effectiveLongOteReady and f_zoneIntersects(tradeLongValidTop, tradeLongValidBottom, effectiveOteLongTop, effectiveOteLongBottom))
 bool strictLongDolPass = not strictModeEnabled or longQualifiedExternalDol
@@ -3478,7 +3464,7 @@ bool strictLongKillzonePass = not strictModeEnabled or strictKillzoneActive
 bool strictLongContextPass = strictLongBiasPass and strictLongSweepPass and strictLongMssPass and strictLongPdPass and strictLongOtePass and strictLongDolPass
 bool longBaseContextPass = effectiveLongDirectional and effectiveLongSweepSeen and effectiveLongMssSeen
 bool longConfirmationPass = not strictModeEnabled or (strictLongContextPass and strictLongKillzonePass)
-bool longExecutionFreshPass = strictModeEnabled ? strictLongMssFresh : effectiveLongMssSeen
+bool longExecutionFreshPass = strictModeEnabled ? effectiveLongMssFresh : effectiveLongMssSeen
 bool longHasIfvgContext = not eng1_exec_valid and not na(bullIfvgCreatedBar)
 bool longIfvgSupportContext = longHasIfvgContext and not na(tradeLongEntry) and (f_zoneIntersects(bullIfvgTop, bullIfvgBottom, tradeLongValidTop, tradeLongValidBottom) or f_zoneMid(bullIfvgTop, bullIfvgBottom) <= tradeLongEntry)
 string longConfirmationSummary = not na(tradeLongEntry) ? f_appendIfvgContext(f_confirmationStateText(strictModeEnabled, strictLongSweepPass, strictLongMssPass, strictLongPdPass, strictLongOtePass, strictLongDolPass, strictLongKillzonePass, false) + " | " + f_setupPathText(true, tradeLongIsFvg, tradeLongIsOb, longUsesExternalDolTarget, false), longHasIfvgContext, longIfvgSupportContext, false) : "-"
@@ -3524,19 +3510,16 @@ bool shortPriceNearZone = not na(tradeShortEntry) and math.abs(close - tradeShor
 int shortSetupAge = not na(tradeShortCreatedBar) ? bar_index - tradeShortCreatedBar : na
 bool shortExpiredUntouched = not tradeShortTouched and not na(shortSetupAge) and shortSetupAge > expiryBarsEffective
 bool shortChased = not tradeShortTouched and not na(tradeShortValidBottom) and close < tradeShortValidBottom - atr * setupChaseAtr
-bool legacyShortStructureInvalidated = not na(tradeShortCreatedBar) and not na(lastBullMssBar) and lastBullMssBar > tradeShortCreatedBar
 bool effectiveShortDirectional = displayExecBias == -1
 bool effectiveShortSweepSeen = eng1_exec_valid ? eng1_exe_bear_sweep : bearLegHasSweep
 bool effectiveShortMssSeen = eng1_exec_valid ? eng1_exe_bear_mss : bearLegHasMss
 bool effectiveShortDisplacementSeen = eng1_exec_valid ? eng1_exe_bear_displacement : bearLegHasDisplacement
-bool legacyShortMssFresh = not na(lastBearMssBar) and (bar_index - lastBearMssBar) <= strictMssLookbackEffective
-bool effectiveShortMssFresh = eng1_exec_valid ? eng1_exe_bear_mss : legacyShortMssFresh
+bool effectiveShortMssFresh = eng1_exec_valid ? eng1_exe_bear_mss : not na(lastBearMssBar) and (bar_index - lastBearMssBar) <= strictMssLookbackEffective
 bool effectiveShortConfirmSeen = effectiveShortDirectional and effectiveShortSweepSeen and effectiveShortMssSeen and effectiveShortDisplacementSeen
-bool effectiveShortStructureInvalidated = eng1_exec_valid ? (displayExecBias == 1 and (eng1_ctx_bull_breakout or eng1_ctx_bull_reversal or eng1_exe_bull_mss)) : legacyShortStructureInvalidated
+bool effectiveShortStructureInvalidated = eng1_exec_valid ? (displayExecBias == 1 and (eng1_ctx_bull_breakout or eng1_ctx_bull_reversal or eng1_exe_bull_mss)) : not na(tradeShortCreatedBar) and not na(lastBullMssBar) and lastBullMssBar > tradeShortCreatedBar
 bool strictShortBiasPass = not strictModeEnabled or (displayExecBias == -1 and displayCtxBias == -1 and displayNarrBias != 1)
 bool strictShortSweepPass = not strictModeEnabled or effectiveShortSweepSeen
-bool strictShortMssFresh = effectiveShortMssFresh
-bool strictShortMssPass = not strictModeEnabled or (effectiveShortMssSeen and strictShortMssFresh and effectiveShortDirectional)
+bool strictShortMssPass = not strictModeEnabled or (effectiveShortMssSeen and effectiveShortMssFresh and effectiveShortDirectional)
 bool strictShortPdPass = not strictModeEnabled or (not na(tradeShortValidTop) and not na(effectiveBearEquilibrium) and f_zoneMid(tradeShortValidTop, tradeShortValidBottom) > effectiveBearEquilibrium)
 bool strictShortOtePass = not strictModeEnabled or (effectiveShortOteReady and f_zoneIntersects(tradeShortValidTop, tradeShortValidBottom, effectiveOteShortTop, effectiveOteShortBottom))
 bool strictShortDolPass = not strictModeEnabled or shortQualifiedExternalDol
@@ -3544,7 +3527,7 @@ bool strictShortKillzonePass = not strictModeEnabled or strictKillzoneActive
 bool strictShortContextPass = strictShortBiasPass and strictShortSweepPass and strictShortMssPass and strictShortPdPass and strictShortOtePass and strictShortDolPass
 bool shortBaseContextPass = effectiveShortDirectional and effectiveShortSweepSeen and effectiveShortMssSeen
 bool shortConfirmationPass = not strictModeEnabled or (strictShortContextPass and strictShortKillzonePass)
-bool shortExecutionFreshPass = strictModeEnabled ? strictShortMssFresh : effectiveShortMssSeen
+bool shortExecutionFreshPass = strictModeEnabled ? effectiveShortMssFresh : effectiveShortMssSeen
 bool shortHasIfvgContext = not eng1_exec_valid and not na(bearIfvgCreatedBar)
 bool shortIfvgSupportContext = shortHasIfvgContext and not na(tradeShortEntry) and (f_zoneIntersects(bearIfvgTop, bearIfvgBottom, tradeShortValidTop, tradeShortValidBottom) or f_zoneMid(bearIfvgTop, bearIfvgBottom) >= tradeShortEntry)
 string shortConfirmationSummary = not na(tradeShortEntry) ? f_appendIfvgContext(f_confirmationStateText(strictModeEnabled, strictShortSweepPass, strictShortMssPass, strictShortPdPass, strictShortOtePass, strictShortDolPass, strictShortKillzonePass, false) + " | " + f_setupPathText(true, tradeShortIsFvg, tradeShortIsOb, shortUsesExternalDolTarget, false), shortHasIfvgContext, shortIfvgSupportContext, false) : "-"
@@ -3629,12 +3612,6 @@ else if currentShortSetupTag != lastShortQualityTag
     lastShortQualityTag := currentShortSetupTag
 string longExecutionState = f_setupExecutionState(not na(tradeLongEntry), longAmbiguous, longInvalidated, longExpired, longChased, longCompleted, longManaged, longBaseContextPass, longConfirmationPass, longExecutionFreshPass, longDisplacementSeen, longPriceInZone, longPriceNearZone)
 string shortExecutionState = f_setupExecutionState(not na(tradeShortEntry), shortAmbiguous, shortInvalidated, shortExpired, shortChased, shortCompleted, shortManaged, shortBaseContextPass, shortConfirmationPass, shortExecutionFreshPass, shortDisplacementSeen, shortPriceInZone, shortPriceNearZone)
-int longResponseScore = not na(tradeLongEntry) ? longResponseScoreSnapshot : 0
-int shortResponseScore = not na(tradeShortEntry) ? shortResponseScoreSnapshot : 0
-int longDisplacementScore = not na(tradeLongEntry) ? longDisplacementScoreSnapshot : 0
-int shortDisplacementScore = not na(tradeShortEntry) ? shortDisplacementScoreSnapshot : 0
-int longAtrExpansionScore = not na(tradeLongEntry) ? longAtrExpansionScoreSnapshot : 0
-int shortAtrExpansionScore = not na(tradeShortEntry) ? shortAtrExpansionScoreSnapshot : 0
 string longQualityTier = not na(tradeLongEntry) ? longQualityTierSnapshot : "-"
 string shortQualityTier = not na(tradeShortEntry) ? shortQualityTierSnapshot : "-"
 string longSetupDisplay = f_setupQualityText(tradeLongSetup, longQualityTier, not na(tradeLongEntry))
