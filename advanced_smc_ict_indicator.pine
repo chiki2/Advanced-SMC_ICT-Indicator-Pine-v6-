@@ -53,8 +53,6 @@ float regimeStrongAtrThreshold = 1.0
 groupRisk = "6. Risk"
 bool showRisk = input.bool(false, "Show stop cues", group=groupRisk)
 float stopAtrBuffer = 0.10
-float sessionVolStopFraction = 0.20
-float sessionVolStopCapAtr = 1.50
 
 int setupFreshBars = 6
 int setupExpiryBars = 25
@@ -581,14 +579,6 @@ f_dashboardMarketSummary(string longValue, bool longRetired, string shortValue, 
     string effectiveLongValue = longRetired ? "-" : longValue
     string effectiveShortValue = shortRetired ? "-" : shortValue
     effectiveLongValue == effectiveShortValue ? effectiveLongValue : effectiveLongValue == "-" ? effectiveShortValue : effectiveShortValue == "-" ? effectiveLongValue : "Mixed"
-
-f_hybridStopDistance(float structuralDistance, float sessionVolRange, float atrLevel) =>
-    float result = structuralDistance
-    if not na(structuralDistance) and structuralDistance > 0 and not na(sessionVolRange) and sessionVolRange > 0 and not na(atrLevel) and atrLevel > 0
-        float sessionVolFloor = sessionVolRange * sessionVolStopFraction
-        float sessionVolCap = structuralDistance + atrLevel * sessionVolStopCapAtr
-        result := math.max(structuralDistance, math.min(sessionVolFloor, sessionVolCap))
-    result
 
 f_trimSessionVisuals() =>
     while array.size(sessionRangeBoxes) > maxSessionVisuals
@@ -2332,8 +2322,6 @@ var float lastNyAmHigh = na
 var float lastNyAmLow = na
 var float lastNyPmHigh = na
 var float lastNyPmLow = na
-var float prevSessionHigh = na
-var float prevSessionLow = na
 var float newYorkSessionVisualHigh = na
 var float newYorkSessionVisualLow = na
 
@@ -2369,11 +2357,6 @@ float lastNyCompositeHigh = f_mergeSessionHigh(lastNyAmHigh, lastNyPmHigh)
 float lastNyCompositeLow = f_mergeSessionLow(lastNyAmLow, lastNyPmLow)
 string currentSessionBlock = inAsiaSession ? "Asia" : inLondonSession ? "London" : inNyAmSession ? "New York AM" : inNyPmSession ? "New York PM" : "Inter-session"
 string liquiditySessionLabel = inLondonSession ? "Asia" : inNyAmSession ? "London" : inNyPmSession ? "New York AM" : "New York Composite"
-prevSessionHigh := inLondonSession ? lastAsiaHigh : inNyAmSession ? lastLondonHigh : inNyPmSession ? lastNyAmHigh : lastNyCompositeHigh
-prevSessionLow := inLondonSession ? lastAsiaLow : inNyAmSession ? lastLondonLow : inNyPmSession ? lastNyAmLow : lastNyCompositeLow
-float prevVolSourceHigh = inLondonSession ? lastAsiaHigh : inNyAmSession ? lastLondonHigh : inNyPmSession ? lastLondonHigh : lastNyCompositeHigh
-float prevVolSourceLow = inLondonSession ? lastAsiaLow : inNyAmSession ? lastLondonLow : inNyPmSession ? lastLondonLow : lastNyCompositeLow
-float prevSessionVolRange = not na(prevVolSourceHigh) and not na(prevVolSourceLow) ? prevVolSourceHigh - prevVolSourceLow : na
 
 //------------------------------------------------------------------------------
 // Session range visuals
@@ -2482,15 +2465,11 @@ if sessionVisualsEnabled and array.size(sessionRangeBoxes) > 0
             label.set_color(sessionLabel, color.new(color.black, 100))
             label.set_size(sessionLabel, size.normal)
 
-[prevDayHigh, prevDayLow] = request.security(syminfo.tickerid, "D", [high[1], low[1]], lookahead=barmerge.lookahead_off)
-[prevWeekHigh, prevWeekLow] = request.security(syminfo.tickerid, "W", [high[1], low[1]], lookahead=barmerge.lookahead_off)
-[prevMonthHigh, prevMonthLow] = request.security(syminfo.tickerid, "M", [high[1], low[1]], lookahead=barmerge.lookahead_off)
-
 //------------------------------------------------------------------------------
 // Pivot-based market structure
 //------------------------------------------------------------------------------
-pivotHigh = ta.pivothigh(high, swingLen, swingLen)
-pivotLow = ta.pivotlow(low, swingLen, swingLen)
+pivotHigh = not eng1_exec_valid ? ta.pivothigh(high, swingLen, swingLen) : na
+pivotLow = not eng1_exec_valid ? ta.pivotlow(low, swingLen, swingLen) : na
 
 var float lastSwingHigh = na
 var int lastSwingHighBar = na
@@ -2538,26 +2517,18 @@ float effectiveExecEqHigh = eng1_exec_valid and eng1_exe_eqh_active ? eng1_exe_e
 float effectiveExecEqLow = eng1_exec_valid and eng1_exe_eql_active ? eng1_exe_eql : latestEqlActive ? latestEql : na
 
 sellSideSweep = (not na(effectiveExecLiqLow) and low < effectiveExecLiqLow and not f_breakDown(effectiveExecLiqLow)) or
-     (not na(prevSessionLow) and low < prevSessionLow and close > prevSessionLow) or
-     (not na(prevDayLow) and low < prevDayLow and close > prevDayLow) or
-     (not na(prevWeekLow) and low < prevWeekLow and close > prevWeekLow) or
-     (not na(prevMonthLow) and low < prevMonthLow and close > prevMonthLow) or
      (not na(effectiveExecEqLow) and low < effectiveExecEqLow and close > effectiveExecEqLow)
 
 buySideSweep = (not na(effectiveExecLiqHigh) and high > effectiveExecLiqHigh and not f_breakUp(effectiveExecLiqHigh)) or
-     (not na(prevSessionHigh) and high > prevSessionHigh and close < prevSessionHigh) or
-     (not na(prevDayHigh) and high > prevDayHigh and close < prevDayHigh) or
-     (not na(prevWeekHigh) and high > prevWeekHigh and close < prevWeekHigh) or
-     (not na(prevMonthHigh) and high > prevMonthHigh and close < prevMonthHigh) or
      (not na(effectiveExecEqHigh) and high > effectiveExecEqHigh and close < effectiveExecEqHigh)
 
 plotshape(displaySweepMarkers and sellSideSweep, title="Sell-side liquidity sweep", style=shape.triangleup, location=location.belowbar, color=bullColor, size=size.tiny, text="")
 plotshape(displaySweepMarkers and buySideSweep, title="Buy-side liquidity sweep", style=shape.triangledown, location=location.abovebar, color=bearColor, size=size.tiny, text="")
 
-if latestEqhActive and not na(latestEqh) and high > latestEqh
+if not eng1_exec_valid and latestEqhActive and not na(latestEqh) and high > latestEqh
     latestEqhActive := false
 
-if latestEqlActive and not na(latestEql) and low < latestEql
+if not eng1_exec_valid and latestEqlActive and not na(latestEql) and low < latestEql
     latestEqlActive := false
 
 var int bullSequenceSweepBar = na
@@ -2567,11 +2538,11 @@ var int bearSequenceSweepBar = na
 var int bearSequenceFvgBar = na
 var int bearSequenceDisplacementBar = na
 
-if sellSideSweep
+if not eng1_exec_valid and sellSideSweep
     bullSequenceSweepBar := bar_index
     bullSequenceFvgBar := na
     bullSequenceDisplacementBar := na
-if buySideSweep
+if not eng1_exec_valid and buySideSweep
     bearSequenceSweepBar := bar_index
     bearSequenceFvgBar := na
     bearSequenceDisplacementBar := na
@@ -2584,8 +2555,8 @@ var int protectedHighBar = na
 var int lastBullMssBar = na
 var int lastBearMssBar = na
 
-bullBreak = not na(effectiveExecLiqHigh) and not lastHighBroken and f_breakUp(effectiveExecLiqHigh)
-bearBreak = not na(effectiveExecLiqLow) and not lastLowBroken and f_breakDown(effectiveExecLiqLow)
+bullBreak = not eng1_exec_valid and not na(effectiveExecLiqHigh) and not lastHighBroken and f_breakUp(effectiveExecLiqHigh)
+bearBreak = not eng1_exec_valid and not na(effectiveExecLiqLow) and not lastLowBroken and f_breakDown(effectiveExecLiqLow)
 
 var float bullLegLow = na
 var float bullLegHigh = na
@@ -2628,19 +2599,19 @@ legSearchBars = obSearchBars + obValidationLookback + 2
 bullFvg = low > high[2] and close[1] > open[1] and close[1] > high[2] and (high[1] - low[1]) >= atr * math.max(fvgMinAtr * 2.0, obImpulseAtr * 0.75) and f_bodyShare(1) >= 0.60 and (low - high[2]) >= atr * fvgMinAtr
 bearFvg = high < low[2] and close[1] < open[1] and close[1] < low[2] and (high[1] - low[1]) >= atr * math.max(fvgMinAtr * 2.0, obImpulseAtr * 0.75) and f_bodyShare(1) >= 0.60 and (low[2] - high) >= atr * fvgMinAtr
 
-if bullFvg
+if not eng1_exec_valid and bullFvg
     if not na(bullSequenceSweepBar) and (bar_index - bullSequenceSweepBar) <= obValidationLookback
         bullSequenceFvgBar := bar_index
         bullSequenceDisplacementBar := bar_index - 1
     f_addFvg(true, low, high[2])
 
-if bearFvg
+if not eng1_exec_valid and bearFvg
     if not na(bearSequenceSweepBar) and (bar_index - bearSequenceSweepBar) <= obValidationLookback
         bearSequenceFvgBar := bar_index
         bearSequenceDisplacementBar := bar_index - 1
     f_addFvg(false, low[2], high)
 
-if array.size(fvgBoxes) > 0
+if not eng1_exec_valid and array.size(fvgBoxes) > 0
     for idx = 0 to array.size(fvgBoxes) - 1
         i = array.size(fvgBoxes) - 1 - idx
         zoneBox = array.get(fvgBoxes, i)
@@ -2663,7 +2634,7 @@ if array.size(fvgBoxes) > 0
                 if not na(zoneBox)
                     box.set_top(zoneBox, zoneTop)
             if low <= zoneBottom
-                if not eng1_exec_valid and zoneTouched and not na(zoneCreatedBar) and bar_index > zoneCreatedBar and close < open and f_breakDown(zoneBottom)
+                if zoneTouched and not na(zoneCreatedBar) and bar_index > zoneCreatedBar and close < open and f_breakDown(zoneBottom)
                     bearIfvgTop := originalZoneTop
                     bearIfvgBottom := originalZoneBottom
                     bearIfvgCreatedBar := bar_index
@@ -2676,7 +2647,7 @@ if array.size(fvgBoxes) > 0
                 if not na(zoneBox)
                     box.set_bottom(zoneBox, zoneBottom)
             if high >= zoneTop
-                if not eng1_exec_valid and zoneTouched and not na(zoneCreatedBar) and bar_index > zoneCreatedBar and close > open and f_breakUp(zoneTop)
+                if zoneTouched and not na(zoneCreatedBar) and bar_index > zoneCreatedBar and close > open and f_breakUp(zoneTop)
                     bullIfvgTop := originalZoneTop
                     bullIfvgBottom := originalZoneBottom
                     bullIfvgCreatedBar := bar_index
@@ -2738,19 +2709,19 @@ else if not na(bearIfvgCreatedBar)
         bearIfvgCreatedBar := na
         bearIfvgTouched := false
 
-if not na(bullSequenceSweepBar) and (bar_index - bullSequenceSweepBar) > obValidationLookback
+if not eng1_exec_valid and not na(bullSequenceSweepBar) and (bar_index - bullSequenceSweepBar) > obValidationLookback
     bullSequenceSweepBar := na
     bullSequenceFvgBar := na
     bullSequenceDisplacementBar := na
-else if not na(bullSequenceFvgBar) and (bar_index - bullSequenceFvgBar) > obValidationLookback
+else if not eng1_exec_valid and not na(bullSequenceFvgBar) and (bar_index - bullSequenceFvgBar) > obValidationLookback
     bullSequenceFvgBar := na
     bullSequenceDisplacementBar := na
 
-if not na(bearSequenceSweepBar) and (bar_index - bearSequenceSweepBar) > obValidationLookback
+if not eng1_exec_valid and not na(bearSequenceSweepBar) and (bar_index - bearSequenceSweepBar) > obValidationLookback
     bearSequenceSweepBar := na
     bearSequenceFvgBar := na
     bearSequenceDisplacementBar := na
-else if not na(bearSequenceFvgBar) and (bar_index - bearSequenceFvgBar) > obValidationLookback
+else if not eng1_exec_valid and not na(bearSequenceFvgBar) and (bar_index - bearSequenceFvgBar) > obValidationLookback
     bearSequenceFvgBar := na
     bearSequenceDisplacementBar := na
 
@@ -2765,69 +2736,63 @@ bearMss = not na(bearMssLevel) and trendBias != -1 and f_breakDown(bearMssLevel)
 bullBos = trendBias == 1 and bullBreak
 bearBos = trendBias == -1 and bearBreak
 
-if bullMss or bullBos
+if not eng1_exec_valid and (bullMss or bullBos)
     bool resetBullLeg = bullMss
     int bullSourceBar = resetBullLeg ? (bullSequenceValid ? bullSequenceSweepBar : na(protectedLowBar) ? lastSwingLowBar : protectedLowBar) : bullLegStartBar
     float bullEventLevel = bullMss ? bullMssLevel : lastSwingHigh
     int bullEventBar = bullMss and not na(protectedHighBar) ? protectedHighBar : lastSwingHighBar
-    if not eng1_exec_valid
-        f_drawStructureEvent(bullEventBar, bullEventLevel, bullMss ? "MSS" : "BOS", true)
+    f_drawStructureEvent(bullEventBar, bullEventLevel, bullMss ? "MSS" : "BOS", true)
     trendBias := 1
     lastHighBroken := true
-    if not eng1_exec_valid and bullMss
+    if bullMss
         lastBullMssBar := bar_index
     bullLegStartBar := bullSourceBar
     if resetBullLeg
         bullLegLow := f_legLowSince(bullLegStartBar, bar_index + 1)
         bullLegHigh := f_legHighSince(bullLegStartBar, bar_index + 1)
-        if not eng1_exec_valid
-            bullNarrativeStartBar := not na(bullSequenceSweepBar) ? bullSequenceSweepBar : bullLegStartBar
-            bullNarrativeEndBar := bar_index
+        bullNarrativeStartBar := not na(bullSequenceSweepBar) ? bullSequenceSweepBar : bullLegStartBar
+        bullNarrativeEndBar := bar_index
         protectedLow := bullLegLow
         protectedLowBar := bullLegStartBar
         bullRangeHighState := bullLegHigh
         bullRangeLowState := bullLegLow
         bullEquilibriumState := not na(bullLegHigh) and not na(bullLegLow) ? (bullLegHigh + bullLegLow) * 0.5 : na
-    if not eng1_exec_valid
-        bullLegHasSweep := resetBullLeg ? bullSequenceValid : (bullLegHasSweep or bullSequenceValid)
-        bullLegHasDisplacement := resetBullLeg ? recentBullDisplacement : (bullLegHasDisplacement or recentBullDisplacement)
-        bullLegHasMss := resetBullLeg ? bullMss : (bullLegHasMss or bullMss)
-        if bullMss
-            bearLegHasSweep := false
-            bearLegHasDisplacement := false
-            bearLegHasMss := false
+    bullLegHasSweep := resetBullLeg ? bullSequenceValid : (bullLegHasSweep or bullSequenceValid)
+    bullLegHasDisplacement := resetBullLeg ? recentBullDisplacement : (bullLegHasDisplacement or recentBullDisplacement)
+    bullLegHasMss := resetBullLeg ? bullMss : (bullLegHasMss or bullMss)
+    if bullMss
+        bearLegHasSweep := false
+        bearLegHasDisplacement := false
+        bearLegHasMss := false
 
-if bearMss or bearBos
+if not eng1_exec_valid and (bearMss or bearBos)
     bool resetBearLeg = bearMss
     int bearSourceBar = resetBearLeg ? (bearSequenceValid ? bearSequenceSweepBar : na(protectedHighBar) ? lastSwingHighBar : protectedHighBar) : bearLegStartBar
     float bearEventLevel = bearMss ? bearMssLevel : lastSwingLow
     int bearEventBar = bearMss and not na(protectedLowBar) ? protectedLowBar : lastSwingLowBar
-    if not eng1_exec_valid
-        f_drawStructureEvent(bearEventBar, bearEventLevel, bearMss ? "MSS" : "BOS", false)
+    f_drawStructureEvent(bearEventBar, bearEventLevel, bearMss ? "MSS" : "BOS", false)
     trendBias := -1
     lastLowBroken := true
-    if not eng1_exec_valid and bearMss
+    if bearMss
         lastBearMssBar := bar_index
     bearLegStartBar := bearSourceBar
     if resetBearLeg
         bearLegHigh := f_legHighSince(bearLegStartBar, bar_index + 1)
         bearLegLow := f_legLowSince(bearLegStartBar, bar_index + 1)
-        if not eng1_exec_valid
-            bearNarrativeStartBar := not na(bearSequenceSweepBar) ? bearSequenceSweepBar : bearLegStartBar
-            bearNarrativeEndBar := bar_index
+        bearNarrativeStartBar := not na(bearSequenceSweepBar) ? bearSequenceSweepBar : bearLegStartBar
+        bearNarrativeEndBar := bar_index
         protectedHigh := bearLegHigh
         protectedHighBar := bearLegStartBar
         bearRangeHighState := bearLegHigh
         bearRangeLowState := bearLegLow
         bearEquilibriumState := not na(bearLegHigh) and not na(bearLegLow) ? (bearLegHigh + bearLegLow) * 0.5 : na
-    if not eng1_exec_valid
-        bearLegHasSweep := resetBearLeg ? bearSequenceValid : (bearLegHasSweep or bearSequenceValid)
-        bearLegHasDisplacement := resetBearLeg ? recentBearDisplacement : (bearLegHasDisplacement or recentBearDisplacement)
-        bearLegHasMss := resetBearLeg ? bearMss : (bearLegHasMss or bearMss)
-        if bearMss
-            bullLegHasSweep := false
-            bullLegHasDisplacement := false
-            bullLegHasMss := false
+    bearLegHasSweep := resetBearLeg ? bearSequenceValid : (bearLegHasSweep or bearSequenceValid)
+    bearLegHasDisplacement := resetBearLeg ? recentBearDisplacement : (bearLegHasDisplacement or recentBearDisplacement)
+    bearLegHasMss := resetBearLeg ? bearMss : (bearLegHasMss or bearMss)
+    if bearMss
+        bullLegHasSweep := false
+        bullLegHasDisplacement := false
+        bullLegHasMss := false
 
 if not na(bullLegStartBar) and trendBias == 1
     bullLegLow := na(bullLegLow) ? low : math.min(bullLegLow, low)
@@ -2844,12 +2809,24 @@ if not na(bearLegStartBar) and trendBias == -1
 if eng1_exec_valid
     lastBullMssBar := na
     lastBearMssBar := na
+    lastSwingHigh := na
+    lastSwingHighBar := na
+    lastSwingLow := na
+    lastSwingLowBar := na
+    bullSequenceSweepBar := na
+    bullSequenceFvgBar := na
+    bullSequenceDisplacementBar := na
+    bearSequenceSweepBar := na
+    bearSequenceFvgBar := na
+    bearSequenceDisplacementBar := na
     bullLegHasSweep := false
     bullLegHasDisplacement := false
     bullLegHasMss := false
     bearLegHasSweep := false
     bearLegHasDisplacement := false
     bearLegHasMss := false
+    lastHighBroken := false
+    lastLowBroken := false
     latestEqh := na
     latestEql := na
     latestEqhActive := false
@@ -2865,17 +2842,17 @@ if eng1_exec_valid
 obBullDisplacement = not na(bullSequenceDisplacementBar) and not na(bullSequenceSweepBar) and bullSequenceDisplacementBar >= bullSequenceSweepBar and (bar_index - bullSequenceDisplacementBar) <= obValidationLookback
 obBearDisplacement = not na(bearSequenceDisplacementBar) and not na(bearSequenceSweepBar) and bearSequenceDisplacementBar >= bearSequenceSweepBar and (bar_index - bearSequenceDisplacementBar) <= obValidationLookback
 
-if (bullMss or bullBos) and bullSequenceValid and obBullDisplacement
+if not eng1_exec_valid and (bullMss or bullBos) and bullSequenceValid and obBullDisplacement
     obShift = f_findLastOpposingCandle(true, bullSequenceSweepBar, bullSequenceFvgBar, legSearchBars)
     if not na(obShift)
         f_addOb(true, obShift)
 
-if (bearMss or bearBos) and bearSequenceValid and obBearDisplacement
+if not eng1_exec_valid and (bearMss or bearBos) and bearSequenceValid and obBearDisplacement
     obShift = f_findLastOpposingCandle(false, bearSequenceSweepBar, bearSequenceFvgBar, legSearchBars)
     if not na(obShift)
         f_addOb(false, obShift)
 
-if array.size(obBoxes) > 0
+if not eng1_exec_valid and array.size(obBoxes) > 0
     for idx = 0 to array.size(obBoxes) - 1
         i = array.size(obBoxes) - 1 - idx
         zoneBox = array.get(obBoxes, i)
@@ -3317,9 +3294,7 @@ bool tradeLongTouched = false
 if preferBullOb
     tradeLongEntry := latestBullEntry
     float structuralLongStop = latestBullZoneBottom - atr * stopAtrBuffer
-    float structuralLongDistance = not na(latestBullEntry) and not na(structuralLongStop) ? latestBullEntry - structuralLongStop : na
-    float hybridLongDistance = f_hybridStopDistance(structuralLongDistance, prevSessionVolRange, atr)
-    tradeLongStop := not na(latestBullEntry) and not na(hybridLongDistance) ? latestBullEntry - hybridLongDistance : structuralLongStop
+    tradeLongStop := structuralLongStop
     tradeLongSetup := latestBullZoneIsBreaker ? "Bullish Breaker" : "Bullish OB"
     tradeLongValidTop := latestBullZoneTop
     tradeLongValidBottom := latestBullZoneBottom
@@ -3330,9 +3305,7 @@ if preferBullOb
 else if preferBullFvg
     tradeLongEntry := f_zoneMid(latestBullFvgTop, latestBullFvgBottom)
     float structuralLongStop = latestBullFvgBottom - atr * stopAtrBuffer
-    float structuralLongDistance = not na(tradeLongEntry) and not na(structuralLongStop) ? tradeLongEntry - structuralLongStop : na
-    float hybridLongDistance = f_hybridStopDistance(structuralLongDistance, prevSessionVolRange, atr)
-    tradeLongStop := not na(tradeLongEntry) and not na(hybridLongDistance) ? tradeLongEntry - hybridLongDistance : structuralLongStop
+    tradeLongStop := structuralLongStop
     tradeLongSetup := "Bullish FVG"
     tradeLongValidTop := latestBullFvgTop
     tradeLongValidBottom := latestBullFvgBottom
@@ -3342,7 +3315,7 @@ else if preferBullFvg
     tradeLongTouched := latestBullFvgTouched
 
 if not na(tradeLongEntry)
-    tradeLongTarget := f_nearestAbove(tradeLongEntry, effectiveExecLiqHigh, effectiveExecEqHigh, prevDayHigh, prevWeekHigh, prevMonthHigh, effectiveContextHigh, na)
+    tradeLongTarget := f_nearestAbove(tradeLongEntry, effectiveExecLiqHigh, effectiveExecEqHigh, effectiveContextHigh, na, na, na, na)
     longTargetIsLiquidity := not na(tradeLongTarget)
     float tempLongRisk = not na(tradeLongStop) ? tradeLongEntry - tradeLongStop : na
     if na(tradeLongTarget) and not na(tempLongRisk) and tempLongRisk > 0
@@ -3364,9 +3337,7 @@ bool tradeShortTouched = false
 if preferBearOb
     tradeShortEntry := latestBearEntry
     float structuralShortStop = latestBearZoneTop + atr * stopAtrBuffer
-    float structuralShortDistance = not na(latestBearEntry) and not na(structuralShortStop) ? structuralShortStop - latestBearEntry : na
-    float hybridShortDistance = f_hybridStopDistance(structuralShortDistance, prevSessionVolRange, atr)
-    tradeShortStop := not na(latestBearEntry) and not na(hybridShortDistance) ? latestBearEntry + hybridShortDistance : structuralShortStop
+    tradeShortStop := structuralShortStop
     tradeShortSetup := latestBearZoneIsBreaker ? "Bearish Breaker" : "Bearish OB"
     tradeShortValidTop := latestBearZoneTop
     tradeShortValidBottom := latestBearZoneBottom
@@ -3377,9 +3348,7 @@ if preferBearOb
 else if preferBearFvg
     tradeShortEntry := f_zoneMid(latestBearFvgTop, latestBearFvgBottom)
     float structuralShortStop = latestBearFvgTop + atr * stopAtrBuffer
-    float structuralShortDistance = not na(tradeShortEntry) and not na(structuralShortStop) ? structuralShortStop - tradeShortEntry : na
-    float hybridShortDistance = f_hybridStopDistance(structuralShortDistance, prevSessionVolRange, atr)
-    tradeShortStop := not na(tradeShortEntry) and not na(hybridShortDistance) ? tradeShortEntry + hybridShortDistance : structuralShortStop
+    tradeShortStop := structuralShortStop
     tradeShortSetup := "Bearish FVG"
     tradeShortValidTop := latestBearFvgTop
     tradeShortValidBottom := latestBearFvgBottom
@@ -3389,14 +3358,14 @@ else if preferBearFvg
     tradeShortTouched := latestBearFvgTouched
 
 if not na(tradeShortEntry)
-    tradeShortTarget := f_nearestBelow(tradeShortEntry, effectiveExecLiqLow, effectiveExecEqLow, prevDayLow, prevWeekLow, prevMonthLow, effectiveContextLow, na)
+    tradeShortTarget := f_nearestBelow(tradeShortEntry, effectiveExecLiqLow, effectiveExecEqLow, effectiveContextLow, na, na, na, na)
     shortTargetIsLiquidity := not na(tradeShortTarget)
     float tempShortRisk = not na(tradeShortStop) ? tradeShortStop - tradeShortEntry : na
     if na(tradeShortTarget) and not na(tempShortRisk) and tempShortRisk > 0
         tradeShortTarget := tradeShortEntry - tempShortRisk * 2.0
 
-float longDolExternal = not na(tradeLongEntry) ? f_nearestAbove(tradeLongEntry, prevDayHigh, prevWeekHigh, prevMonthHigh, effectiveContextHigh, na, na, na) : na
-float shortDolExternal = not na(tradeShortEntry) ? f_nearestBelow(tradeShortEntry, prevDayLow, prevWeekLow, prevMonthLow, effectiveContextLow, na, na, na) : na
+float longDolExternal = not na(tradeLongEntry) ? f_nearestAbove(tradeLongEntry, effectiveContextHigh, na, na, na, na, na, na) : na
+float shortDolExternal = not na(tradeShortEntry) ? f_nearestBelow(tradeShortEntry, effectiveContextLow, na, na, na, na, na, na) : na
 bool longQualifiedExternalDol = not na(longDolExternal) and not na(tradeLongEntry) and not na(tradeLongStop) and tradeLongEntry > tradeLongStop and longDolExternal - tradeLongEntry >= tradeLongEntry - tradeLongStop
 bool shortQualifiedExternalDol = not na(shortDolExternal) and not na(tradeShortEntry) and not na(tradeShortStop) and tradeShortStop > tradeShortEntry and tradeShortEntry - shortDolExternal >= tradeShortStop - tradeShortEntry
 bool longUsesExternalDolTarget = strictModeEnabled and longQualifiedExternalDol
