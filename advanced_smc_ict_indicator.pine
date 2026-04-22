@@ -326,6 +326,56 @@ f_zoneTouchedSinceBar(float zoneTop, float zoneBottom, int createdBar, int maxSc
 f_zoneIntersects(float zoneTop, float zoneBottom, float refTop, float refBottom) =>
     not na(zoneTop) and not na(zoneBottom) and not na(refTop) and not na(refBottom) and math.max(zoneBottom, refBottom) <= math.min(zoneTop, refTop)
 
+f_resolveLevel(float primaryLevel, float fallbackLevel) =>
+    not na(primaryLevel) ? primaryLevel : fallbackLevel
+
+f_resolveBias(int primaryBias, int fallbackBias) =>
+    primaryBias != 0 ? primaryBias : fallbackBias
+
+f_narrativeContains(int createdBar, int narrativeStartBar, int narrativeEndBar, int endPadding) =>
+    not na(createdBar) and not na(narrativeStartBar) and not na(narrativeEndBar) and createdBar >= narrativeStartBar and createdBar <= narrativeEndBar + endPadding
+
+f_pickLatestNarrativeFvg(bool isBull, int narrativeStartBar, int narrativeEndBar) =>
+    float selectedTop = na
+    float selectedBottom = na
+    int selectedCreatedBar = na
+    bool selectedTouched = false
+    if array.size(fvgBoxes) > 0
+        for idx = 0 to array.size(fvgBoxes) - 1
+            int i = array.size(fvgBoxes) - 1 - idx
+            bool zoneBull = array.get(fvgBull, i)
+            int zoneCreatedBar = array.get(fvgCreatedBars, i)
+            bool narrativeMatch = f_narrativeContains(zoneCreatedBar, narrativeStartBar, narrativeEndBar, 0)
+            if zoneBull == isBull and narrativeMatch and na(selectedTop)
+                selectedTop := array.get(fvgTops, i)
+                selectedBottom := array.get(fvgBottoms, i)
+                selectedCreatedBar := zoneCreatedBar
+                selectedTouched := array.get(fvgTouched, i)
+    [selectedTop, selectedBottom, selectedCreatedBar, selectedTouched]
+
+f_pickLatestNarrativeOb(bool isBull, int narrativeStartBar, int narrativeEndBar) =>
+    float selectedTop = na
+    float selectedBottom = na
+    float selectedEntry = na
+    bool selectedBreaker = false
+    int selectedCreatedBar = na
+    bool selectedTouched = false
+    if array.size(obBoxes) > 0
+        for idx = 0 to array.size(obBoxes) - 1
+            int i = array.size(obBoxes) - 1 - idx
+            bool zoneBull = array.get(obBull, i)
+            bool zoneFailed = array.get(obFailed, i)
+            int zoneCreatedBar = array.get(obCreatedBars, i)
+            bool narrativeMatch = f_narrativeContains(zoneCreatedBar, narrativeStartBar, narrativeEndBar, 1)
+            if zoneBull == isBull and not zoneFailed and narrativeMatch and na(selectedTop)
+                selectedTop := array.get(obTops, i)
+                selectedBottom := array.get(obBottoms, i)
+                selectedEntry := array.get(obEntries, i)
+                selectedBreaker := array.get(obBreaker, i)
+                selectedCreatedBar := zoneCreatedBar
+                selectedTouched := array.get(obTouched, i)
+    [selectedTop, selectedBottom, selectedEntry, selectedBreaker, selectedCreatedBar, selectedTouched]
+
 f_bodyShare(int shift) =>
     float candleRange = high[shift] - low[shift]
     candleRange > 0 ? math.abs(close[shift] - open[shift]) / candleRange : 0.0
@@ -2729,8 +2779,8 @@ bullSequenceValid = not na(bullSequenceSweepBar) and not na(bullSequenceFvgBar) 
 bearSequenceValid = not na(bearSequenceSweepBar) and not na(bearSequenceFvgBar) and (bar_index - bearSequenceSweepBar) <= obValidationLookback and (bar_index - bearSequenceFvgBar) <= obValidationLookback and bearSequenceFvgBar >= bearSequenceSweepBar
 recentBullDisplacement = not na(bullSequenceDisplacementBar) and (bar_index - bullSequenceDisplacementBar) <= engineDisplacementLookback
 recentBearDisplacement = not na(bearSequenceDisplacementBar) and (bar_index - bearSequenceDisplacementBar) <= engineDisplacementLookback
-bullMssLevel = not na(eng1_exe_protected_high) ? eng1_exe_protected_high : not na(protectedHigh) ? protectedHigh : effectiveExecLiqHigh
-bearMssLevel = not na(eng1_exe_protected_low) ? eng1_exe_protected_low : not na(protectedLow) ? protectedLow : effectiveExecLiqLow
+bullMssLevel = f_resolveLevel(eng1_exe_protected_high, f_resolveLevel(protectedHigh, effectiveExecLiqHigh))
+bearMssLevel = f_resolveLevel(eng1_exe_protected_low, f_resolveLevel(protectedLow, effectiveExecLiqLow))
 bullMss = not na(bullMssLevel) and trendBias != 1 and f_breakUp(bullMssLevel) and bullSequenceValid and recentBullDisplacement
 bearMss = not na(bearMssLevel) and trendBias != -1 and f_breakDown(bearMssLevel) and bearSequenceValid and recentBearDisplacement
 bullBos = trendBias == 1 and bullBreak
@@ -2999,9 +3049,9 @@ else
     htfStructureLow := na
     htfBias := 0
 
-int displayExecBias = eng1_exec_valid and eng1_ctx_trend_bias != 0 ? eng1_ctx_trend_bias : trendBias
-int displayCtxBias = eng1_exec_valid and eng1_ctx_trend_bias != 0 ? eng1_ctx_trend_bias : htfBias
-int displayNarrBias = eng1_exec_valid and eng1_narr_bias != 0 ? eng1_narr_bias : not eng1_exec_valid and narrativeHtfReady ? f_regimeBias(narrativeClose, narrativeMomentumRef) : 0
+int displayExecBias = eng1_exec_valid ? f_resolveBias(eng1_ctx_trend_bias, trendBias) : trendBias
+int displayCtxBias = eng1_exec_valid ? f_resolveBias(eng1_ctx_trend_bias, htfBias) : htfBias
+int displayNarrBias = eng1_exec_valid ? f_resolveBias(eng1_narr_bias, 0) : narrativeHtfReady ? f_regimeBias(narrativeClose, narrativeMomentumRef) : 0
 
 bool eng1CtxRangeReady = eng1_exec_valid and not na(eng1_ctx_liq_high) and not na(eng1_ctx_liq_low) and eng1_ctx_liq_high > eng1_ctx_liq_low
 float eng1CtxRangeHigh = eng1CtxRangeReady ? eng1_ctx_liq_high : na
@@ -3064,8 +3114,8 @@ oteLongTop = trendBias == 1 and not bullOteMitigated and not bullOteInvalidated 
 oteLongBottom = trendBias == 1 and not bullOteMitigated and not bullOteInvalidated ? bullOteBottomState : na
 oteShortTop = trendBias == -1 and not bearOteMitigated and not bearOteInvalidated ? bearOteTopState : na
 oteShortBottom = trendBias == -1 and not bearOteMitigated and not bearOteInvalidated ? bearOteBottomState : na
-float effectiveProtectedHigh = not na(eng1_exe_protected_high) ? eng1_exe_protected_high : protectedHigh
-float effectiveProtectedLow = not na(eng1_exe_protected_low) ? eng1_exe_protected_low : protectedLow
+float effectiveProtectedHigh = f_resolveLevel(eng1_exe_protected_high, protectedHigh)
+float effectiveProtectedLow = f_resolveLevel(eng1_exe_protected_low, protectedLow)
 float effectiveContextHigh = eng1CtxRangeReady ? eng1CtxRangeHigh : htfStructureHigh
 float effectiveContextLow = eng1CtxRangeReady ? eng1CtxRangeLow : htfStructureLow
 float effectiveBullEquilibrium = eng1CtxRangeReady ? eng1CtxEquilibrium : not na(bullEquilibriumState) ? bullEquilibriumState : not na(bullLegHigh) and not na(bullLegLow) ? (bullLegHigh + bullLegLow) * 0.5 : na
@@ -3110,25 +3160,17 @@ bool eng1BullFvgTouched = f_zoneTouchedSinceBar(eng1_ctx_bull_fvg_top, eng1_ctx_
 bool eng1BearObTouched = f_zoneTouchedSinceBar(eng1_ctx_bear_ob_top, eng1_ctx_bear_ob_bottom, eng1BearObCreatedBar, eng1ContextTouchScan)
 bool eng1BearFvgTouched = f_zoneTouchedSinceBar(eng1_ctx_bear_fvg_top, eng1_ctx_bear_fvg_bottom, eng1BearFvgCreatedBar, eng1ContextTouchScan)
 
-if not eng1_exec_valid and array.size(fvgBoxes) > 0
-    for idx = 0 to array.size(fvgBoxes) - 1
-        i = array.size(fvgBoxes) - 1 - idx
-        zoneTop = array.get(fvgTops, i)
-        zoneBottom = array.get(fvgBottoms, i)
-        zoneBull = array.get(fvgBull, i)
-        zoneCreatedBar = array.get(fvgCreatedBars, i)
-        bullNarrativeMatch = not na(bullNarrativeStartBar) and not na(bullNarrativeEndBar) and zoneCreatedBar >= bullNarrativeStartBar and zoneCreatedBar <= bullNarrativeEndBar
-        bearNarrativeMatch = not na(bearNarrativeStartBar) and not na(bearNarrativeEndBar) and zoneCreatedBar >= bearNarrativeStartBar and zoneCreatedBar <= bearNarrativeEndBar
-        if zoneBull and bullNarrativeMatch and na(latestBullFvgTop)
-            latestBullFvgTop := zoneTop
-            latestBullFvgBottom := zoneBottom
-            latestBullFvgCreatedBar := zoneCreatedBar
-            latestBullFvgTouched := array.get(fvgTouched, i)
-        if not zoneBull and bearNarrativeMatch and na(latestBearFvgTop)
-            latestBearFvgTop := zoneTop
-            latestBearFvgBottom := zoneBottom
-            latestBearFvgCreatedBar := zoneCreatedBar
-            latestBearFvgTouched := array.get(fvgTouched, i)
+if not eng1_exec_valid
+    [bullNarrativeFvgTop, bullNarrativeFvgBottom, bullNarrativeFvgBar, bullNarrativeFvgTouched] = f_pickLatestNarrativeFvg(true, bullNarrativeStartBar, bullNarrativeEndBar)
+    latestBullFvgTop := bullNarrativeFvgTop
+    latestBullFvgBottom := bullNarrativeFvgBottom
+    latestBullFvgCreatedBar := bullNarrativeFvgBar
+    latestBullFvgTouched := bullNarrativeFvgTouched
+    [bearNarrativeFvgTop, bearNarrativeFvgBottom, bearNarrativeFvgBar, bearNarrativeFvgTouched] = f_pickLatestNarrativeFvg(false, bearNarrativeStartBar, bearNarrativeEndBar)
+    latestBearFvgTop := bearNarrativeFvgTop
+    latestBearFvgBottom := bearNarrativeFvgBottom
+    latestBearFvgCreatedBar := bearNarrativeFvgBar
+    latestBearFvgTouched := bearNarrativeFvgTouched
 
 float latestBullZoneTop = na
 float latestBullZoneBottom = na
@@ -3145,31 +3187,21 @@ int latestBearZoneCreatedBar = na
 bool latestBearZoneTouched = false
 bool latestBearZoneFromEng1 = false
 
-if not eng1_exec_valid and array.size(obBoxes) > 0
-    for idx = 0 to array.size(obBoxes) - 1
-        i = array.size(obBoxes) - 1 - idx
-        zoneTop = array.get(obTops, i)
-        zoneBottom = array.get(obBottoms, i)
-        zoneBull = array.get(obBull, i)
-        zoneBreaker = array.get(obBreaker, i)
-        zoneFailed = array.get(obFailed, i)
-        zoneCreatedBar = array.get(obCreatedBars, i)
-        bullNarrativeMatch = not na(bullNarrativeStartBar) and not na(bullNarrativeEndBar) and zoneCreatedBar >= bullNarrativeStartBar and zoneCreatedBar <= bullNarrativeEndBar + 1
-        bearNarrativeMatch = not na(bearNarrativeStartBar) and not na(bearNarrativeEndBar) and zoneCreatedBar >= bearNarrativeStartBar and zoneCreatedBar <= bearNarrativeEndBar + 1
-        if zoneBull and not zoneFailed and bullNarrativeMatch and na(latestBullZoneBottom)
-            latestBullZoneTop := zoneTop
-            latestBullZoneBottom := zoneBottom
-            latestBullEntry := array.get(obEntries, i)
-            latestBullZoneIsBreaker := zoneBreaker
-            latestBullZoneCreatedBar := zoneCreatedBar
-            latestBullZoneTouched := array.get(obTouched, i)
-        if not zoneBull and not zoneFailed and bearNarrativeMatch and na(latestBearZoneTop)
-            latestBearZoneBottom := zoneBottom
-            latestBearZoneTop := zoneTop
-            latestBearEntry := array.get(obEntries, i)
-            latestBearZoneIsBreaker := zoneBreaker
-            latestBearZoneCreatedBar := zoneCreatedBar
-            latestBearZoneTouched := array.get(obTouched, i)
+if not eng1_exec_valid
+    [bullNarrativeObTop, bullNarrativeObBottom, bullNarrativeObEntry, bullNarrativeObBreaker, bullNarrativeObBar, bullNarrativeObTouched] = f_pickLatestNarrativeOb(true, bullNarrativeStartBar, bullNarrativeEndBar)
+    latestBullZoneTop := bullNarrativeObTop
+    latestBullZoneBottom := bullNarrativeObBottom
+    latestBullEntry := bullNarrativeObEntry
+    latestBullZoneIsBreaker := bullNarrativeObBreaker
+    latestBullZoneCreatedBar := bullNarrativeObBar
+    latestBullZoneTouched := bullNarrativeObTouched
+    [bearNarrativeObTop, bearNarrativeObBottom, bearNarrativeObEntry, bearNarrativeObBreaker, bearNarrativeObBar, bearNarrativeObTouched] = f_pickLatestNarrativeOb(false, bearNarrativeStartBar, bearNarrativeEndBar)
+    latestBearZoneBottom := bearNarrativeObBottom
+    latestBearZoneTop := bearNarrativeObTop
+    latestBearEntry := bearNarrativeObEntry
+    latestBearZoneIsBreaker := bearNarrativeObBreaker
+    latestBearZoneCreatedBar := bearNarrativeObBar
+    latestBearZoneTouched := bearNarrativeObTouched
 if na(latestBullZoneBottom) and eng1HasBullObContext
     latestBullZoneTop := eng1_ctx_bull_ob_top
     latestBullZoneBottom := eng1_ctx_bull_ob_bottom
