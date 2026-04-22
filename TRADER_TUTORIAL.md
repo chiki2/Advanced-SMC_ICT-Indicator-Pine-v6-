@@ -163,6 +163,12 @@ Prinsip:
 - dalam profile `Strict Confirm`, indikator sekarang memprioritaskan `FVG` dulu
 - jika tidak ada `FVG` yang valid, `OB` dipakai sebagai fallback POI
 
+Tambahan konteks baru:
+- `iFVG` di indikator ini berarti `Inversion FVG`
+- `iFVG` muncul saat `FVG` lama gagal lalu flip fungsi
+- untuk sekarang `iFVG` dipakai sebagai `context-only`, bukan entry engine utama
+- jadi `iFVG` membantu membaca pergantian delivery, tetapi tidak otomatis menggantikan `FVG / OB` terpilih
+
 Jika nama setup di dashboard diikuti:
 - `Q1`
 - `Q2`
@@ -367,6 +373,12 @@ Kolom Long/Short pada baris ini sekarang menunjukkan status konfirmasi:
 Dalam strict mode, ringkasan ini juga membawa jalur setup singkat:
 - `FVG > DOL` = flow paling dekat ke ICT yang dicari indikator
 - `OB > DOL` = setup masih valid, tetapi POI yang dipakai adalah order block fallback
+- `iCtx` = ada `iFVG` aktif yang sedang memberi konteks tambahan
+- `iCtx+` = ada `iFVG` aktif dan posisinya selaras dengan setup yang sedang dibaca
+
+Jika sisi `Long` atau `Short` sudah tidak actionable lagi:
+- baris `Sess/Cfm` untuk sisi itu akan ditulis `Retired`
+- ini sengaja supaya dashboard tidak terus membahas konfirmasi untuk setup yang sudah selesai, invalid, atau basi
 
 Status strict sekarang dibaca lebih eksplisit:
 - `Need ERL` = belum ada sweep external liquidity yang cukup
@@ -421,6 +433,8 @@ Prinsip pakai:
 Catatan penting:
 - jika compact menulis setup seperti `Bullish OB | Q2 | Ctx`, itu berarti ada kandidat dengan `Setup Grade Q2` yang masih sedang terbentuk
 - `Ctx` berarti setup itu masih `context-only`, belum actionable untuk entry
+- `Ctx+i` berarti ada kandidat setup context-only dan `iFVG` aktif sedang menambah konteks
+- `Ctx+i+` berarti `iFVG` aktif itu juga selaras dengan setup kandidat yang sedang terbaca
 - selama `Zone` dan `E / SL / TP` masih `-`, trader sebaiknya tetap membaca itu sebagai fase scan
 - `R / DOL` berarti `Reward / Draw on Liquidity`
 
