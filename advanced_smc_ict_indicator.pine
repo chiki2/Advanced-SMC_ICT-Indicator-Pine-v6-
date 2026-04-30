@@ -1,5 +1,5 @@
 //@version=6
-indicator("Advanced SMC / ICT Indicator", shorttitle="SMC/ICT", overlay=true, max_lines_count=500, max_labels_count=500, max_boxes_count=500)
+indicator("Advanced SMC / ICT Indicator", shorttitle="SMC/ICT", overlay=true, max_lines_count=500, max_labels_count=500, max_boxes_count=500, max_linefill_count=20)
 
 //------------------------------------------------------------------------------
 // Inputs
@@ -9,6 +9,8 @@ usagePreset = input.string("Standard", "Usage profile", options=["Standard", "Co
 
 groupStructure = "1. Structure"
 bool showTrendBackground = input.bool(true, "Tint background by current bias", group=groupStructure)
+bool showMarketStructure = input.bool(true, "Show market structure labels (HH/HL/LH/LL, BOS/MSS)", group=groupStructure)
+int structureSwingLen = input.int(3, "Structure swing length", minval=1, maxval=20, group=groupStructure)
 
 groupLiquidity = "2. Liquidity"
 bool showLiquidity = input.bool(true, "Show liquidity pools", group=groupLiquidity)
@@ -68,12 +70,13 @@ panelHeaderBg = color.new(color.black, 12)
 panelCellBg = color.new(color.black, 18)
 panelBullBg = color.new(color.rgb(36, 54, 48), 26)
 panelBearBg = color.new(color.rgb(65, 44, 44), 26)
-asiaSessionFillColor = color.new(color.rgb(165, 82, 72), 86)
-asiaSessionBorderColor = color.new(color.rgb(198, 102, 91), 26)
-londonSessionFillColor = color.new(color.rgb(55, 92, 160), 86)
-londonSessionBorderColor = color.new(color.rgb(84, 126, 214), 24)
-newYorkSessionFillColor = color.new(color.rgb(170, 152, 57), 85)
-newYorkSessionBorderColor = color.new(color.rgb(208, 187, 79), 22)
+// Session visuals: keep soft, but readable across light/dark chart themes.
+asiaSessionFillColor = color.new(color.rgb(165, 82, 72), 82)
+asiaSessionBorderColor = color.new(color.rgb(198, 102, 91), 18)
+londonSessionFillColor = color.new(color.rgb(55, 92, 160), 82)
+londonSessionBorderColor = color.new(color.rgb(84, 126, 214), 18)
+newYorkSessionFillColor = color.new(color.rgb(170, 152, 57), 82)
+newYorkSessionBorderColor = color.new(color.rgb(208, 187, 79), 18)
 decisionPremiumFillColor = color.new(color.rgb(177, 58, 58), 92)
 decisionDiscountFillColor = color.new(color.rgb(33, 140, 96), 92)
 decisionEqColor = color.new(color.rgb(65, 126, 214), 10)
@@ -102,14 +105,54 @@ var label protectedHighLabel = na
 var label protectedLowLabel = na
 var label htfHighLabel = na
 var label htfLowLabel = na
+var label eqHighLabel = na
+var label eqLowLabel = na
 var label longStopLabel = na
 var label shortStopLabel = na
+var label[] eng2StructureLabels = array.new_label()
+var float eng2StructLastHigh = na
+var float eng2StructLastLow = na
+var bool eng2StructHighBroken = false
+var bool eng2StructLowBroken = false
+
+// Active level lines (single-instance, no history clutter).
+var line eng2BslLine = na
+var line eng2SslLine = na
+var line eng2ProtectedHighLine = na
+var line eng2ProtectedLowLine = na
+var line eng2CtxHighLine = na
+var line eng2CtxLowLine = na
+var line eng2RangeHighLine = na
+var line eng2RangeLowLine = na
+var line eng2RangeEqLine = na
+var linefill eng2RangePremiumFill = na
+var linefill eng2RangeDiscountFill = na
+var line eng2OteLongTopLine = na
+var line eng2OteLongBottomLine = na
+var linefill eng2OteLongFill = na
+var line eng2OteShortTopLine = na
+var line eng2OteShortBottomLine = na
+var linefill eng2OteShortFill = na
+var line eng2RiskLongEntryLine = na
+var line eng2RiskShortEntryLine = na
+var line eng2RiskLongStopLine = na
+var line eng2RiskShortStopLine = na
+var line eng2RiskLongTargetLine = na
+var line eng2RiskShortTargetLine = na
 var box eng2LongZoneBox = na
 var line eng2LongZoneLine = na
 var label eng2LongZoneLabel = na
 var box eng2ShortZoneBox = na
 var line eng2ShortZoneLine = na
 var label eng2ShortZoneLabel = na
+var box eng2CtxBullObBox = na
+var label eng2CtxBullObLabel = na
+var box eng2CtxBullFvgBox = na
+var label eng2CtxBullFvgLabel = na
+var box eng2CtxBearObBox = na
+var label eng2CtxBearObLabel = na
+var box eng2CtxBearFvgBox = na
+var label eng2CtxBearFvgLabel = na
 var box eng2LongHistoryBox = na
 var box eng2ShortHistoryBox = na
 var int eng2LongHistoryLeftBar = na
@@ -332,6 +375,17 @@ f_horizontalLevel(float level, bool enabled) =>
 f_safeBarIndexX(int targetBar) =>
     math.max(targetBar, math.max(bar_index - 5000, 0))
 
+f_trimLabels(label[] labelsArr, int cap) =>
+    while array.size(labelsArr) > cap
+        old = array.shift(labelsArr)
+        if not na(old)
+            label.delete(old)
+
+f_pushLabel(label[] labelsArr, label newLabel, int cap) =>
+    if not na(newLabel)
+        array.push(labelsArr, newLabel)
+        f_trimLabels(labelsArr, cap)
+
 f_syncRightEdgeLabel(label currentLabel, float level, string labelText, color labelColor, color textColor, bool enabled) =>
     label updatedLabel = currentLabel
     if enabled and not na(level)
@@ -350,6 +404,36 @@ f_syncRightEdgeLabel(label currentLabel, float level, string labelText, color la
         updatedLabel := na
     updatedLabel
 
+f_syncHLine(line currentLine, float level, color lineColor, int lineWidth, line.style lineStyle, bool enabled) =>
+    line updatedLine = currentLine
+    if enabled and not na(level)
+        int x1 = f_safeBarIndexX(bar_index - 1)
+        if na(updatedLine)
+            updatedLine := line.new(x1=x1, y1=level, x2=bar_index, y2=level, xloc=xloc.bar_index, extend=extend.both, color=lineColor, style=lineStyle, width=math.max(lineWidth, 1))
+        else
+            line.set_xy1(updatedLine, x1, level)
+            line.set_xy2(updatedLine, bar_index, level)
+            line.set_extend(updatedLine, extend.both)
+            line.set_color(updatedLine, lineColor)
+            line.set_style(updatedLine, lineStyle)
+            line.set_width(updatedLine, math.max(lineWidth, 1))
+    else if not na(updatedLine)
+        line.delete(updatedLine)
+        updatedLine := na
+    updatedLine
+
+f_syncLineFill(linefill currentFill, line lineA, line lineB, color fillColor, bool enabled) =>
+    linefill updatedFill = currentFill
+    if enabled and not na(lineA) and not na(lineB)
+        if na(updatedFill)
+            updatedFill := linefill.new(lineA, lineB, fillColor)
+        else
+            linefill.set_color(updatedFill, fillColor)
+    else if not na(updatedFill)
+        linefill.delete(updatedFill)
+        updatedFill := na
+    updatedFill
+
 f_levelsClose(float levelA, float levelB, float tolerance) =>
     not na(levelA) and not na(levelB) and not na(tolerance) and math.abs(levelA - levelB) <= tolerance
 
@@ -360,10 +444,11 @@ f_sessionBorderColor(string sessionName) =>
     sessionName == "Asia" ? asiaSessionBorderColor : sessionName == "London" ? londonSessionBorderColor : newYorkSessionBorderColor
 
 f_sessionTextColor(string sessionName) =>
-    color.new(f_sessionBorderColor(sessionName), 12)
+    // Slightly more opaque than lines so the session name stays readable.
+    color.new(f_sessionBorderColor(sessionName), 8)
 
 f_sessionLineColor(string sessionName, bool isHigh) =>
-    color.new(f_sessionBorderColor(sessionName), isHigh ? 18 : 28)
+    color.new(f_sessionBorderColor(sessionName), isHigh ? 18 : 30)
 
 f_setCell(table targetTable, int col, int row, string cellText, color textClr, color bgClr) =>
     table.cell(targetTable, col, row, cellText, text_color=textClr, bgcolor=bgClr, text_size=compactDashboardMode ? size.small : size.normal)
@@ -374,8 +459,8 @@ f_lifecycleText(int setupAge, bool touched) =>
 f_compactLifecycleText(bool useLong, int longAge, bool longTouchedState, int shortAge, bool shortTouchedState) =>
     useLong ? (na(longAge) ? "-" : str.tostring(longAge) + "b") + "/" + (longTouchedState ? "T" : "U") : (na(shortAge) ? "-" : str.tostring(shortAge) + "b") + "/" + (shortTouchedState ? "T" : "U")
 
-f_biasSummary(int currentBias, bool htfReady, int higherBias, int regimeBias, string regimeStrength) =>
-    f_biasShort(currentBias) + "/" + (htfReady ? f_biasShort(higherBias) : "G") + "/R" + f_biasShort(regimeBias) + " " + f_regimeStrengthShort(regimeStrength)
+f_biasSummary(int execBias, bool ctxReady, int ctxBias, int narrBias, string narrStrength) =>
+    f_biasShort(execBias) + "/" + (ctxReady ? f_biasShort(ctxBias) : "G") + "/" + f_biasShort(narrBias) + " " + f_regimeStrengthShort(narrStrength)
 
 f_zoneVisibleByMode(string mode, bool isSelected, bool isBull, string preferredDirection, bool useLongPreference) =>
     mode == "Full" ? true : preferredDirection == "Wait" ? isSelected : useLongPreference ? (isBull and isSelected) : (not isBull and isSelected)
@@ -487,8 +572,9 @@ f_addSessionVisual(string sessionName, int leftBar, float sessionHigh, float ses
     int safeLeftBar = f_safeBarIndexX(leftBar)
     color fillColor = f_sessionFillColor(sessionName)
     color borderColor = f_sessionBorderColor(sessionName)
-    box newBox = box.new(left=safeLeftBar, top=sessionHigh, right=bar_index, bottom=sessionLow, xloc=xloc.bar_index, bgcolor=fillColor, border_color=borderColor)
-    label newLabel = label.new(x=f_safeBarIndexX(int(math.floor((safeLeftBar + bar_index) * 0.5))), y=f_zoneMid(sessionHigh, sessionLow), xloc=xloc.bar_index, text=sessionName, style=label.style_none, color=color.new(color.black, 92), textcolor=f_sessionTextColor(sessionName), size=size.normal)
+    box newBox = box.new(left=safeLeftBar, top=sessionHigh, right=bar_index, bottom=sessionLow, xloc=xloc.bar_index, bgcolor=fillColor, border_color=borderColor, border_width=1)
+    // Center label with a very soft backdrop so it's readable on both light and dark themes.
+    label newLabel = label.new(x=f_safeBarIndexX(int(math.floor((safeLeftBar + bar_index) * 0.5))), y=f_zoneMid(sessionHigh, sessionLow), xloc=xloc.bar_index, text=sessionName, style=label.style_label_center, color=color.new(color.black, 86), textcolor=f_sessionTextColor(sessionName), size=size.small)
     line newHighLine = line.new(x1=safeLeftBar, y1=sessionHigh, x2=bar_index, y2=sessionHigh, xloc=xloc.bar_index, color=f_sessionLineColor(sessionName, true), width=1, style=line.style_solid)
     line newLowLine = line.new(x1=safeLeftBar, y1=sessionLow, x2=bar_index, y2=sessionLow, xloc=xloc.bar_index, color=f_sessionLineColor(sessionName, false), width=1, style=line.style_solid)
     array.push(sessionRangeBoxes, newBox)
@@ -520,9 +606,34 @@ f_syncSessionVisual(box currentBox, label currentLabel, line currentHighLine, li
         label.set_x(currentLabel, f_safeBarIndexX(int(math.floor((leftBar + bar_index) * 0.5))))
         label.set_y(currentLabel, f_zoneMid(sessionHigh, sessionLow))
         label.set_text(currentLabel, sessionName)
-        label.set_style(currentLabel, label.style_none)
-        label.set_color(currentLabel, color.new(color.black, 92))
-        label.set_size(currentLabel, size.normal)
+        label.set_style(currentLabel, label.style_label_center)
+        label.set_color(currentLabel, color.new(color.black, 86))
+        label.set_size(currentLabel, size.small)
+
+f_eng2_syncActiveSession(bool visualsEnabled, bool inSession, bool newSession, bool sessionEnded, box currentBox, label currentLabel, line currentHighLine, line currentLowLine, int currentStartBar, string sessionName, float sessionHigh, float sessionLow) =>
+    box nextBox = currentBox
+    label nextLabel = currentLabel
+    line nextHighLine = currentHighLine
+    line nextLowLine = currentLowLine
+    int nextStartBar = currentStartBar
+    if newSession
+        nextStartBar := bar_index
+    if visualsEnabled and inSession and na(nextBox) and not na(sessionHigh) and not na(sessionLow)
+        nextStartBar := na(nextStartBar) ? bar_index : nextStartBar
+        [newBox, newLabel, newHighLine, newLowLine] = f_addSessionVisual(sessionName, nextStartBar, sessionHigh, sessionLow)
+        nextBox := newBox
+        nextLabel := newLabel
+        nextHighLine := newHighLine
+        nextLowLine := newLowLine
+    if inSession and visualsEnabled
+        f_syncSessionVisual(nextBox, nextLabel, nextHighLine, nextLowLine, nextStartBar, sessionHigh, sessionLow, sessionName)
+    else if sessionEnded
+        nextBox := na
+        nextLabel := na
+        nextHighLine := na
+        nextLowLine := na
+        nextStartBar := na
+    [nextBox, nextLabel, nextHighLine, nextLowLine, nextStartBar]
 
 f_executionStateBadge(string stateText, bool compactText) =>
     stateText == "Active" ? (compactText ? "ACT" : "Active") : stateText == "Armed" ? (compactText ? "ARM" : "Armed") : stateText == "Managed" ? (compactText ? "MNG" : "Managed") : stateText == "Ambiguous" ? (compactText ? "AMB" : "Ambiguous") : stateText == "Completed" ? (compactText ? "CMP" : "Completed") : ""
@@ -565,7 +676,10 @@ f_setupScore(bool hasSetup, bool biasAligned, bool htfAligned, bool priceInZone,
             score := f_clamp(points / maxPoints * 100.0, 0.0, 100.0)
     score
 
-f_buildTradeCandidate(bool isBull, bool preferOb, bool preferFvg, float obTop, float obBottom, float obEntry, bool obIsBreaker, bool obFromEng1, int obCreatedBar, bool obTouched, float fvgTop, float fvgBottom, bool fvgFromEng1, int fvgCreatedBar, bool fvgTouched, float atrLevel, float stopBuffer, float execLiqHigh, float execLiqLow, float execEqHigh, float execEqLow, float ctxHigh, float ctxLow) =>
+//------------------------------------------------------------------------------
+// ENGINE 3 HELPERS (Setup + Lifecycle)
+//------------------------------------------------------------------------------
+f_eng3_build_trade_plan(bool isBull, bool preferOb, bool preferFvg, float obTop, float obBottom, float obEntry, bool obIsBreaker, int obCreatedBar, bool obTouched, float fvgTop, float fvgBottom, int fvgCreatedBar, bool fvgTouched, float atrLevel, float stopBuffer, float execLiqHigh, float execLiqLow, float execEqHigh, float execEqLow, float ctxHigh, float ctxLow) =>
     float entry = na
     float stop = na
     float target = na
@@ -575,7 +689,6 @@ f_buildTradeCandidate(bool isBull, bool preferOb, bool preferFvg, float obTop, f
     float validBottom = na
     bool isOb = false
     bool isFvg = false
-    bool fromEng1 = false
     int createdBar = na
     bool touched = false
     if preferOb
@@ -585,7 +698,6 @@ f_buildTradeCandidate(bool isBull, bool preferOb, bool preferFvg, float obTop, f
         validTop := obTop
         validBottom := obBottom
         isOb := true
-        fromEng1 := obFromEng1
         createdBar := obCreatedBar
         touched := obTouched
     else if preferFvg
@@ -595,7 +707,6 @@ f_buildTradeCandidate(bool isBull, bool preferOb, bool preferFvg, float obTop, f
         validTop := fvgTop
         validBottom := fvgBottom
         isFvg := true
-        fromEng1 := fvgFromEng1
         createdBar := fvgCreatedBar
         touched := fvgTouched
     if not na(entry)
@@ -604,13 +715,85 @@ f_buildTradeCandidate(bool isBull, bool preferOb, bool preferFvg, float obTop, f
         float risk = not na(stop) ? (isBull ? entry - stop : stop - entry) : na
         if na(target) and not na(risk) and risk > 0
             target := isBull ? entry + risk * 2.0 : entry - risk * 2.0
-    [entry, stop, target, targetIsLiquidity, setup, validTop, validBottom, isOb, isFvg, fromEng1, createdBar, touched]
+    [entry, stop, target, targetIsLiquidity, setup, validTop, validBottom, isOb, isFvg, createdBar, touched]
+
+f_eng3_validate_narrative_side(bool bullSide, bool execValid, int narrBias, int ctxTrendBias, bool ctxBullReversal, bool ctxBearReversal) =>
+    bullSide ? (execValid and narrBias != -1 and (ctxTrendBias == 1 or ctxBullReversal)) : (execValid and narrBias != 1 and (ctxTrendBias == -1 or ctxBearReversal))
+
+f_eng3_select_poi_preference(bool strictEnabled, bool hasOb, bool hasFvg, bool obConfirmPass, bool fvgConfirmPass, bool obInZone, bool fvgInZone) =>
+    bool preferOb = false
+    bool preferFvg = false
+    if strictEnabled
+        // In strict ICT mode, prefer FVG first after the ERL sweep.
+        if hasFvg and fvgConfirmPass
+            preferFvg := true
+        else if hasOb and obConfirmPass
+            preferOb := true
+        else
+            preferFvg := hasFvg
+            preferOb := not preferFvg and hasOb
+    else
+        // In standard mode, keep selection explicit and lean:
+        // confirmed candidate wins; otherwise in-zone candidate wins; otherwise OB wins.
+        bool fvgConfirmed = hasFvg and fvgConfirmPass
+        bool obConfirmed = hasOb and obConfirmPass
+        if fvgConfirmed and not obConfirmed
+            preferFvg := true
+        else if obConfirmed and not fvgConfirmed
+            preferOb := true
+        else if fvgInZone and not obInZone
+            preferFvg := true
+        else if obInZone and not fvgInZone
+            preferOb := true
+        else if hasOb
+            preferOb := true
+        else
+            preferFvg := hasFvg
+    [preferOb, preferFvg]
+
+f_eng3_update_trade_lifecycle(string setupTag, string prevSetupTag, bool managedLatched, bool completedLatched, bool ambiguousLatched, bool touched, bool managedHit, bool stopHit, bool tpHit, bool structureInvalidated, int setupAge, int expiryBarsWindow) =>
+    string nextPrevTag = prevSetupTag
+    bool nextManagedLatched = managedLatched
+    bool nextCompletedLatched = completedLatched
+    bool nextAmbiguousLatched = ambiguousLatched
+    if setupTag == ""
+        nextPrevTag := ""
+        nextManagedLatched := false
+        nextCompletedLatched := false
+        nextAmbiguousLatched := false
+    else if setupTag != prevSetupTag
+        nextManagedLatched := false
+        nextCompletedLatched := false
+        nextAmbiguousLatched := false
+    if setupTag != "" and managedHit
+        nextManagedLatched := true
+
+    bool latchedState = setupTag != "" and nextManagedLatched
+    bool ambiguousNow = setupTag != "" and touched and not nextCompletedLatched and not nextAmbiguousLatched and stopHit and tpHit
+    if ambiguousNow
+        nextAmbiguousLatched := true
+    if setupTag != "" and tpHit and not ambiguousNow and not nextAmbiguousLatched
+        nextCompletedLatched := true
+    bool isAmbiguous = setupTag != "" and nextAmbiguousLatched
+    bool isCompleted = setupTag != "" and nextCompletedLatched and not isAmbiguous
+    bool invalidated = not isAmbiguous and ((stopHit and not ambiguousNow) or structureInvalidated)
+    bool managedStale = latchedState and not isCompleted and not isAmbiguous and not na(setupAge) and setupAge > expiryBarsWindow
+    bool isManaged = latchedState and not managedStale and not isAmbiguous
+    bool touchedStale = touched and not latchedState and not isCompleted and not isAmbiguous and not na(setupAge) and setupAge > expiryBarsWindow
+    bool expiredUntouched = not touched and not na(setupAge) and setupAge > expiryBarsWindow
+    bool expired = expiredUntouched or touchedStale or managedStale
+
+    nextPrevTag := setupTag
+    [nextPrevTag, nextManagedLatched, nextCompletedLatched, nextAmbiguousLatched, isManaged, isCompleted, isAmbiguous, invalidated, expired]
 
 //------------------------------------------------------------------------------
 // ENGINE 1 (SAFE INTEGRATION)
 // Closed-candle MTF buffer + snapshot contract.
 // This block is isolated from the live setup engine. It is safe to keep in
 // parallel until the old engine is migrated to buffer-first ownership.
+// Note: MAIN_CONTRACT.md mentions BOS/CHOCH + ERL/IRL per-TF snapshots. They are
+// intentionally not produced yet because they are not used to make decisions in
+// this version, keeping Engine 1 lean and preventing fat-code drift.
 //------------------------------------------------------------------------------
 string ENG1_TF_M1 = "1"
 string ENG1_TF_M5 = "5"
@@ -645,7 +828,7 @@ f_eng1_tf_closed_ohlc(string tf) =>
 
 f_eng1_update_ohlc_buffer(string tf, int lastClosedTime, array<int> arrT, array<float> arrO, array<float> arrH, array<float> arrL, array<float> arrC, int cap) =>
     [closedTime, closedOpen, closedHigh, closedLow, closedClose] = f_eng1_tf_closed_ohlc(tf)
-    bool newClosed = not na(closedTime) and closedTime != lastClosedTime
+    bool newClosed = not na(closedTime) and (na(lastClosedTime) or closedTime != lastClosedTime)
     int nextLastClosedTime = lastClosedTime
     if newClosed
         f_eng1_buf_push_int(arrT, closedTime, cap)
@@ -713,6 +896,8 @@ f_eng1_find_swings(array<float> arrH, array<float> arrL, int swingLen) =>
                 else if na(prevLow)
                     prevLow := array.get(arrL, idx)
                     prevLowIdx := idx
+            if not na(lastHigh) and not na(prevHigh) and not na(lastLow) and not na(prevLow)
+                break
     [lastHigh, lastHighIdx, prevHigh, prevHighIdx, lastLow, lastLowIdx, prevLow, prevLowIdx]
 
 f_eng1_build_structure(array<int> arrT, array<float> arrH, array<float> arrL, array<float> arrC, int swingLen) =>
@@ -760,6 +945,48 @@ f_eng1_build_liquidity(array<float> arrH, array<float> arrL, array<float> arrC) 
                 eqlActive := eqlActive and array.get(arrL, i) >= eql
     [eqh, eql, eqhActive, eqlActive]
 
+f_eng1_build_structure_liquidity(array<float> arrH, array<float> arrL, array<float> arrC, int swingLen) =>
+    [lastHigh, lastHighIdx, prevHigh, prevHighIdx, lastLow, lastLowIdx, prevLow, prevLowIdx] = f_eng1_find_swings(arrH, arrL, swingLen)
+    int trendBiasLocal = 0
+    int closeSize = array.size(arrC)
+    if closeSize > 0
+        float latestClose = array.get(arrC, 0)
+        if not na(lastHigh) and latestClose > lastHigh
+            trendBiasLocal := 1
+        else if not na(lastLow) and latestClose < lastLow
+            trendBiasLocal := -1
+        else if not na(lastHigh) and not na(prevHigh) and not na(lastLow) and not na(prevLow)
+            bool higherHighs = lastHigh > prevHigh
+            bool higherLows = lastLow > prevLow
+            bool lowerHighs = lastHigh < prevHigh
+            bool lowerLows = lastLow < prevLow
+            trendBiasLocal := higherHighs and higherLows ? 1 : lowerHighs and lowerLows ? -1 : 0
+        else if not na(lastHigh) and not na(lastLow)
+            float swingMid = (lastHigh + lastLow) * 0.5
+            trendBiasLocal := latestClose > swingMid ? 1 : latestClose < swingMid ? -1 : 0
+
+    float eqh = na
+    float eql = na
+    bool eqhActive = false
+    bool eqlActive = false
+    float avgRange = f_eng1_avg_range(arrH, arrL, 20)
+    float tolerance = na(avgRange) ? syminfo.mintick * 2.0 : math.max(avgRange * equalToleranceAtr, syminfo.mintick * 2.0)
+    if not na(lastHigh) and not na(prevHigh) and math.abs(lastHigh - prevHigh) <= tolerance
+        eqh := math.max(lastHigh, prevHigh)
+        int eqhAnchorIdx = math.min(lastHighIdx, prevHighIdx)
+        eqhActive := true
+        if eqhAnchorIdx > 0
+            for i = 0 to eqhAnchorIdx - 1
+                eqhActive := eqhActive and array.get(arrH, i) <= eqh
+    if not na(lastLow) and not na(prevLow) and math.abs(lastLow - prevLow) <= tolerance
+        eql := math.min(lastLow, prevLow)
+        int eqlAnchorIdx = math.min(lastLowIdx, prevLowIdx)
+        eqlActive := true
+        if eqlAnchorIdx > 0
+            for i = 0 to eqlAnchorIdx - 1
+                eqlActive := eqlActive and array.get(arrL, i) >= eql
+    [lastHigh, lastLow, trendBiasLocal, eqh, eql, eqhActive, eqlActive]
+
 f_eng1_body_share(float candleOpen, float candleHigh, float candleLow, float candleClose) =>
     float candleRange = candleHigh - candleLow
     candleRange > 0 ? math.abs(candleClose - candleOpen) / candleRange : 0.0
@@ -775,8 +1002,9 @@ f_eng1_window_high(array<float> arrH, int lookback) =>
     float highest = na
     if sample > 0
         highest := array.get(arrH, 0)
-        for i = 1 to sample - 1
-            highest := math.max(highest, array.get(arrH, i))
+        if sample > 1
+            for i = 1 to sample - 1
+                highest := math.max(highest, array.get(arrH, i))
     highest
 
 f_eng1_window_low(array<float> arrL, int lookback) =>
@@ -784,8 +1012,9 @@ f_eng1_window_low(array<float> arrL, int lookback) =>
     float lowest = na
     if sample > 0
         lowest := array.get(arrL, 0)
-        for i = 1 to sample - 1
-            lowest := math.min(lowest, array.get(arrL, i))
+        if sample > 1
+            for i = 1 to sample - 1
+                lowest := math.min(lowest, array.get(arrL, i))
     lowest
 
 f_eng1_segment_high(array<float> arrH, int startIdx, int endIdx) =>
@@ -833,6 +1062,10 @@ f_eng1_build_fvg(array<int> arrT, array<float> arrO, array<float> arrH, array<fl
         float minGap = na(avgRange) ? syminfo.mintick * 4.0 : math.max(avgRange * fvgMinAtr, syminfo.mintick * 4.0)
         float displacementThreshold = na(avgRange) ? syminfo.mintick * 10.0 : math.max(avgRange * math.max(fvgMinAtr * 2.0, obImpulseAtr * 0.75), syminfo.mintick * 10.0)
         int maxRecentIdx = size - 3
+        // Performance note: keep this O(n). We track running extremes of newer bars
+        // instead of validating candidates with nested loops.
+        float runningMinLow = na
+        float runningMaxHigh = na
         for recentIdx = 0 to maxRecentIdx
             int middleIdx = recentIdx + 1
             int olderIdx = recentIdx + 2
@@ -852,13 +1085,11 @@ f_eng1_build_fvg(array<int> arrT, array<float> arrO, array<float> arrH, array<fl
                 float candidateTop = recentLow
                 float candidateBottom = olderHigh
                 bool candidateActive = true
-                if recentIdx > 0
-                    for j = 0 to recentIdx - 1
-                        float newerLow = array.get(arrL, j)
-                        if newerLow <= candidateBottom
-                            candidateActive := false
-                        else if newerLow < candidateTop
-                            candidateTop := math.max(newerLow, candidateBottom)
+                if not na(runningMinLow)
+                    if runningMinLow <= candidateBottom
+                        candidateActive := false
+                    else if runningMinLow < candidateTop
+                        candidateTop := math.max(runningMinLow, candidateBottom)
                 if candidateActive
                     bullTop := candidateTop
                     bullBottom := candidateBottom
@@ -867,17 +1098,18 @@ f_eng1_build_fvg(array<int> arrT, array<float> arrO, array<float> arrH, array<fl
                 float candidateTop = olderLow
                 float candidateBottom = recentHigh
                 bool candidateActive = true
-                if recentIdx > 0
-                    for j = 0 to recentIdx - 1
-                        float newerHigh = array.get(arrH, j)
-                        if newerHigh >= candidateTop
-                            candidateActive := false
-                        else if newerHigh > candidateBottom
-                            candidateBottom := math.min(newerHigh, candidateTop)
+                if not na(runningMaxHigh)
+                    if runningMaxHigh >= candidateTop
+                        candidateActive := false
+                    else if runningMaxHigh > candidateBottom
+                        candidateBottom := math.min(runningMaxHigh, candidateTop)
                 if candidateActive
                     bearTop := candidateTop
                     bearBottom := candidateBottom
                     bearBar := array.get(arrT, recentIdx)
+            // Update running extremes after validating candidates.
+            runningMinLow := na(runningMinLow) ? recentLow : math.min(runningMinLow, recentLow)
+            runningMaxHigh := na(runningMaxHigh) ? recentHigh : math.max(runningMaxHigh, recentHigh)
             if not na(bullTop) and not na(bearTop)
                 break
     [bullTop, bullBottom, bullBar, bearTop, bearBottom, bearBar]
@@ -1272,6 +1504,32 @@ f_eng1_regime_strength_from_buffer(int bias, array<float> arrC, array<float> arr
         strength := f_regimeStrengthText(bias, currentClose, refClose, atrApprox)
     strength
 
+f_eng1_fallback_window_range(string tf, int lookback) =>
+    float hi = na
+    float lo = na
+    if tf == ENG1_TF_M1
+        hi := f_eng1_window_high(eng1_buf_m1_high, lookback)
+        lo := f_eng1_window_low(eng1_buf_m1_low, lookback)
+    else if tf == ENG1_TF_M5
+        hi := f_eng1_window_high(eng1_buf_m5_high, lookback)
+        lo := f_eng1_window_low(eng1_buf_m5_low, lookback)
+    else if tf == ENG1_TF_M15
+        hi := f_eng1_window_high(eng1_buf_m15_high, lookback)
+        lo := f_eng1_window_low(eng1_buf_m15_low, lookback)
+    else if tf == ENG1_TF_M30
+        hi := f_eng1_window_high(eng1_buf_m30_high, lookback)
+        lo := f_eng1_window_low(eng1_buf_m30_low, lookback)
+    else if tf == ENG1_TF_H1
+        hi := f_eng1_window_high(eng1_buf_h1_high, lookback)
+        lo := f_eng1_window_low(eng1_buf_h1_low, lookback)
+    else if tf == ENG1_TF_H4
+        hi := f_eng1_window_high(eng1_buf_h4_high, lookback)
+        lo := f_eng1_window_low(eng1_buf_h4_low, lookback)
+    else if tf == ENG1_TF_D1
+        hi := f_eng1_window_high(eng1_buf_d1_high, lookback)
+        lo := f_eng1_window_low(eng1_buf_d1_low, lookback)
+    [hi, lo]
+
 f_eng1_select_narrative_snapshot(string tf) =>
     int narrBias = 0
     float narrLiqHigh = na
@@ -1316,6 +1574,11 @@ f_eng1_select_narrative_snapshot(string tf) =>
         narrBearSdBottom := eng1_d1_bear_ob_bottom
         narrBearSdBar := eng1_d1_bear_ob_bar
         narrStrength := f_eng1_regime_strength_from_buffer(narrBias, eng1_buf_d1_close, eng1_buf_d1_high, eng1_buf_d1_low)
+    bool narrNeedsFallback = na(narrLiqHigh) or na(narrLiqLow) or narrLiqHigh <= narrLiqLow
+    if narrNeedsFallback
+        [fallbackHigh, fallbackLow] = f_eng1_fallback_window_range(tf, 60)
+        narrLiqHigh := fallbackHigh
+        narrLiqLow := fallbackLow
     [narrBias, narrLiqHigh, narrLiqLow, narrBullSdTop, narrBullSdBottom, narrBullSdBar, narrBearSdTop, narrBearSdBottom, narrBearSdBar, narrStrength]
 
 f_eng1_select_context_snapshot(string tf) =>
@@ -1398,6 +1661,11 @@ f_eng1_select_context_snapshot(string tf) =>
         ctxBearFvgBar := eng1_h4_bear_fvg_bar
         ctxLiqHigh := eng1_h4_eqh_active ? eng1_h4_eqh : eng1_h4_last_swing_high
         ctxLiqLow := eng1_h4_eql_active ? eng1_h4_eql : eng1_h4_last_swing_low
+    bool ctxNeedsFallback = na(ctxLiqHigh) or na(ctxLiqLow) or ctxLiqHigh <= ctxLiqLow
+    if ctxNeedsFallback
+        [fallbackHigh, fallbackLow] = f_eng1_fallback_window_range(tf, 60)
+        ctxLiqHigh := fallbackHigh
+        ctxLiqLow := fallbackLow
     [ctxTrendBias, ctxBullReversal, ctxBearReversal, ctxBullObTop, ctxBullObBottom, ctxBullObEntry, ctxBullObBar, ctxBullFvgTop, ctxBullFvgBottom, ctxBullFvgBar, ctxBearObTop, ctxBearObBottom, ctxBearObEntry, ctxBearObBar, ctxBearFvgTop, ctxBearFvgBottom, ctxBearFvgBar, ctxLiqHigh, ctxLiqLow]
 
 f_eng1_select_execution_trend_bias(string tf) =>
@@ -1501,6 +1769,11 @@ f_eng1_select_execution_levels(string tf) =>
     else if tf == ENG1_TF_M30
         exeLiqHigh := eng1_m30_eqh_active ? eng1_m30_eqh : eng1_m30_last_swing_high
         exeLiqLow := eng1_m30_eql_active ? eng1_m30_eql : eng1_m30_last_swing_low
+    bool exeNeedsFallback = na(exeLiqHigh) or na(exeLiqLow) or exeLiqHigh <= exeLiqLow
+    if exeNeedsFallback
+        [fallbackHigh, fallbackLow] = f_eng1_fallback_window_range(tf, 60)
+        exeLiqHigh := fallbackHigh
+        exeLiqLow := fallbackLow
     [exeLiqHigh, exeLiqLow]
 
 eng1_m1_last_closed_time_tmp = f_eng1_update_ohlc_buffer(ENG1_TF_M1, eng1_m1_last_closed_time, eng1_buf_m1_time, eng1_buf_m1_open, eng1_buf_m1_high, eng1_buf_m1_low, eng1_buf_m1_close, ENG1_BUF_CAP)
@@ -1518,13 +1791,13 @@ eng1_h1_last_closed_time := eng1_h1_last_closed_time_tmp
 eng1_h4_last_closed_time := eng1_h4_last_closed_time_tmp
 eng1_d1_last_closed_time := eng1_d1_last_closed_time_tmp
 
-[eng1_m1_last_swing_high_tmp, eng1_m1_last_swing_low_tmp, eng1_m1_trend_bias_tmp] = f_eng1_build_structure(eng1_buf_m1_time, eng1_buf_m1_high, eng1_buf_m1_low, eng1_buf_m1_close, ENG1_SWING_LEN)
-[eng1_m5_last_swing_high_tmp, eng1_m5_last_swing_low_tmp, eng1_m5_trend_bias_tmp] = f_eng1_build_structure(eng1_buf_m5_time, eng1_buf_m5_high, eng1_buf_m5_low, eng1_buf_m5_close, ENG1_SWING_LEN)
-[eng1_m15_last_swing_high_tmp, eng1_m15_last_swing_low_tmp, eng1_m15_trend_bias_tmp] = f_eng1_build_structure(eng1_buf_m15_time, eng1_buf_m15_high, eng1_buf_m15_low, eng1_buf_m15_close, ENG1_SWING_LEN)
-[eng1_m30_last_swing_high_tmp, eng1_m30_last_swing_low_tmp, eng1_m30_trend_bias_tmp] = f_eng1_build_structure(eng1_buf_m30_time, eng1_buf_m30_high, eng1_buf_m30_low, eng1_buf_m30_close, ENG1_SWING_LEN)
-[eng1_h1_last_swing_high_tmp, eng1_h1_last_swing_low_tmp, eng1_h1_trend_bias_tmp] = f_eng1_build_structure(eng1_buf_h1_time, eng1_buf_h1_high, eng1_buf_h1_low, eng1_buf_h1_close, ENG1_SWING_LEN)
-[eng1_h4_last_swing_high_tmp, eng1_h4_last_swing_low_tmp, eng1_h4_trend_bias_tmp] = f_eng1_build_structure(eng1_buf_h4_time, eng1_buf_h4_high, eng1_buf_h4_low, eng1_buf_h4_close, ENG1_SWING_LEN)
-[eng1_d1_last_swing_high_tmp, eng1_d1_last_swing_low_tmp, eng1_d1_trend_bias_tmp] = f_eng1_build_structure(eng1_buf_d1_time, eng1_buf_d1_high, eng1_buf_d1_low, eng1_buf_d1_close, ENG1_SWING_LEN)
+[eng1_m1_last_swing_high_tmp, eng1_m1_last_swing_low_tmp, eng1_m1_trend_bias_tmp, eng1_m1_eqh_tmp, eng1_m1_eql_tmp, eng1_m1_eqh_active_tmp, eng1_m1_eql_active_tmp] = f_eng1_build_structure_liquidity(eng1_buf_m1_high, eng1_buf_m1_low, eng1_buf_m1_close, ENG1_SWING_LEN)
+[eng1_m5_last_swing_high_tmp, eng1_m5_last_swing_low_tmp, eng1_m5_trend_bias_tmp, eng1_m5_eqh_tmp, eng1_m5_eql_tmp, eng1_m5_eqh_active_tmp, eng1_m5_eql_active_tmp] = f_eng1_build_structure_liquidity(eng1_buf_m5_high, eng1_buf_m5_low, eng1_buf_m5_close, ENG1_SWING_LEN)
+[eng1_m15_last_swing_high_tmp, eng1_m15_last_swing_low_tmp, eng1_m15_trend_bias_tmp, eng1_m15_eqh_tmp, eng1_m15_eql_tmp, eng1_m15_eqh_active_tmp, eng1_m15_eql_active_tmp] = f_eng1_build_structure_liquidity(eng1_buf_m15_high, eng1_buf_m15_low, eng1_buf_m15_close, ENG1_SWING_LEN)
+[eng1_m30_last_swing_high_tmp, eng1_m30_last_swing_low_tmp, eng1_m30_trend_bias_tmp, eng1_m30_eqh_tmp, eng1_m30_eql_tmp, eng1_m30_eqh_active_tmp, eng1_m30_eql_active_tmp] = f_eng1_build_structure_liquidity(eng1_buf_m30_high, eng1_buf_m30_low, eng1_buf_m30_close, ENG1_SWING_LEN)
+[eng1_h1_last_swing_high_tmp, eng1_h1_last_swing_low_tmp, eng1_h1_trend_bias_tmp, eng1_h1_eqh_tmp, eng1_h1_eql_tmp, eng1_h1_eqh_active_tmp, eng1_h1_eql_active_tmp] = f_eng1_build_structure_liquidity(eng1_buf_h1_high, eng1_buf_h1_low, eng1_buf_h1_close, ENG1_SWING_LEN)
+[eng1_h4_last_swing_high_tmp, eng1_h4_last_swing_low_tmp, eng1_h4_trend_bias_tmp, eng1_h4_eqh_tmp, eng1_h4_eql_tmp, eng1_h4_eqh_active_tmp, eng1_h4_eql_active_tmp] = f_eng1_build_structure_liquidity(eng1_buf_h4_high, eng1_buf_h4_low, eng1_buf_h4_close, ENG1_SWING_LEN)
+[eng1_d1_last_swing_high_tmp, eng1_d1_last_swing_low_tmp, eng1_d1_trend_bias_tmp, eng1_d1_eqh_tmp, eng1_d1_eql_tmp, eng1_d1_eqh_active_tmp, eng1_d1_eql_active_tmp] = f_eng1_build_structure_liquidity(eng1_buf_d1_high, eng1_buf_d1_low, eng1_buf_d1_close, ENG1_SWING_LEN)
 eng1_m1_last_swing_high := eng1_m1_last_swing_high_tmp
 eng1_m1_last_swing_low := eng1_m1_last_swing_low_tmp
 eng1_m1_trend_bias := eng1_m1_trend_bias_tmp
@@ -1547,13 +1820,6 @@ eng1_d1_last_swing_high := eng1_d1_last_swing_high_tmp
 eng1_d1_last_swing_low := eng1_d1_last_swing_low_tmp
 eng1_d1_trend_bias := eng1_d1_trend_bias_tmp
 
-[eng1_m1_eqh_tmp, eng1_m1_eql_tmp, eng1_m1_eqh_active_tmp, eng1_m1_eql_active_tmp] = f_eng1_build_liquidity(eng1_buf_m1_high, eng1_buf_m1_low, eng1_buf_m1_close)
-[eng1_m5_eqh_tmp, eng1_m5_eql_tmp, eng1_m5_eqh_active_tmp, eng1_m5_eql_active_tmp] = f_eng1_build_liquidity(eng1_buf_m5_high, eng1_buf_m5_low, eng1_buf_m5_close)
-[eng1_m15_eqh_tmp, eng1_m15_eql_tmp, eng1_m15_eqh_active_tmp, eng1_m15_eql_active_tmp] = f_eng1_build_liquidity(eng1_buf_m15_high, eng1_buf_m15_low, eng1_buf_m15_close)
-[eng1_m30_eqh_tmp, eng1_m30_eql_tmp, eng1_m30_eqh_active_tmp, eng1_m30_eql_active_tmp] = f_eng1_build_liquidity(eng1_buf_m30_high, eng1_buf_m30_low, eng1_buf_m30_close)
-[eng1_h1_eqh_tmp, eng1_h1_eql_tmp, eng1_h1_eqh_active_tmp, eng1_h1_eql_active_tmp] = f_eng1_build_liquidity(eng1_buf_h1_high, eng1_buf_h1_low, eng1_buf_h1_close)
-[eng1_h4_eqh_tmp, eng1_h4_eql_tmp, eng1_h4_eqh_active_tmp, eng1_h4_eql_active_tmp] = f_eng1_build_liquidity(eng1_buf_h4_high, eng1_buf_h4_low, eng1_buf_h4_close)
-[eng1_d1_eqh_tmp, eng1_d1_eql_tmp, eng1_d1_eqh_active_tmp, eng1_d1_eql_active_tmp] = f_eng1_build_liquidity(eng1_buf_d1_high, eng1_buf_d1_low, eng1_buf_d1_close)
 eng1_m1_eqh := eng1_m1_eqh_tmp
 eng1_m1_eql := eng1_m1_eql_tmp
 eng1_m1_eqh_active := eng1_m1_eqh_active_tmp
@@ -1773,16 +2039,20 @@ f_eng2_syncSetupZoneVisual(box currentBox, line currentLine, label currentLabel,
         else if not na(nextLine)
             line.delete(nextLine)
             nextLine := na
-        if na(nextLabel)
-            nextLabel := label.new(x=bar_index, y=f_zoneMid(zoneTop, zoneBottom), xloc=xloc.bar_index, text=labelText, style=labelStyle, color=color.new(borderColor, 0), textcolor=color.white, size=size.tiny)
-        else
-            label.set_x(nextLabel, bar_index)
-            label.set_y(nextLabel, f_zoneMid(zoneTop, zoneBottom))
-            label.set_text(nextLabel, labelText)
-            label.set_style(nextLabel, labelStyle)
-            label.set_color(nextLabel, color.new(borderColor, 0))
-            label.set_textcolor(nextLabel, color.white)
-            label.set_size(nextLabel, size.tiny)
+        if labelText != ""
+            if na(nextLabel)
+                nextLabel := label.new(x=bar_index, y=f_zoneMid(zoneTop, zoneBottom), xloc=xloc.bar_index, text=labelText, style=labelStyle, color=color.new(borderColor, 0), textcolor=color.white, size=size.tiny)
+            else
+                label.set_x(nextLabel, bar_index)
+                label.set_y(nextLabel, f_zoneMid(zoneTop, zoneBottom))
+                label.set_text(nextLabel, labelText)
+                label.set_style(nextLabel, labelStyle)
+                label.set_color(nextLabel, color.new(borderColor, 0))
+                label.set_textcolor(nextLabel, color.white)
+                label.set_size(nextLabel, size.tiny)
+        else if not na(nextLabel)
+            label.delete(nextLabel)
+            nextLabel := na
     else
         if not na(nextBox)
             box.delete(nextBox)
@@ -1814,40 +2084,6 @@ f_eng2_syncHistoryZoneBox(box currentBox, bool enabled, int leftBar, int rightBa
         box.delete(nextBox)
         nextBox := na
     nextBox
-
-f_eng2_syncZoneVisual(box currentBox, label currentLabel, bool enabled, int createdBar, float zoneTop, float zoneBottom, string labelText, color borderColor, color fillColor, int borderWidth, string labelStyle) =>
-    box nextBox = currentBox
-    label nextLabel = currentLabel
-    if enabled and not na(zoneTop) and not na(zoneBottom)
-        int leftBar = f_safeBarIndexX(not na(createdBar) ? createdBar : bar_index)
-        if na(nextBox)
-            nextBox := box.new(left=leftBar, top=zoneTop, right=bar_index, bottom=zoneBottom, xloc=xloc.bar_index, extend=extend.right, bgcolor=fillColor, border_color=borderColor)
-        else
-            box.set_left(nextBox, leftBar)
-            box.set_right(nextBox, bar_index)
-            box.set_top(nextBox, zoneTop)
-            box.set_bottom(nextBox, zoneBottom)
-            box.set_bgcolor(nextBox, fillColor)
-            box.set_border_color(nextBox, borderColor)
-        box.set_border_width(nextBox, borderWidth)
-        if na(nextLabel)
-            nextLabel := label.new(x=bar_index, y=f_zoneMid(zoneTop, zoneBottom), xloc=xloc.bar_index, text=labelText, style=labelStyle, color=color.new(borderColor, 0), textcolor=color.white, size=size.tiny)
-        else
-            label.set_x(nextLabel, bar_index)
-            label.set_y(nextLabel, f_zoneMid(zoneTop, zoneBottom))
-            label.set_text(nextLabel, labelText)
-            label.set_style(nextLabel, labelStyle)
-            label.set_color(nextLabel, color.new(borderColor, 0))
-            label.set_textcolor(nextLabel, color.white)
-            label.set_size(nextLabel, size.tiny)
-    else
-        if not na(nextBox)
-            box.delete(nextBox)
-            nextBox := na
-        if not na(nextLabel)
-            label.delete(nextLabel)
-            nextLabel := na
-    [nextBox, nextLabel]
 
 //------------------------------------------------------------------------------
 // Session liquidity tracking
@@ -1899,74 +2135,38 @@ if not sessionVisualsEnabled and array.size(sessionRangeBoxes) > 0
     activeAsiaSessionLabel := na
     activeAsiaSessionHighLine := na
     activeAsiaSessionLowLine := na
-    activeLondonSessionBox := na
-    activeLondonSessionLabel := na
-    activeLondonSessionHighLine := na
-    activeLondonSessionLowLine := na
-    activeNewYorkSessionBox := na
-    activeNewYorkSessionLabel := na
-    activeNewYorkSessionHighLine := na
-    activeNewYorkSessionLowLine := na
-
-if newAsiaSession
-    activeAsiaSessionStartBar := bar_index
-if sessionVisualsEnabled and inAsiaSession and na(activeAsiaSessionBox)
-    activeAsiaSessionStartBar := na(activeAsiaSessionStartBar) ? bar_index : activeAsiaSessionStartBar
-    [newAsiaSessionBox, newAsiaSessionLabel, newAsiaSessionHighLine, newAsiaSessionLowLine] = f_addSessionVisual("Asia", activeAsiaSessionStartBar, asiaSessionHigh, asiaSessionLow)
-    activeAsiaSessionBox := newAsiaSessionBox
-    activeAsiaSessionLabel := newAsiaSessionLabel
-    activeAsiaSessionHighLine := newAsiaSessionHighLine
-    activeAsiaSessionLowLine := newAsiaSessionLowLine
-
-if inAsiaSession
-    if sessionVisualsEnabled
-        f_syncSessionVisual(activeAsiaSessionBox, activeAsiaSessionLabel, activeAsiaSessionHighLine, activeAsiaSessionLowLine, activeAsiaSessionStartBar, asiaSessionHigh, asiaSessionLow, "Asia")
-else if asiaSessionEnded
-    activeAsiaSessionBox := na
-    activeAsiaSessionLabel := na
-    activeAsiaSessionHighLine := na
-    activeAsiaSessionLowLine := na
     activeAsiaSessionStartBar := na
-
-if newLondonSession
-    activeLondonSessionStartBar := bar_index
-if sessionVisualsEnabled and inLondonSession and na(activeLondonSessionBox)
-    activeLondonSessionStartBar := na(activeLondonSessionStartBar) ? bar_index : activeLondonSessionStartBar
-    [newLondonSessionBox, newLondonSessionLabel, newLondonSessionHighLine, newLondonSessionLowLine] = f_addSessionVisual("London", activeLondonSessionStartBar, londonSessionHigh, londonSessionLow)
-    activeLondonSessionBox := newLondonSessionBox
-    activeLondonSessionLabel := newLondonSessionLabel
-    activeLondonSessionHighLine := newLondonSessionHighLine
-    activeLondonSessionLowLine := newLondonSessionLowLine
-
-if inLondonSession
-    if sessionVisualsEnabled
-        f_syncSessionVisual(activeLondonSessionBox, activeLondonSessionLabel, activeLondonSessionHighLine, activeLondonSessionLowLine, activeLondonSessionStartBar, londonSessionHigh, londonSessionLow, "London")
-else if londonSessionEnded
     activeLondonSessionBox := na
     activeLondonSessionLabel := na
     activeLondonSessionHighLine := na
     activeLondonSessionLowLine := na
     activeLondonSessionStartBar := na
-
-if newNewYorkSessionVisual
-    activeNewYorkSessionStartBar := bar_index
-if sessionVisualsEnabled and inNewYorkSessionVisual and na(activeNewYorkSessionBox)
-    activeNewYorkSessionStartBar := na(activeNewYorkSessionStartBar) ? bar_index : activeNewYorkSessionStartBar
-    [newNewYorkSessionBox, newNewYorkSessionLabel, newNewYorkSessionHighLine, newNewYorkSessionLowLine] = f_addSessionVisual("New York", activeNewYorkSessionStartBar, newYorkSessionVisualHigh, newYorkSessionVisualLow)
-    activeNewYorkSessionBox := newNewYorkSessionBox
-    activeNewYorkSessionLabel := newNewYorkSessionLabel
-    activeNewYorkSessionHighLine := newNewYorkSessionHighLine
-    activeNewYorkSessionLowLine := newNewYorkSessionLowLine
-
-if inNewYorkSessionVisual
-    if sessionVisualsEnabled
-        f_syncSessionVisual(activeNewYorkSessionBox, activeNewYorkSessionLabel, activeNewYorkSessionHighLine, activeNewYorkSessionLowLine, activeNewYorkSessionStartBar, newYorkSessionVisualHigh, newYorkSessionVisualLow, "New York")
-else if newYorkSessionVisualEnded
     activeNewYorkSessionBox := na
     activeNewYorkSessionLabel := na
     activeNewYorkSessionHighLine := na
     activeNewYorkSessionLowLine := na
     activeNewYorkSessionStartBar := na
+
+[activeAsiaSessionBoxTmp, activeAsiaSessionLabelTmp, activeAsiaSessionHighLineTmp, activeAsiaSessionLowLineTmp, activeAsiaSessionStartBarTmp] = f_eng2_syncActiveSession(sessionVisualsEnabled, inAsiaSession, newAsiaSession, asiaSessionEnded, activeAsiaSessionBox, activeAsiaSessionLabel, activeAsiaSessionHighLine, activeAsiaSessionLowLine, activeAsiaSessionStartBar, "Asia", asiaSessionHigh, asiaSessionLow)
+activeAsiaSessionBox := activeAsiaSessionBoxTmp
+activeAsiaSessionLabel := activeAsiaSessionLabelTmp
+activeAsiaSessionHighLine := activeAsiaSessionHighLineTmp
+activeAsiaSessionLowLine := activeAsiaSessionLowLineTmp
+activeAsiaSessionStartBar := activeAsiaSessionStartBarTmp
+
+[activeLondonSessionBoxTmp, activeLondonSessionLabelTmp, activeLondonSessionHighLineTmp, activeLondonSessionLowLineTmp, activeLondonSessionStartBarTmp] = f_eng2_syncActiveSession(sessionVisualsEnabled, inLondonSession, newLondonSession, londonSessionEnded, activeLondonSessionBox, activeLondonSessionLabel, activeLondonSessionHighLine, activeLondonSessionLowLine, activeLondonSessionStartBar, "London", londonSessionHigh, londonSessionLow)
+activeLondonSessionBox := activeLondonSessionBoxTmp
+activeLondonSessionLabel := activeLondonSessionLabelTmp
+activeLondonSessionHighLine := activeLondonSessionHighLineTmp
+activeLondonSessionLowLine := activeLondonSessionLowLineTmp
+activeLondonSessionStartBar := activeLondonSessionStartBarTmp
+
+[activeNewYorkSessionBoxTmp, activeNewYorkSessionLabelTmp, activeNewYorkSessionHighLineTmp, activeNewYorkSessionLowLineTmp, activeNewYorkSessionStartBarTmp] = f_eng2_syncActiveSession(sessionVisualsEnabled, inNewYorkSessionVisual, newNewYorkSessionVisual, newYorkSessionVisualEnded, activeNewYorkSessionBox, activeNewYorkSessionLabel, activeNewYorkSessionHighLine, activeNewYorkSessionLowLine, activeNewYorkSessionStartBar, "New York", newYorkSessionVisualHigh, newYorkSessionVisualLow)
+activeNewYorkSessionBox := activeNewYorkSessionBoxTmp
+activeNewYorkSessionLabel := activeNewYorkSessionLabelTmp
+activeNewYorkSessionHighLine := activeNewYorkSessionHighLineTmp
+activeNewYorkSessionLowLine := activeNewYorkSessionLowLineTmp
+activeNewYorkSessionStartBar := activeNewYorkSessionStartBarTmp
 
 if sessionVisualsEnabled and array.size(sessionRangeBoxes) > 0
     for i = 0 to array.size(sessionRangeBoxes) - 1
@@ -1983,6 +2183,7 @@ if sessionVisualsEnabled and array.size(sessionRangeBoxes) > 0
         if not na(sessionBox)
             box.set_bgcolor(sessionBox, fillColor)
             box.set_border_color(sessionBox, borderColor)
+            box.set_border_width(sessionBox, 1)
         if not na(sessionHighLine)
             line.set_x2(sessionHighLine, bar_index)
             line.set_color(sessionHighLine, highLineColor)
@@ -1992,8 +2193,9 @@ if sessionVisualsEnabled and array.size(sessionRangeBoxes) > 0
         if not na(sessionLabel)
             label.set_text(sessionLabel, sessionName)
             label.set_textcolor(sessionLabel, textColor)
-            label.set_color(sessionLabel, color.new(color.black, 92))
-            label.set_size(sessionLabel, size.normal)
+            label.set_style(sessionLabel, label.style_label_center)
+            label.set_color(sessionLabel, color.new(color.black, 86))
+            label.set_size(sessionLabel, size.small)
 
 //------------------------------------------------------------------------------
 // Execution liquidity (Engine 1 owned)
@@ -2005,6 +2207,69 @@ float effectiveExecEqLow = eng1_exe_eql_active ? eng1_exe_eql : na
 
 plotshape(displaySweepMarkers and eng1_exe_bull_sweep, title="Sell-side liquidity sweep", style=shape.triangleup, location=location.belowbar, color=bullColor, size=size.tiny, text="")
 plotshape(displaySweepMarkers and eng1_exe_bear_sweep, title="Buy-side liquidity sweep", style=shape.triangledown, location=location.abovebar, color=bearColor, size=size.tiny, text="")
+
+//------------------------------------------------------------------------------
+// Market structure labels (chart TF, pivot-confirmed)
+// Note: Engine 1 intentionally does not output BOS/CHOCH history yet to stay lean.
+// This renderer provides trader-facing HH/HL/LH/LL + BOS/MSS markers without
+// coupling setup ownership to legacy pivot loops.
+//------------------------------------------------------------------------------
+float eng2PivotHigh = ta.pivothigh(high, structureSwingLen, structureSwingLen)
+float eng2PivotLow = ta.pivotlow(low, structureSwingLen, structureSwingLen)
+bool eng2BullBos = ta.crossover(close, eng2StructLastHigh)
+bool eng2BearBos = ta.crossunder(close, eng2StructLastLow)
+bool eng2BullMssEvent = eng1_exe_bull_mss and not eng1_exe_bull_mss[1]
+bool eng2BearMssEvent = eng1_exe_bear_mss and not eng1_exe_bear_mss[1]
+
+// Follow MAIN_CONTRACT: structure labels are Full-mode only (no clutter in Focused/Minimal).
+bool eng2StructureVisualsEnabled = showMarketStructure and not compactMode and effectiveZoneDisplayMode == "Full"
+int eng2StructureLabelCap = 160
+float eng2StructTol = math.max(atr * equalToleranceAtr, syminfo.mintick * 2.0)
+
+// Make the toggle literal: when disabled, clear all structure labels.
+if not eng2StructureVisualsEnabled and array.size(eng2StructureLabels) > 0
+    f_trimLabels(eng2StructureLabels, 0)
+    eng2StructLastHigh := na
+    eng2StructLastLow := na
+    eng2StructHighBroken := false
+    eng2StructLowBroken := false
+
+if eng2StructureVisualsEnabled and not na(eng2PivotHigh)
+    int pivotBar = f_safeBarIndexX(bar_index - structureSwingLen)
+    string pivotText = na(eng2StructLastHigh) ? "H" : math.abs(eng2PivotHigh - eng2StructLastHigh) <= eng2StructTol ? "EQH" : eng2PivotHigh > eng2StructLastHigh ? "HH" : "LH"
+    color pivotTextColor = pivotText == "HH" ? bullColor : pivotText == "LH" ? bearColor : color.white
+    label pivotLabel = label.new(x=pivotBar, y=eng2PivotHigh, xloc=xloc.bar_index, text=pivotText, style=label.style_label_down, color=color.new(color.black, 72), textcolor=pivotTextColor, size=size.tiny)
+    f_pushLabel(eng2StructureLabels, pivotLabel, eng2StructureLabelCap)
+    eng2StructLastHigh := eng2PivotHigh
+    eng2StructHighBroken := false
+
+if eng2StructureVisualsEnabled and not na(eng2PivotLow)
+    int pivotBar = f_safeBarIndexX(bar_index - structureSwingLen)
+    string pivotText = na(eng2StructLastLow) ? "L" : math.abs(eng2PivotLow - eng2StructLastLow) <= eng2StructTol ? "EQL" : eng2PivotLow < eng2StructLastLow ? "LL" : "HL"
+    color pivotTextColor = pivotText == "LL" ? bearColor : pivotText == "HL" ? bullColor : color.white
+    label pivotLabel = label.new(x=pivotBar, y=eng2PivotLow, xloc=xloc.bar_index, text=pivotText, style=label.style_label_up, color=color.new(color.black, 72), textcolor=pivotTextColor, size=size.tiny)
+    f_pushLabel(eng2StructureLabels, pivotLabel, eng2StructureLabelCap)
+    eng2StructLastLow := eng2PivotLow
+    eng2StructLowBroken := false
+
+if eng2StructureVisualsEnabled and eng2BullMssEvent and (not na(eng1_exe_protected_high) or not na(eng2StructLastHigh))
+    float mssLevel = not na(eng1_exe_protected_high) ? eng1_exe_protected_high : eng2StructLastHigh
+    label mssLabel = label.new(x=bar_index, y=mssLevel, xloc=xloc.bar_index, text="MSS", style=label.style_label_left, color=color.new(bullColor, 35), textcolor=color.white, size=size.tiny)
+    f_pushLabel(eng2StructureLabels, mssLabel, eng2StructureLabelCap)
+else if eng2StructureVisualsEnabled and eng2BullBos and not eng2BullMssEvent and not na(eng2StructLastHigh) and not eng2StructHighBroken
+    label bosLabel = label.new(x=bar_index, y=eng2StructLastHigh, xloc=xloc.bar_index, text="BOS", style=label.style_label_left, color=color.new(bullColor, 50), textcolor=color.white, size=size.tiny)
+    f_pushLabel(eng2StructureLabels, bosLabel, eng2StructureLabelCap)
+    eng2StructHighBroken := true
+
+if eng2StructureVisualsEnabled and eng2BearMssEvent and (not na(eng1_exe_protected_low) or not na(eng2StructLastLow))
+    float mssLevel = not na(eng1_exe_protected_low) ? eng1_exe_protected_low : eng2StructLastLow
+    label mssLabel = label.new(x=bar_index, y=mssLevel, xloc=xloc.bar_index, text="MSS", style=label.style_label_left, color=color.new(bearColor, 35), textcolor=color.white, size=size.tiny)
+    f_pushLabel(eng2StructureLabels, mssLabel, eng2StructureLabelCap)
+else if eng2StructureVisualsEnabled and eng2BearBos and not eng2BearMssEvent and not na(eng2StructLastLow) and not eng2StructLowBroken
+    label bosLabel = label.new(x=bar_index, y=eng2StructLastLow, xloc=xloc.bar_index, text="BOS", style=label.style_label_left, color=color.new(bearColor, 50), textcolor=color.white, size=size.tiny)
+    f_pushLabel(eng2StructureLabels, bosLabel, eng2StructureLabelCap)
+    eng2StructLowBroken := true
+
 //------------------------------------------------------------------------------
 // Higher timeframe structure context (Engine 1 owned)
 //------------------------------------------------------------------------------
@@ -2042,22 +2307,12 @@ bool effectiveLongOteReady = not na(effectiveOteLongTop) and not na(effectiveOte
 bool effectiveShortOteReady = not na(effectiveOteShortTop) and not na(effectiveOteShortBottom)
 
 //------------------------------------------------------------------------------
-// Risk cues from latest live zone or structure
+// ENGINE 3 (SETUP ENGINE)
+// Resolve context POI, validate execution confirmations, and manage lifecycle.
 //------------------------------------------------------------------------------
-float latestBullFvgTop = na
-float latestBullFvgBottom = na
-float latestBearFvgTop = na
-float latestBearFvgBottom = na
-int latestBullFvgCreatedBar = na
-int latestBearFvgCreatedBar = na
-bool latestBullFvgTouched = false
-bool latestBearFvgTouched = false
-bool latestBullFvgFromEng1 = false
-bool latestBearFvgFromEng1 = false
-
 int eng1ContextTouchScan = math.max(expiryBarsEffective, freshBarsEffective) + strictMssLookbackEffective + 10
-bool eng1BullContextAllowed = eng1_exec_valid and eng1_narr_bias != -1 and (eng1_ctx_trend_bias == 1 or eng1_ctx_bull_reversal)
-bool eng1BearContextAllowed = eng1_exec_valid and eng1_narr_bias != 1 and (eng1_ctx_trend_bias == -1 or eng1_ctx_bear_reversal)
+bool eng1BullContextAllowed = f_eng3_validate_narrative_side(true, eng1_exec_valid, eng1_narr_bias, eng1_ctx_trend_bias, eng1_ctx_bull_reversal, eng1_ctx_bear_reversal)
+bool eng1BearContextAllowed = f_eng3_validate_narrative_side(false, eng1_exec_valid, eng1_narr_bias, eng1_ctx_trend_bias, eng1_ctx_bull_reversal, eng1_ctx_bear_reversal)
 bool eng1HasBullObContext = eng1BullContextAllowed and not na(eng1_ctx_bull_ob_entry)
 bool eng1HasBullFvgContext = eng1BullContextAllowed and not na(eng1_ctx_bull_fvg_top) and not na(eng1_ctx_bull_fvg_bottom)
 bool eng1HasBearObContext = eng1BearContextAllowed and not na(eng1_ctx_bear_ob_entry)
@@ -2075,130 +2330,58 @@ bool eng1BullFvgTouched = f_zoneTouchedSinceBar(eng1_ctx_bull_fvg_top, eng1_ctx_
 bool eng1BearObTouched = f_zoneTouchedSinceBar(eng1_ctx_bear_ob_top, eng1_ctx_bear_ob_bottom, eng1BearObCreatedBar, eng1ContextTouchScan)
 bool eng1BearFvgTouched = f_zoneTouchedSinceBar(eng1_ctx_bear_fvg_top, eng1_ctx_bear_fvg_bottom, eng1BearFvgCreatedBar, eng1ContextTouchScan)
 
-float latestBullZoneTop = na
-float latestBullZoneBottom = na
-float latestBullEntry = na
-bool latestBullZoneIsBreaker = false
-int latestBullZoneCreatedBar = na
-bool latestBullZoneTouched = false
-bool latestBullZoneFromEng1 = false
-float latestBearZoneBottom = na
-float latestBearZoneTop = na
-float latestBearEntry = na
-bool latestBearZoneIsBreaker = false
-int latestBearZoneCreatedBar = na
-bool latestBearZoneTouched = false
-bool latestBearZoneFromEng1 = false
-if na(latestBullZoneBottom) and eng1HasBullObContext
-    latestBullZoneTop := eng1_ctx_bull_ob_top
-    latestBullZoneBottom := eng1_ctx_bull_ob_bottom
-    latestBullEntry := eng1_ctx_bull_ob_entry
-    latestBullZoneIsBreaker := eng1_ctx_bull_reversal
-    latestBullZoneCreatedBar := eng1BullObCreatedBar
-    latestBullZoneTouched := eng1BullObTouched
-    latestBullZoneFromEng1 := true
+// Context POI sources (Engine 1 owned). Keep them explicit so Engine 3 never
+// accidentally pulls from execution-only state.
+float ctxBullObTop = eng1HasBullObContext ? eng1_ctx_bull_ob_top : na
+float ctxBullObBottom = eng1HasBullObContext ? eng1_ctx_bull_ob_bottom : na
+float ctxBullObEntry = eng1HasBullObContext ? eng1_ctx_bull_ob_entry : na
+bool ctxBullObBreaker = eng1HasBullObContext ? eng1_ctx_bull_reversal : false
+int ctxBullObCreatedBar = eng1HasBullObContext ? eng1BullObCreatedBar : na
+bool ctxBullObTouched = eng1HasBullObContext ? eng1BullObTouched : false
+float ctxBullFvgTop = eng1HasBullFvgContext ? eng1_ctx_bull_fvg_top : na
+float ctxBullFvgBottom = eng1HasBullFvgContext ? eng1_ctx_bull_fvg_bottom : na
+int ctxBullFvgCreatedBar = eng1HasBullFvgContext ? eng1BullFvgCreatedBar : na
+bool ctxBullFvgTouched = eng1HasBullFvgContext ? eng1BullFvgTouched : false
 
-if na(latestBullFvgTop) and eng1HasBullFvgContext
-    latestBullFvgTop := eng1_ctx_bull_fvg_top
-    latestBullFvgBottom := eng1_ctx_bull_fvg_bottom
-    latestBullFvgCreatedBar := eng1BullFvgCreatedBar
-    latestBullFvgTouched := eng1BullFvgTouched
-    latestBullFvgFromEng1 := true
+float ctxBearObTop = eng1HasBearObContext ? eng1_ctx_bear_ob_top : na
+float ctxBearObBottom = eng1HasBearObContext ? eng1_ctx_bear_ob_bottom : na
+float ctxBearObEntry = eng1HasBearObContext ? eng1_ctx_bear_ob_entry : na
+bool ctxBearObBreaker = eng1HasBearObContext ? eng1_ctx_bear_reversal : false
+int ctxBearObCreatedBar = eng1HasBearObContext ? eng1BearObCreatedBar : na
+bool ctxBearObTouched = eng1HasBearObContext ? eng1BearObTouched : false
+float ctxBearFvgTop = eng1HasBearFvgContext ? eng1_ctx_bear_fvg_top : na
+float ctxBearFvgBottom = eng1HasBearFvgContext ? eng1_ctx_bear_fvg_bottom : na
+int ctxBearFvgCreatedBar = eng1HasBearFvgContext ? eng1BearFvgCreatedBar : na
+bool ctxBearFvgTouched = eng1HasBearFvgContext ? eng1BearFvgTouched : false
 
-if na(latestBearZoneTop) and eng1HasBearObContext
-    latestBearZoneBottom := eng1_ctx_bear_ob_bottom
-    latestBearZoneTop := eng1_ctx_bear_ob_top
-    latestBearEntry := eng1_ctx_bear_ob_entry
-    latestBearZoneIsBreaker := eng1_ctx_bear_reversal
-    latestBearZoneCreatedBar := eng1BearObCreatedBar
-    latestBearZoneTouched := eng1BearObTouched
-    latestBearZoneFromEng1 := true
+bool hasBullOb = eng1HasBullObContext
+bool hasBullFvg = eng1HasBullFvgContext
+bool hasBearOb = eng1HasBearObContext
+bool hasBearFvg = eng1HasBearFvgContext
 
-if na(latestBearFvgTop) and eng1HasBearFvgContext
-    latestBearFvgTop := eng1_ctx_bear_fvg_top
-    latestBearFvgBottom := eng1_ctx_bear_fvg_bottom
-    latestBearFvgCreatedBar := eng1BearFvgCreatedBar
-    latestBearFvgTouched := eng1BearFvgTouched
-    latestBearFvgFromEng1 := true
+bool bullObPdPass = hasBullOb and not na(effectiveRangeEquilibrium) and f_zoneMid(ctxBullObTop, ctxBullObBottom) < effectiveRangeEquilibrium
+bool bullFvgPdPass = hasBullFvg and not na(effectiveRangeEquilibrium) and f_zoneMid(ctxBullFvgTop, ctxBullFvgBottom) < effectiveRangeEquilibrium
+bool bearObPdPass = hasBearOb and not na(effectiveRangeEquilibrium) and f_zoneMid(ctxBearObTop, ctxBearObBottom) > effectiveRangeEquilibrium
+bool bearFvgPdPass = hasBearFvg and not na(effectiveRangeEquilibrium) and f_zoneMid(ctxBearFvgTop, ctxBearFvgBottom) > effectiveRangeEquilibrium
+bool bullObOtePass = hasBullOb and effectiveLongOteReady and f_zoneIntersects(ctxBullObTop, ctxBullObBottom, effectiveOteLongTop, effectiveOteLongBottom)
+bool bullFvgOtePass = hasBullFvg and effectiveLongOteReady and f_zoneIntersects(ctxBullFvgTop, ctxBullFvgBottom, effectiveOteLongTop, effectiveOteLongBottom)
+bool bearObOtePass = hasBearOb and effectiveShortOteReady and f_zoneIntersects(ctxBearObTop, ctxBearObBottom, effectiveOteShortTop, effectiveOteShortBottom)
+bool bearFvgOtePass = hasBearFvg and effectiveShortOteReady and f_zoneIntersects(ctxBearFvgTop, ctxBearFvgBottom, effectiveOteShortTop, effectiveOteShortBottom)
 
-bool bullObPdPass = not na(latestBullZoneTop) and not na(effectiveRangeEquilibrium) and f_zoneMid(latestBullZoneTop, latestBullZoneBottom) < effectiveRangeEquilibrium
-bool bullFvgPdPass = not na(latestBullFvgTop) and not na(effectiveRangeEquilibrium) and f_zoneMid(latestBullFvgTop, latestBullFvgBottom) < effectiveRangeEquilibrium
-bool bearObPdPass = not na(latestBearZoneTop) and not na(effectiveRangeEquilibrium) and f_zoneMid(latestBearZoneTop, latestBearZoneBottom) > effectiveRangeEquilibrium
-bool bearFvgPdPass = not na(latestBearFvgTop) and not na(effectiveRangeEquilibrium) and f_zoneMid(latestBearFvgTop, latestBearFvgBottom) > effectiveRangeEquilibrium
-bool bullObOtePass = effectiveLongOteReady and f_zoneIntersects(latestBullZoneTop, latestBullZoneBottom, effectiveOteLongTop, effectiveOteLongBottom)
-bool bullFvgOtePass = effectiveLongOteReady and f_zoneIntersects(latestBullFvgTop, latestBullFvgBottom, effectiveOteLongTop, effectiveOteLongBottom)
-bool bearObOtePass = effectiveShortOteReady and f_zoneIntersects(latestBearZoneTop, latestBearZoneBottom, effectiveOteShortTop, effectiveOteShortBottom)
-bool bearFvgOtePass = effectiveShortOteReady and f_zoneIntersects(latestBearFvgTop, latestBearFvgBottom, effectiveOteShortTop, effectiveOteShortBottom)
-bool hasBullOb = not na(latestBullEntry)
-bool hasBullFvg = not na(latestBullFvgTop) and not na(latestBullFvgBottom)
-bool hasBearOb = not na(latestBearEntry)
-bool hasBearFvg = not na(latestBearFvgTop) and not na(latestBearFvgBottom)
 bool bullObZoneConfirmPass = bullObPdPass and bullObOtePass
 bool bullFvgZoneConfirmPass = bullFvgPdPass and bullFvgOtePass
 bool bearObZoneConfirmPass = bearObPdPass and bearObOtePass
 bool bearFvgZoneConfirmPass = bearFvgPdPass and bearFvgOtePass
-bool preferBullOb = false
-bool preferBullFvg = false
-bool preferBearOb = false
-bool preferBearFvg = false
+bool bullFvgInZone = hasBullFvg and close >= ctxBullFvgBottom and close <= ctxBullFvgTop
+bool bullObInZone = hasBullOb and close >= ctxBullObBottom and close <= ctxBullObTop
+bool bearFvgInZone = hasBearFvg and close >= ctxBearFvgBottom and close <= ctxBearFvgTop
+bool bearObInZone = hasBearOb and close >= ctxBearObBottom and close <= ctxBearObTop
 
-if strictModeEnabled
-    // In strict ICT mode, prefer FVG first after the ERL sweep.
-    if hasBullFvg and bullFvgZoneConfirmPass
-        preferBullFvg := true
-    else if hasBullOb and bullObZoneConfirmPass
-        preferBullOb := true
-    else
-        preferBullFvg := hasBullFvg
-        preferBullOb := not preferBullFvg and hasBullOb
+[preferBullOb, preferBullFvg] = f_eng3_select_poi_preference(strictModeEnabled, hasBullOb, hasBullFvg, bullObZoneConfirmPass, bullFvgZoneConfirmPass, bullObInZone, bullFvgInZone)
+[preferBearOb, preferBearFvg] = f_eng3_select_poi_preference(strictModeEnabled, hasBearOb, hasBearFvg, bearObZoneConfirmPass, bearFvgZoneConfirmPass, bearObInZone, bearFvgInZone)
 
-    if hasBearFvg and bearFvgZoneConfirmPass
-        preferBearFvg := true
-    else if hasBearOb and bearObZoneConfirmPass
-        preferBearOb := true
-    else
-        preferBearFvg := hasBearFvg
-        preferBearOb := not preferBearFvg and hasBearOb
-else
-    // In standard mode, keep selection explicit and lean:
-    // confirmed candidate wins; otherwise in-zone candidate wins; otherwise OB wins.
-    bool bullFvgConfirmed = hasBullFvg and bullFvgZoneConfirmPass
-    bool bullObConfirmed = hasBullOb and bullObZoneConfirmPass
-    bool bearFvgConfirmed = hasBearFvg and bearFvgZoneConfirmPass
-    bool bearObConfirmed = hasBearOb and bearObZoneConfirmPass
-    bool bullFvgInZone = hasBullFvg and close >= latestBullFvgBottom and close <= latestBullFvgTop
-    bool bullObInZone = hasBullOb and close >= latestBullZoneBottom and close <= latestBullZoneTop
-    bool bearFvgInZone = hasBearFvg and close >= latestBearFvgBottom and close <= latestBearFvgTop
-    bool bearObInZone = hasBearOb and close >= latestBearZoneBottom and close <= latestBearZoneTop
-
-    if bullFvgConfirmed and not bullObConfirmed
-        preferBullFvg := true
-    else if bullObConfirmed and not bullFvgConfirmed
-        preferBullOb := true
-    else if bullFvgInZone and not bullObInZone
-        preferBullFvg := true
-    else if bullObInZone and not bullFvgInZone
-        preferBullOb := true
-    else if hasBullOb
-        preferBullOb := true
-    else
-        preferBullFvg := hasBullFvg
-
-    if bearFvgConfirmed and not bearObConfirmed
-        preferBearFvg := true
-    else if bearObConfirmed and not bearFvgConfirmed
-        preferBearOb := true
-    else if bearFvgInZone and not bearObInZone
-        preferBearFvg := true
-    else if bearObInZone and not bearFvgInZone
-        preferBearOb := true
-    else if hasBearOb
-        preferBearOb := true
-    else
-        preferBearFvg := hasBearFvg
-
-[tradeLongEntry, tradeLongStop, tradeLongTarget, longTargetIsLiquidity, tradeLongSetup, tradeLongValidTop, tradeLongValidBottom, tradeLongIsOb, tradeLongIsFvg, tradeLongFromEng1, tradeLongCreatedBar, tradeLongTouched] = f_buildTradeCandidate(true, preferBullOb, preferBullFvg, latestBullZoneTop, latestBullZoneBottom, latestBullEntry, latestBullZoneIsBreaker, latestBullZoneFromEng1, latestBullZoneCreatedBar, latestBullZoneTouched, latestBullFvgTop, latestBullFvgBottom, latestBullFvgFromEng1, latestBullFvgCreatedBar, latestBullFvgTouched, atr, stopAtrBuffer, effectiveExecLiqHigh, effectiveExecLiqLow, effectiveExecEqHigh, effectiveExecEqLow, effectiveContextHigh, effectiveContextLow)
-[tradeShortEntry, tradeShortStop, tradeShortTarget, shortTargetIsLiquidity, tradeShortSetup, tradeShortValidTop, tradeShortValidBottom, tradeShortIsOb, tradeShortIsFvg, tradeShortFromEng1, tradeShortCreatedBar, tradeShortTouched] = f_buildTradeCandidate(false, preferBearOb, preferBearFvg, latestBearZoneTop, latestBearZoneBottom, latestBearEntry, latestBearZoneIsBreaker, latestBearZoneFromEng1, latestBearZoneCreatedBar, latestBearZoneTouched, latestBearFvgTop, latestBearFvgBottom, latestBearFvgFromEng1, latestBearFvgCreatedBar, latestBearFvgTouched, atr, stopAtrBuffer, effectiveExecLiqHigh, effectiveExecLiqLow, effectiveExecEqHigh, effectiveExecEqLow, effectiveContextHigh, effectiveContextLow)
+[tradeLongEntry, tradeLongStop, tradeLongTarget, longTargetIsLiquidity, tradeLongSetup, tradeLongValidTop, tradeLongValidBottom, tradeLongIsOb, tradeLongIsFvg, tradeLongCreatedBar, tradeLongTouched] = f_eng3_build_trade_plan(true, preferBullOb, preferBullFvg, ctxBullObTop, ctxBullObBottom, ctxBullObEntry, ctxBullObBreaker, ctxBullObCreatedBar, ctxBullObTouched, ctxBullFvgTop, ctxBullFvgBottom, ctxBullFvgCreatedBar, ctxBullFvgTouched, atr, stopAtrBuffer, effectiveExecLiqHigh, effectiveExecLiqLow, effectiveExecEqHigh, effectiveExecEqLow, effectiveContextHigh, effectiveContextLow)
+[tradeShortEntry, tradeShortStop, tradeShortTarget, shortTargetIsLiquidity, tradeShortSetup, tradeShortValidTop, tradeShortValidBottom, tradeShortIsOb, tradeShortIsFvg, tradeShortCreatedBar, tradeShortTouched] = f_eng3_build_trade_plan(false, preferBearOb, preferBearFvg, ctxBearObTop, ctxBearObBottom, ctxBearObEntry, ctxBearObBreaker, ctxBearObCreatedBar, ctxBearObTouched, ctxBearFvgTop, ctxBearFvgBottom, ctxBearFvgCreatedBar, ctxBearFvgTouched, atr, stopAtrBuffer, effectiveExecLiqHigh, effectiveExecLiqLow, effectiveExecEqHigh, effectiveExecEqLow, effectiveContextHigh, effectiveContextLow)
 
 float longDolExternal = not na(tradeLongEntry) ? f_nearestAbove(tradeLongEntry, effectiveContextHigh, na, na, na, na, na, na) : na
 float shortDolExternal = not na(tradeShortEntry) ? f_nearestBelow(tradeShortEntry, effectiveContextLow, na, na, na, na, na, na) : na
@@ -2215,57 +2398,35 @@ float longRr = not na(longRisk) and longRisk > 0 and not na(longReward) ? longRe
 bool longPriceInZone = not na(tradeLongValidBottom) and close >= tradeLongValidBottom and close <= tradeLongValidTop
 bool longPriceNearZone = not na(tradeLongEntry) and math.abs(close - tradeLongEntry) <= atr * 0.25
 int longSetupAge = not na(tradeLongCreatedBar) ? bar_index - tradeLongCreatedBar : na
-bool longExpiredUntouched = not tradeLongTouched and not na(longSetupAge) and longSetupAge > expiryBarsEffective
 bool longChased = not tradeLongTouched and not na(tradeLongValidTop) and close > tradeLongValidTop + atr * setupChaseAtr
 bool effectiveLongDirectional = displayExecBias == 1
 bool effectiveLongSweepSeen = eng1_exe_bull_sweep
 bool effectiveLongMssSeen = eng1_exe_bull_mss
 bool effectiveLongDisplacementSeen = eng1_exe_bull_displacement
-bool effectiveLongMssFresh = eng1_exe_bull_mss
 bool effectiveLongStructureInvalidated = displayExecBias == -1 and ((eng1_ctx_trend_bias == -1) or eng1_ctx_bear_reversal or eng1_exe_bear_mss)
 bool strictLongBiasPass = not strictModeEnabled or (displayExecBias == 1 and displayCtxBias == 1 and displayNarrBias != -1)
 bool strictLongSweepPass = not strictModeEnabled or effectiveLongSweepSeen
-bool strictLongMssPass = not strictModeEnabled or (effectiveLongMssSeen and effectiveLongMssFresh and effectiveLongDirectional)
+bool strictLongMssPass = not strictModeEnabled or (effectiveLongMssSeen and effectiveLongDirectional)
 bool strictLongPdPass = not strictModeEnabled or (not na(tradeLongValidTop) and not na(effectiveRangeEquilibrium) and f_zoneMid(tradeLongValidTop, tradeLongValidBottom) < effectiveRangeEquilibrium)
 bool strictLongOtePass = not strictModeEnabled or (effectiveLongOteReady and f_zoneIntersects(tradeLongValidTop, tradeLongValidBottom, effectiveOteLongTop, effectiveOteLongBottom))
 bool strictLongDolPass = not strictModeEnabled or longQualifiedExternalDol
 bool strictLongKillzonePass = not strictModeEnabled or strictKillzoneActive
 bool strictLongContextPass = strictLongBiasPass and strictLongSweepPass and strictLongMssPass and strictLongPdPass and strictLongOtePass and strictLongDolPass
 bool longConfirmationPass = not strictModeEnabled or (strictLongContextPass and strictLongKillzonePass)
-bool longExecutionFreshPass = strictModeEnabled ? effectiveLongMssFresh : effectiveLongMssSeen
+bool longExecutionFreshPass = effectiveLongMssSeen
 var string lastLongSetupTag = ""
 var bool longManagedLatched = false
 var bool longCompletedLatched = false
 var bool longAmbiguousLatched = false
 string currentLongSetupTag = not na(tradeLongCreatedBar) ? tradeLongSetup + "|" + str.tostring(tradeLongCreatedBar) : ""
-if currentLongSetupTag == ""
-    longManagedLatched := false
-    longCompletedLatched := false
-    longAmbiguousLatched := false
-else if currentLongSetupTag != lastLongSetupTag
-    longManagedLatched := false
-    longCompletedLatched := false
-    longAmbiguousLatched := false
 bool longManagedHit = tradeLongTouched and not na(longRisk) and high >= tradeLongEntry + longRisk * setupManagedR
-if longManagedHit
-    longManagedLatched := true
-bool longManagedLatchedState = currentLongSetupTag != "" and longManagedLatched
 bool longStopHit = not na(tradeLongStop) and low <= tradeLongStop
 bool longTpHit = tradeLongTouched and not na(activeLongTarget) and high >= activeLongTarget
-bool longAmbiguousNow = currentLongSetupTag != "" and tradeLongTouched and not longCompletedLatched and not longAmbiguousLatched and longStopHit and longTpHit
-if longAmbiguousNow
-    longAmbiguousLatched := true
-if longTpHit and not longAmbiguousNow and not longAmbiguousLatched
-    longCompletedLatched := true
-bool longAmbiguous = currentLongSetupTag != "" and longAmbiguousLatched
-bool longCompleted = currentLongSetupTag != "" and longCompletedLatched and not longAmbiguous
-lastLongSetupTag := currentLongSetupTag
-bool longInvalidated = not longAmbiguous and ((longStopHit and not longAmbiguousNow) or effectiveLongStructureInvalidated)
-bool longManagedStale = longManagedLatchedState and not longCompleted and not longAmbiguous and not na(longSetupAge) and longSetupAge > expiryBarsEffective
-bool longManaged = longManagedLatchedState and not longManagedStale and not longAmbiguous
-bool longTouchedStale = tradeLongTouched and not longManagedLatchedState and not longCompleted and not longAmbiguous and not na(longSetupAge) and longSetupAge > expiryBarsEffective
-bool longExpired = longExpiredUntouched or longTouchedStale
-longExpired := longExpired or longManagedStale
+[nextLastLongSetupTag, nextLongManagedLatched, nextLongCompletedLatched, nextLongAmbiguousLatched, longManaged, longCompleted, longAmbiguous, longInvalidated, longExpired] = f_eng3_update_trade_lifecycle(currentLongSetupTag, lastLongSetupTag, longManagedLatched, longCompletedLatched, longAmbiguousLatched, tradeLongTouched, longManagedHit, longStopHit, longTpHit, effectiveLongStructureInvalidated, longSetupAge, expiryBarsEffective)
+lastLongSetupTag := nextLastLongSetupTag
+longManagedLatched := nextLongManagedLatched
+longCompletedLatched := nextLongCompletedLatched
+longAmbiguousLatched := nextLongAmbiguousLatched
 
 float shortRisk = not na(tradeShortEntry) and not na(tradeShortStop) ? tradeShortStop - tradeShortEntry : na
 float shortReward = not na(tradeShortEntry) and not na(activeShortTarget) ? tradeShortEntry - activeShortTarget : na
@@ -2273,57 +2434,35 @@ float shortRr = not na(shortRisk) and shortRisk > 0 and not na(shortReward) ? sh
 bool shortPriceInZone = not na(tradeShortValidBottom) and close >= tradeShortValidBottom and close <= tradeShortValidTop
 bool shortPriceNearZone = not na(tradeShortEntry) and math.abs(close - tradeShortEntry) <= atr * 0.25
 int shortSetupAge = not na(tradeShortCreatedBar) ? bar_index - tradeShortCreatedBar : na
-bool shortExpiredUntouched = not tradeShortTouched and not na(shortSetupAge) and shortSetupAge > expiryBarsEffective
 bool shortChased = not tradeShortTouched and not na(tradeShortValidBottom) and close < tradeShortValidBottom - atr * setupChaseAtr
 bool effectiveShortDirectional = displayExecBias == -1
 bool effectiveShortSweepSeen = eng1_exe_bear_sweep
 bool effectiveShortMssSeen = eng1_exe_bear_mss
 bool effectiveShortDisplacementSeen = eng1_exe_bear_displacement
-bool effectiveShortMssFresh = eng1_exe_bear_mss
 bool effectiveShortStructureInvalidated = displayExecBias == 1 and ((eng1_ctx_trend_bias == 1) or eng1_ctx_bull_reversal or eng1_exe_bull_mss)
 bool strictShortBiasPass = not strictModeEnabled or (displayExecBias == -1 and displayCtxBias == -1 and displayNarrBias != 1)
 bool strictShortSweepPass = not strictModeEnabled or effectiveShortSweepSeen
-bool strictShortMssPass = not strictModeEnabled or (effectiveShortMssSeen and effectiveShortMssFresh and effectiveShortDirectional)
+bool strictShortMssPass = not strictModeEnabled or (effectiveShortMssSeen and effectiveShortDirectional)
 bool strictShortPdPass = not strictModeEnabled or (not na(tradeShortValidTop) and not na(effectiveRangeEquilibrium) and f_zoneMid(tradeShortValidTop, tradeShortValidBottom) > effectiveRangeEquilibrium)
 bool strictShortOtePass = not strictModeEnabled or (effectiveShortOteReady and f_zoneIntersects(tradeShortValidTop, tradeShortValidBottom, effectiveOteShortTop, effectiveOteShortBottom))
 bool strictShortDolPass = not strictModeEnabled or shortQualifiedExternalDol
 bool strictShortKillzonePass = not strictModeEnabled or strictKillzoneActive
 bool strictShortContextPass = strictShortBiasPass and strictShortSweepPass and strictShortMssPass and strictShortPdPass and strictShortOtePass and strictShortDolPass
 bool shortConfirmationPass = not strictModeEnabled or (strictShortContextPass and strictShortKillzonePass)
-bool shortExecutionFreshPass = strictModeEnabled ? effectiveShortMssFresh : effectiveShortMssSeen
+bool shortExecutionFreshPass = effectiveShortMssSeen
 var string lastShortSetupTag = ""
 var bool shortManagedLatched = false
 var bool shortCompletedLatched = false
 var bool shortAmbiguousLatched = false
 string currentShortSetupTag = not na(tradeShortCreatedBar) ? tradeShortSetup + "|" + str.tostring(tradeShortCreatedBar) : ""
-if currentShortSetupTag == ""
-    shortManagedLatched := false
-    shortCompletedLatched := false
-    shortAmbiguousLatched := false
-else if currentShortSetupTag != lastShortSetupTag
-    shortManagedLatched := false
-    shortCompletedLatched := false
-    shortAmbiguousLatched := false
 bool shortManagedHit = tradeShortTouched and not na(shortRisk) and low <= tradeShortEntry - shortRisk * setupManagedR
-if shortManagedHit
-    shortManagedLatched := true
-bool shortManagedLatchedState = currentShortSetupTag != "" and shortManagedLatched
 bool shortStopHit = not na(tradeShortStop) and high >= tradeShortStop
 bool shortTpHit = tradeShortTouched and not na(activeShortTarget) and low <= activeShortTarget
-bool shortAmbiguousNow = currentShortSetupTag != "" and tradeShortTouched and not shortCompletedLatched and not shortAmbiguousLatched and shortStopHit and shortTpHit
-if shortAmbiguousNow
-    shortAmbiguousLatched := true
-if shortTpHit and not shortAmbiguousNow and not shortAmbiguousLatched
-    shortCompletedLatched := true
-bool shortAmbiguous = currentShortSetupTag != "" and shortAmbiguousLatched
-bool shortCompleted = currentShortSetupTag != "" and shortCompletedLatched and not shortAmbiguous
-lastShortSetupTag := currentShortSetupTag
-bool shortInvalidated = not shortAmbiguous and ((shortStopHit and not shortAmbiguousNow) or effectiveShortStructureInvalidated)
-bool shortManagedStale = shortManagedLatchedState and not shortCompleted and not shortAmbiguous and not na(shortSetupAge) and shortSetupAge > expiryBarsEffective
-bool shortManaged = currentShortSetupTag != "" and shortManagedLatched and not shortManagedStale and not shortAmbiguous
-bool shortTouchedStale = tradeShortTouched and not shortManagedLatchedState and not shortCompleted and not shortAmbiguous and not na(shortSetupAge) and shortSetupAge > expiryBarsEffective
-bool shortExpired = shortExpiredUntouched or shortTouchedStale
-shortExpired := shortExpired or shortManagedStale
+[nextLastShortSetupTag, nextShortManagedLatched, nextShortCompletedLatched, nextShortAmbiguousLatched, shortManaged, shortCompleted, shortAmbiguous, shortInvalidated, shortExpired] = f_eng3_update_trade_lifecycle(currentShortSetupTag, lastShortSetupTag, shortManagedLatched, shortCompletedLatched, shortAmbiguousLatched, tradeShortTouched, shortManagedHit, shortStopHit, shortTpHit, effectiveShortStructureInvalidated, shortSetupAge, expiryBarsEffective)
+lastShortSetupTag := nextLastShortSetupTag
+shortManagedLatched := nextShortManagedLatched
+shortCompletedLatched := nextShortCompletedLatched
+shortAmbiguousLatched := nextShortAmbiguousLatched
 
 // Keep setup scoring intentionally simple to reduce overtuning.
 bool longBiasAligned = displayExecBias == 1
@@ -2334,8 +2473,7 @@ bool longDisplacementSeen = effectiveLongDisplacementSeen
 bool shortDisplacementSeen = effectiveShortDisplacementSeen
 bool longPoiConfirmPass = tradeLongIsFvg ? bullFvgZoneConfirmPass : tradeLongIsOb ? bullObZoneConfirmPass : false
 bool shortPoiConfirmPass = tradeShortIsFvg ? bearFvgZoneConfirmPass : tradeShortIsOb ? bearObZoneConfirmPass : false
-float longDepartureRange = not na(effectiveRangeHigh) and not na(effectiveRangeLow) ? effectiveRangeHigh - effectiveRangeLow : na
-float shortDepartureRange = not na(effectiveRangeHigh) and not na(effectiveRangeLow) ? effectiveRangeHigh - effectiveRangeLow : na
+float contextDepartureRange = not na(effectiveRangeHigh) and not na(effectiveRangeLow) ? effectiveRangeHigh - effectiveRangeLow : na
 var string lastLongQualityTag = ""
 var int longResponseScoreSnapshot = 0
 var int longDisplacementScoreSnapshot = 0
@@ -2355,7 +2493,7 @@ if currentLongSetupTag == ""
 else if currentLongSetupTag != lastLongQualityTag
     longResponseScoreSnapshot := f_zoneResponseScore(true, longPoiConfirmPass)
     longDisplacementScoreSnapshot := f_zoneDisplacementScore(longDisplacementSeen)
-    longAtrExpansionScoreSnapshot := f_zoneAtrExpansionScore(longDepartureRange, atr)
+    longAtrExpansionScoreSnapshot := f_zoneAtrExpansionScore(contextDepartureRange, atr)
     longQualityTierSnapshot := f_zoneQualityTier(true, longResponseScoreSnapshot, longDisplacementScoreSnapshot, longAtrExpansionScoreSnapshot)
     lastLongQualityTag := currentLongSetupTag
 if currentShortSetupTag == ""
@@ -2367,7 +2505,7 @@ if currentShortSetupTag == ""
 else if currentShortSetupTag != lastShortQualityTag
     shortResponseScoreSnapshot := f_zoneResponseScore(true, shortPoiConfirmPass)
     shortDisplacementScoreSnapshot := f_zoneDisplacementScore(shortDisplacementSeen)
-    shortAtrExpansionScoreSnapshot := f_zoneAtrExpansionScore(shortDepartureRange, atr)
+    shortAtrExpansionScoreSnapshot := f_zoneAtrExpansionScore(contextDepartureRange, atr)
     shortQualityTierSnapshot := f_zoneQualityTier(true, shortResponseScoreSnapshot, shortDisplacementScoreSnapshot, shortAtrExpansionScoreSnapshot)
     lastShortQualityTag := currentShortSetupTag
 string longExecutionState = f_setupExecutionState(not na(tradeLongEntry), longAmbiguous, longInvalidated, longExpired, longChased, longCompleted, longManaged, effectiveLongDirectional and effectiveLongSweepSeen and effectiveLongMssSeen, longConfirmationPass, longExecutionFreshPass, longDisplacementSeen, longPriceInZone, longPriceNearZone)
@@ -2417,13 +2555,13 @@ else
 
 bool eng2LongZoneTypeVisible = (tradeLongIsOb and showOb) or (tradeLongIsFvg and showFvg)
 bool eng2ShortZoneTypeVisible = (tradeShortIsOb and showOb) or (tradeShortIsFvg and showFvg)
-bool showEng2LongLiveZone = longSelectedVisualActive and tradeLongFromEng1 and eng2LongZoneTypeVisible and f_zoneVisibleByMode(effectiveZoneDisplayMode, compactUseLong, true, preferredDirection, compactUseLong)
-bool showEng2ShortLiveZone = shortSelectedVisualActive and tradeShortFromEng1 and eng2ShortZoneTypeVisible and f_zoneVisibleByMode(effectiveZoneDisplayMode, not compactUseLong, false, preferredDirection, compactUseLong)
+bool showEng2LongLiveZone = longSelectedVisualActive and eng2LongZoneTypeVisible and f_zoneVisibleByMode(effectiveZoneDisplayMode, compactUseLong, true, preferredDirection, compactUseLong)
+bool showEng2ShortLiveZone = shortSelectedVisualActive and eng2ShortZoneTypeVisible and f_zoneVisibleByMode(effectiveZoneDisplayMode, not compactUseLong, false, preferredDirection, compactUseLong)
 
 bool longTerminalNow = f_executionTerminal(longExecutionState)
 bool shortTerminalNow = f_executionTerminal(shortExecutionState)
-bool longTerminalSnapshot = longTerminalNow and currentLongSetupTag != "" and tradeLongFromEng1 and eng2LongHistoryTag != currentLongSetupTag
-bool shortTerminalSnapshot = shortTerminalNow and currentShortSetupTag != "" and tradeShortFromEng1 and eng2ShortHistoryTag != currentShortSetupTag
+bool longTerminalSnapshot = longTerminalNow and currentLongSetupTag != "" and eng2LongHistoryTag != currentLongSetupTag
+bool shortTerminalSnapshot = shortTerminalNow and currentShortSetupTag != "" and eng2ShortHistoryTag != currentShortSetupTag
 if longTerminalSnapshot
     eng2LongHistoryTag := currentLongSetupTag
     eng2LongHistoryLeftBar := nz(tradeLongCreatedBar, bar_index)
@@ -2454,6 +2592,38 @@ color eng1BullContextBorder = color.new(bullColor, longExecutionState == "Manage
 color eng1BearContextBorder = color.new(bearColor, shortExecutionState == "Managed" ? 18 : 0)
 color eng1BullContextFill = color.new(bullColor, f_executionSelectedFillAlpha(longExecutionState))
 color eng1BearContextFill = color.new(bearColor, f_executionSelectedFillAlpha(shortExecutionState))
+
+// Context zones (Full mode): show the snapshot OB/FVG even when no setup is selected yet.
+bool eng2ContextZonesEnabled = eng1_exec_valid and (showOb or showFvg) and not compactMode and effectiveZoneDisplayMode == "Full"
+bool showEng2CtxBullOb = eng2ContextZonesEnabled and showOb and not na(eng1_ctx_bull_ob_top) and not na(eng1_ctx_bull_ob_bottom) and not (showEng2LongLiveZone and tradeLongIsOb)
+bool showEng2CtxBullFvg = eng2ContextZonesEnabled and showFvg and not na(eng1_ctx_bull_fvg_top) and not na(eng1_ctx_bull_fvg_bottom) and not (showEng2LongLiveZone and tradeLongIsFvg)
+bool showEng2CtxBearOb = eng2ContextZonesEnabled and showOb and not na(eng1_ctx_bear_ob_top) and not na(eng1_ctx_bear_ob_bottom) and not (showEng2ShortLiveZone and tradeShortIsOb)
+bool showEng2CtxBearFvg = eng2ContextZonesEnabled and showFvg and not na(eng1_ctx_bear_fvg_top) and not na(eng1_ctx_bear_fvg_bottom) and not (showEng2ShortLiveZone and tradeShortIsFvg)
+string eng2CtxBullObText = "Ctx " + (eng1_ctx_bull_reversal ? "BRK+" : "OB+")
+string eng2CtxBearObText = "Ctx " + (eng1_ctx_bear_reversal ? "BRK-" : "OB-")
+string eng2CtxBullFvgText = "Ctx FVG+"
+string eng2CtxBearFvgText = "Ctx FVG-"
+color eng2CtxBullObBorder = color.new(bullColor, 40)
+color eng2CtxBearObBorder = color.new(bearColor, 40)
+color eng2CtxBullFvgBorder = color.new(bullColor, 55)
+color eng2CtxBearFvgBorder = color.new(bearColor, 55)
+color eng2CtxBullObFill = color.new(bullColor, 92)
+color eng2CtxBearObFill = color.new(bearColor, 92)
+color eng2CtxBullFvgFill = color.new(bullColor, 95)
+color eng2CtxBearFvgFill = color.new(bearColor, 95)
+[eng2CtxBullObBoxTmp, eng2CtxBullObLineTmp, eng2CtxBullObLabelTmp] = f_eng2_syncSetupZoneVisual(eng2CtxBullObBox, na, eng2CtxBullObLabel, showEng2CtxBullOb, eng1BullObCreatedBar, eng1_ctx_bull_ob_top, eng1_ctx_bull_ob_bottom, na, eng2CtxBullObText, label.style_label_right, eng2CtxBullObBorder, eng2CtxBullObFill, 1, false, "Waiting")
+[eng2CtxBullFvgBoxTmp, eng2CtxBullFvgLineTmp, eng2CtxBullFvgLabelTmp] = f_eng2_syncSetupZoneVisual(eng2CtxBullFvgBox, na, eng2CtxBullFvgLabel, showEng2CtxBullFvg, eng1BullFvgCreatedBar, eng1_ctx_bull_fvg_top, eng1_ctx_bull_fvg_bottom, na, eng2CtxBullFvgText, label.style_label_right, eng2CtxBullFvgBorder, eng2CtxBullFvgFill, 1, false, "Waiting")
+[eng2CtxBearObBoxTmp, eng2CtxBearObLineTmp, eng2CtxBearObLabelTmp] = f_eng2_syncSetupZoneVisual(eng2CtxBearObBox, na, eng2CtxBearObLabel, showEng2CtxBearOb, eng1BearObCreatedBar, eng1_ctx_bear_ob_top, eng1_ctx_bear_ob_bottom, na, eng2CtxBearObText, label.style_label_right, eng2CtxBearObBorder, eng2CtxBearObFill, 1, false, "Waiting")
+[eng2CtxBearFvgBoxTmp, eng2CtxBearFvgLineTmp, eng2CtxBearFvgLabelTmp] = f_eng2_syncSetupZoneVisual(eng2CtxBearFvgBox, na, eng2CtxBearFvgLabel, showEng2CtxBearFvg, eng1BearFvgCreatedBar, eng1_ctx_bear_fvg_top, eng1_ctx_bear_fvg_bottom, na, eng2CtxBearFvgText, label.style_label_right, eng2CtxBearFvgBorder, eng2CtxBearFvgFill, 1, false, "Waiting")
+eng2CtxBullObBox := eng2CtxBullObBoxTmp
+eng2CtxBullObLabel := eng2CtxBullObLabelTmp
+eng2CtxBullFvgBox := eng2CtxBullFvgBoxTmp
+eng2CtxBullFvgLabel := eng2CtxBullFvgLabelTmp
+eng2CtxBearObBox := eng2CtxBearObBoxTmp
+eng2CtxBearObLabel := eng2CtxBearObLabelTmp
+eng2CtxBearFvgBox := eng2CtxBearFvgBoxTmp
+eng2CtxBearFvgLabel := eng2CtxBearFvgLabelTmp
+
 string eng2LongLabelStyle = tradeLongIsOb ? label.style_label_right : label.style_label_left
 string eng2ShortLabelStyle = tradeShortIsOb ? label.style_label_right : label.style_label_left
 [eng2LongZoneBoxTmp, eng2LongZoneLineTmp, eng2LongZoneLabelTmp] = f_eng2_syncSetupZoneVisual(eng2LongZoneBox, eng2LongZoneLine, eng2LongZoneLabel, showEng2LongLiveZone, tradeLongCreatedBar, tradeLongValidTop, tradeLongValidBottom, tradeLongEntry, eng1BullContextLabelText, eng2LongLabelStyle, eng1BullContextBorder, eng1BullContextFill, 2, tradeLongIsOb, longExecutionState)
@@ -2465,10 +2635,11 @@ eng2ShortZoneBox := eng2ShortZoneBoxTmp
 eng2ShortZoneLine := eng2ShortZoneLineTmp
 eng2ShortZoneLabel := eng2ShortZoneLabelTmp
 
-color eng2LongHistoryBorder = color.new(bullColor, 72)
-color eng2ShortHistoryBorder = color.new(bearColor, 72)
-color eng2LongHistoryFill = color.new(bullColor, 97)
-color eng2ShortHistoryFill = color.new(bearColor, 97)
+// History boxes should stay visible, but feel lighter than the live / selected zone.
+color eng2LongHistoryBorder = color.new(bullColor, 80)
+color eng2ShortHistoryBorder = color.new(bearColor, 80)
+color eng2LongHistoryFill = color.new(bullColor, 98)
+color eng2ShortHistoryFill = color.new(bearColor, 98)
 eng2LongHistoryBox := f_eng2_syncHistoryZoneBox(eng2LongHistoryBox, showEng2LongHistoryZone, eng2LongHistoryLeftBar, eng2LongHistoryRightBar, eng2LongHistoryTop, eng2LongHistoryBottom, eng2LongHistoryBorder, eng2LongHistoryFill, 1)
 eng2ShortHistoryBox := f_eng2_syncHistoryZoneBox(eng2ShortHistoryBox, showEng2ShortHistoryZone, eng2ShortHistoryLeftBar, eng2ShortHistoryRightBar, eng2ShortHistoryTop, eng2ShortHistoryBottom, eng2ShortHistoryBorder, eng2ShortHistoryFill, 1)
 
@@ -2488,8 +2659,8 @@ color eng2NarrBullBorder = color.new(bullColor, 38)
 color eng2NarrBearBorder = color.new(bearColor, 38)
 color eng2NarrBullFill = color.new(bullColor, 94)
 color eng2NarrBearFill = color.new(bearColor, 94)
-[eng2NarrBullSdBoxTmp, eng2NarrBullSdLabelTmp] = f_eng2_syncZoneVisual(eng2NarrBullSdBox, eng2NarrBullSdLabel, eng2NarrativeZonesEnabled, eng2NarrBullSdCreatedBar, eng1_narr_bull_sd_top, eng1_narr_bull_sd_bottom, eng2NarrBullSdText, eng2NarrBullBorder, eng2NarrBullFill, 1, label.style_label_right)
-[eng2NarrBearSdBoxTmp, eng2NarrBearSdLabelTmp] = f_eng2_syncZoneVisual(eng2NarrBearSdBox, eng2NarrBearSdLabel, eng2NarrativeZonesEnabled, eng2NarrBearSdCreatedBar, eng1_narr_bear_sd_top, eng1_narr_bear_sd_bottom, eng2NarrBearSdText, eng2NarrBearBorder, eng2NarrBearFill, 1, label.style_label_right)
+[eng2NarrBullSdBoxTmp, eng2NarrBullSdLineTmp, eng2NarrBullSdLabelTmp] = f_eng2_syncSetupZoneVisual(eng2NarrBullSdBox, na, eng2NarrBullSdLabel, eng2NarrativeZonesEnabled, eng2NarrBullSdCreatedBar, eng1_narr_bull_sd_top, eng1_narr_bull_sd_bottom, na, eng2NarrBullSdText, label.style_label_right, eng2NarrBullBorder, eng2NarrBullFill, 1, false, "Waiting")
+[eng2NarrBearSdBoxTmp, eng2NarrBearSdLineTmp, eng2NarrBearSdLabelTmp] = f_eng2_syncSetupZoneVisual(eng2NarrBearSdBox, na, eng2NarrBearSdLabel, eng2NarrativeZonesEnabled, eng2NarrBearSdCreatedBar, eng1_narr_bear_sd_top, eng1_narr_bear_sd_bottom, na, eng2NarrBearSdText, label.style_label_right, eng2NarrBearBorder, eng2NarrBearFill, 1, false, "Waiting")
 eng2NarrBullSdBox := eng2NarrBullSdBoxTmp
 eng2NarrBullSdLabel := eng2NarrBullSdLabelTmp
 eng2NarrBearSdBox := eng2NarrBearSdBoxTmp
@@ -2541,8 +2712,9 @@ float bearStop = not na(tradeShortStop) ? tradeShortStop : not na(effectiveExecL
 float longDashboardDol = longUsesExternalDolTarget ? longDolExternal : na
 float shortDashboardDol = shortUsesExternalDolTarget ? shortDolExternal : na
 primaryExternalDrawLevel = compactUseLong ? longDashboardDol : shortDashboardDol
-targetEqHigh = f_preferredLevelMatch(effectiveExecEqHigh, compactBalanced, compactUseLong, activeLongTarget, activeShortTarget)
-targetEqLow = f_preferredLevelMatch(effectiveExecEqLow, compactBalanced, compactUseLong, activeLongTarget, activeShortTarget)
+// BSL/SSL should reflect the current execution swing liquidity (not only EQH/EQL).
+targetEqHigh = f_preferredLevelMatch(effectiveExecLiqHigh, compactBalanced, compactUseLong, activeLongTarget, activeShortTarget)
+targetEqLow = f_preferredLevelMatch(effectiveExecLiqLow, compactBalanced, compactUseLong, activeLongTarget, activeShortTarget)
 showEqHighVisual = showLiquidity and not compactMode and f_targetVisualByMode(effectiveZoneDisplayMode, targetEqHigh)
 showEqLowVisual = showLiquidity and not compactMode and f_targetVisualByMode(effectiveZoneDisplayMode, targetEqLow)
 showProtectedHighVisual = showProtectedLevels and not na(effectiveProtectedHigh)
@@ -2553,14 +2725,14 @@ oteActiveSummary = not na(effectiveOteLongTop) ? "OTE:L" : not na(effectiveOteSh
 string modeStatusCore = "Eff " + effectiveZoneDisplayMode + " | " + mtfSummary + " | " + oteActiveSummary
 string desktopModeStatus = modeStatusCore
 string compactModeStatus = usagePreset + " | " + modeStatusCore
-showHtfHighVisual = showHtf and not na(effectiveContextHigh)
-showHtfLowVisual = showHtf and not na(effectiveContextLow)
+showHtfHighVisual = showHtf and not na(effectiveContextHigh) and f_contextVisualByMode(effectiveZoneDisplayMode)
+showHtfLowVisual = showHtf and not na(effectiveContextLow) and f_contextVisualByMode(effectiveZoneDisplayMode)
 showLongRiskVisual = showRisk and not compactMode and f_executionVisualByMode(effectiveZoneDisplayMode, f_executionRiskVisible(longExecutionState), preferredDirection, true, compactUseLong)
 showShortRiskVisual = showRisk and not compactMode and f_executionVisualByMode(effectiveZoneDisplayMode, f_executionRiskVisible(shortExecutionState), preferredDirection, false, compactUseLong)
 
 if effectiveZoneDisplayMode != "Full"
-    showEqHighVisual := f_uniqueLevelVisual(showEqHighVisual, effectiveExecEqHigh, showHtfHighVisual, effectiveContextHigh, false, na, false, na, false, na, false, na)
-    showEqLowVisual := f_uniqueLevelVisual(showEqLowVisual, effectiveExecEqLow, showHtfLowVisual, effectiveContextLow, false, na, false, na, false, na, false, na)
+    showEqHighVisual := f_uniqueLevelVisual(showEqHighVisual, effectiveExecLiqHigh, showHtfHighVisual, effectiveContextHigh, false, na, false, na, false, na, false, na)
+    showEqLowVisual := f_uniqueLevelVisual(showEqLowVisual, effectiveExecLiqLow, showHtfLowVisual, effectiveContextLow, false, na, false, na, false, na, false, na)
 
 //------------------------------------------------------------------------------
 // Plots
@@ -2591,6 +2763,8 @@ showHtfHighRightLabel = showLiquidityRightLabels and showHtfHighVisual and not f
 showHtfLowRightLabel = showLiquidityRightLabels and showHtfLowVisual and not f_levelsClose(htfStructureLowLevel, riskBullStopLevel, rightEdgeLabelTolerance)
 showProtectedHighRightLabel = showLiquidityRightLabels and showProtectedHighVisual and not f_levelsClose(protectedHighLevel, riskBearStopLevel, rightEdgeLabelTolerance) and not f_levelsClose(protectedHighLevel, htfStructureHighLevel, rightEdgeLabelTolerance)
 showProtectedLowRightLabel = showLiquidityRightLabels and showProtectedLowVisual and not f_levelsClose(protectedLowLevel, riskBullStopLevel, rightEdgeLabelTolerance) and not f_levelsClose(protectedLowLevel, htfStructureLowLevel, rightEdgeLabelTolerance)
+showEqHighRightLabel = showLiquidityRightLabels and showEqHighVisual and not f_levelsClose(eqHighLevel, riskBearStopLevel, rightEdgeLabelTolerance) and not f_levelsClose(eqHighLevel, protectedHighLevel, rightEdgeLabelTolerance) and not f_levelsClose(eqHighLevel, htfStructureHighLevel, rightEdgeLabelTolerance)
+showEqLowRightLabel = showLiquidityRightLabels and showEqLowVisual and not f_levelsClose(eqLowLevel, riskBullStopLevel, rightEdgeLabelTolerance) and not f_levelsClose(eqLowLevel, protectedLowLevel, rightEdgeLabelTolerance) and not f_levelsClose(eqLowLevel, htfStructureLowLevel, rightEdgeLabelTolerance)
 showNarrHighRightLabel = showLiquidityRightLabels and showHtf and not compactMode and effectiveZoneDisplayMode == "Full" and not na(eng1_narr_liq_high) and not f_levelsClose(eng1_narr_liq_high, htfStructureHighLevel, rightEdgeLabelTolerance) and not f_levelsClose(eng1_narr_liq_high, protectedHighLevel, rightEdgeLabelTolerance) and not f_levelsClose(eng1_narr_liq_high, eqHighLevel, rightEdgeLabelTolerance)
 showNarrLowRightLabel = showLiquidityRightLabels and showHtf and not compactMode and effectiveZoneDisplayMode == "Full" and not na(eng1_narr_liq_low) and not f_levelsClose(eng1_narr_liq_low, htfStructureLowLevel, rightEdgeLabelTolerance) and not f_levelsClose(eng1_narr_liq_low, protectedLowLevel, rightEdgeLabelTolerance) and not f_levelsClose(eng1_narr_liq_low, eqLowLevel, rightEdgeLabelTolerance)
 
@@ -2607,6 +2781,8 @@ fill(internalHighPlot, internalEqPlot, color=showRangeVisual ? decisionPremiumFi
 fill(internalEqPlot, internalLowPlot, color=showRangeVisual ? decisionDiscountFillColor : na)
 
 if barstate.islast
+    eqHighLabel := f_syncRightEdgeLabel(eqHighLabel, eqHighLevel, "BSL", color.new(liqHighColor, 12), color.white, showEqHighRightLabel)
+    eqLowLabel := f_syncRightEdgeLabel(eqLowLabel, eqLowLevel, "SSL", color.new(liqLowColor, 12), color.white, showEqLowRightLabel)
     protectedHighLabel := f_syncRightEdgeLabel(protectedHighLabel, protectedHighLevel, "Prot H", color.new(liqHighColor, 8), color.white, showProtectedHighRightLabel)
     protectedLowLabel := f_syncRightEdgeLabel(protectedLowLabel, protectedLowLevel, "Prot L", color.new(liqLowColor, 8), color.white, showProtectedLowRightLabel)
     htfHighLabel := f_syncRightEdgeLabel(htfHighLabel, htfStructureHighLevel, "Ctx H", color.new(color.fuchsia, 15), color.white, showHtfHighRightLabel)
@@ -2633,7 +2809,11 @@ plot(riskBearStopLevel, "Bearish Stop Cue", color=color.new(bullColor, 0), linew
 plot(riskLongTargetLevel, "Bullish TP Cue", color=color.new(liqHighColor, 0), linewidth=1, style=plot.style_linebr, display=overlayLineDisplay)
 plot(riskShortTargetLevel, "Bearish TP Cue", color=color.new(liqLowColor, 0), linewidth=1, style=plot.style_linebr, display=overlayLineDisplay)
 
-chartBackdrop = showTrendBackground and not compactMode ? color.new(displayExecBias == 1 ? bullColor : displayExecBias == -1 ? bearColor : neutralColor, 93) : na
+int backdropBias = displayExecBias != 0 ? displayExecBias : (eng1CtxRangeReady and displayCtxBias != 0 ? displayCtxBias : displayNarrBias)
+color backdropColor = backdropBias == 1 ? bullColor : backdropBias == -1 ? bearColor : neutralColor
+// Keep bias tint subtle so it doesn't overpower zones/candles.
+int backdropAlpha = backdropBias == 0 ? 95 : 92
+chartBackdrop = showTrendBackground and not compactMode ? color.new(backdropColor, backdropAlpha) : na
 bgcolor(chartBackdrop)
 
 //------------------------------------------------------------------------------
