@@ -404,7 +404,7 @@ f_syncRightEdgeLabel(label currentLabel, float level, string labelText, color la
         updatedLabel := na
     updatedLabel
 
-f_syncHLine(line currentLine, float level, color lineColor, int lineWidth, line.style lineStyle, bool enabled) =>
+f_syncHLine(line currentLine, float level, color lineColor, int lineWidth, string lineStyle, bool enabled) =>
     line updatedLine = currentLine
     if enabled and not na(level)
         int x1 = f_safeBarIndexX(bar_index - 1)
@@ -2735,27 +2735,28 @@ if effectiveZoneDisplayMode != "Full"
     showEqLowVisual := f_uniqueLevelVisual(showEqLowVisual, effectiveExecLiqLow, showHtfLowVisual, effectiveContextLow, false, na, false, na, false, na, false, na)
 
 //------------------------------------------------------------------------------
-// Plots
+// Active Levels (single-instance lines)
+// Keep these non-historical to avoid scattered segments when levels update.
 //------------------------------------------------------------------------------
-eqHighLevel = f_horizontalLevel(effectiveExecEqHigh, showEqHighVisual)
-eqLowLevel = f_horizontalLevel(effectiveExecEqLow, showEqLowVisual)
-protectedHighLevel = f_horizontalLevel(effectiveProtectedHigh, showProtectedHighVisual)
-protectedLowLevel = f_horizontalLevel(effectiveProtectedLow, showProtectedLowVisual)
-internalHighLevel = f_horizontalLevel(effectiveRangeHigh, showRangeVisual)
-internalLowLevel = f_horizontalLevel(effectiveRangeLow, showRangeVisual)
-internalEqLevel = f_horizontalLevel(effectiveRangeEquilibrium, showRangeVisual)
-htfStructureHighLevel = f_horizontalLevel(effectiveContextHigh, showHtfHighVisual)
-htfStructureLowLevel = f_horizontalLevel(effectiveContextLow, showHtfLowVisual)
-riskLongEntryLevel = f_horizontalLevel(tradeLongEntry, showLongRiskVisual)
-riskShortEntryLevel = f_horizontalLevel(tradeShortEntry, showShortRiskVisual)
-riskBullStopLevel = f_horizontalLevel(bullStop, showLongRiskVisual)
-riskBearStopLevel = f_horizontalLevel(bearStop, showShortRiskVisual)
-riskLongTargetLevel = f_horizontalLevel(activeLongTarget, showLongRiskVisual)
-riskShortTargetLevel = f_horizontalLevel(activeShortTarget, showShortRiskVisual)
-oteLongTopLevel = f_horizontalLevel(effectiveOteLongTop, showOteVisual)
-oteLongBottomLevel = f_horizontalLevel(effectiveOteLongBottom, showOteVisual)
-oteShortTopLevel = f_horizontalLevel(effectiveOteShortTop, showOteVisual)
-oteShortBottomLevel = f_horizontalLevel(effectiveOteShortBottom, showOteVisual)
+eqHighLevel = showEqHighVisual ? effectiveExecLiqHigh : na
+eqLowLevel = showEqLowVisual ? effectiveExecLiqLow : na
+protectedHighLevel = showProtectedHighVisual ? effectiveProtectedHigh : na
+protectedLowLevel = showProtectedLowVisual ? effectiveProtectedLow : na
+internalHighLevel = showRangeVisual ? effectiveRangeHigh : na
+internalLowLevel = showRangeVisual ? effectiveRangeLow : na
+internalEqLevel = showRangeVisual ? effectiveRangeEquilibrium : na
+htfStructureHighLevel = showHtfHighVisual ? effectiveContextHigh : na
+htfStructureLowLevel = showHtfLowVisual ? effectiveContextLow : na
+riskLongEntryLevel = showLongRiskVisual ? tradeLongEntry : na
+riskShortEntryLevel = showShortRiskVisual ? tradeShortEntry : na
+riskBullStopLevel = showLongRiskVisual ? bullStop : na
+riskBearStopLevel = showShortRiskVisual ? bearStop : na
+riskLongTargetLevel = showLongRiskVisual ? activeLongTarget : na
+riskShortTargetLevel = showShortRiskVisual ? activeShortTarget : na
+oteLongTopLevel = showOteVisual ? effectiveOteLongTop : na
+oteLongBottomLevel = showOteVisual ? effectiveOteLongBottom : na
+oteShortTopLevel = showOteVisual ? effectiveOteShortTop : na
+oteShortBottomLevel = showOteVisual ? effectiveOteShortBottom : na
 rightEdgeLabelTolerance = atr * 0.15
 showShortStopRightLabel = showLiquidityRightLabels and showShortRiskVisual and not na(riskBearStopLevel)
 showLongStopRightLabel = showLiquidityRightLabels and showLongRiskVisual and not na(riskBullStopLevel)
@@ -2768,19 +2769,36 @@ showEqLowRightLabel = showLiquidityRightLabels and showEqLowVisual and not f_lev
 showNarrHighRightLabel = showLiquidityRightLabels and showHtf and not compactMode and effectiveZoneDisplayMode == "Full" and not na(eng1_narr_liq_high) and not f_levelsClose(eng1_narr_liq_high, htfStructureHighLevel, rightEdgeLabelTolerance) and not f_levelsClose(eng1_narr_liq_high, protectedHighLevel, rightEdgeLabelTolerance) and not f_levelsClose(eng1_narr_liq_high, eqHighLevel, rightEdgeLabelTolerance)
 showNarrLowRightLabel = showLiquidityRightLabels and showHtf and not compactMode and effectiveZoneDisplayMode == "Full" and not na(eng1_narr_liq_low) and not f_levelsClose(eng1_narr_liq_low, htfStructureLowLevel, rightEdgeLabelTolerance) and not f_levelsClose(eng1_narr_liq_low, protectedLowLevel, rightEdgeLabelTolerance) and not f_levelsClose(eng1_narr_liq_low, eqLowLevel, rightEdgeLabelTolerance)
 
-plot(eqHighLevel, "EQH Liquidity", color=color.new(liqHighColor, 12), linewidth=1, style=plot.style_linebr, display=overlayLineDisplay)
-plot(eqLowLevel, "EQL Liquidity", color=color.new(liqLowColor, 12), linewidth=1, style=plot.style_linebr, display=overlayLineDisplay)
-
-plot(protectedHighLevel, "Protected High", color=color.new(liqHighColor, 8), linewidth=2, style=plot.style_linebr, display=overlayLineDisplay)
-plot(protectedLowLevel, "Protected Low", color=color.new(liqLowColor, 8), linewidth=2, style=plot.style_linebr, display=overlayLineDisplay)
-
-internalHighPlot = plot(internalHighLevel, "ICT Dealing Range High", color=color.new(color.silver, 35), linewidth=1, style=plot.style_linebr, display=overlayLineDisplay)
-internalLowPlot = plot(internalLowLevel, "ICT Dealing Range Low", color=color.new(color.silver, 35), linewidth=1, style=plot.style_linebr, display=overlayLineDisplay)
-internalEqPlot = plot(internalEqLevel, "ICT Equilibrium", color=decisionEqColor, linewidth=2, style=plot.style_linebr, display=overlayLineDisplay)
-fill(internalHighPlot, internalEqPlot, color=showRangeVisual ? decisionPremiumFillColor : na)
-fill(internalEqPlot, internalLowPlot, color=showRangeVisual ? decisionDiscountFillColor : na)
-
 if barstate.islast
+    // Lines (single instance per level)
+    eng2BslLine := f_syncHLine(eng2BslLine, eqHighLevel, color.new(liqHighColor, 12), 1, line.style_solid, showEqHighVisual)
+    eng2SslLine := f_syncHLine(eng2SslLine, eqLowLevel, color.new(liqLowColor, 12), 1, line.style_solid, showEqLowVisual)
+    eng2ProtectedHighLine := f_syncHLine(eng2ProtectedHighLine, protectedHighLevel, color.new(liqHighColor, 8), 2, line.style_solid, showProtectedHighVisual)
+    eng2ProtectedLowLine := f_syncHLine(eng2ProtectedLowLine, protectedLowLevel, color.new(liqLowColor, 8), 2, line.style_solid, showProtectedLowVisual)
+    eng2CtxHighLine := f_syncHLine(eng2CtxHighLine, htfStructureHighLevel, color.new(color.fuchsia, 15), 2, line.style_solid, showHtfHighVisual)
+    eng2CtxLowLine := f_syncHLine(eng2CtxLowLine, htfStructureLowLevel, color.new(color.fuchsia, 15), 2, line.style_solid, showHtfLowVisual)
+
+    eng2RangeHighLine := f_syncHLine(eng2RangeHighLine, internalHighLevel, color.new(color.silver, 35), 1, line.style_solid, showRangeVisual)
+    eng2RangeLowLine := f_syncHLine(eng2RangeLowLine, internalLowLevel, color.new(color.silver, 35), 1, line.style_solid, showRangeVisual)
+    eng2RangeEqLine := f_syncHLine(eng2RangeEqLine, internalEqLevel, decisionEqColor, 2, line.style_solid, showRangeVisual)
+    eng2RangePremiumFill := f_syncLineFill(eng2RangePremiumFill, eng2RangeHighLine, eng2RangeEqLine, decisionPremiumFillColor, showRangeVisual)
+    eng2RangeDiscountFill := f_syncLineFill(eng2RangeDiscountFill, eng2RangeEqLine, eng2RangeLowLine, decisionDiscountFillColor, showRangeVisual)
+
+    eng2OteLongTopLine := f_syncHLine(eng2OteLongTopLine, oteLongTopLevel, color.new(bullColor, 40), 1, line.style_solid, showOteVisual)
+    eng2OteLongBottomLine := f_syncHLine(eng2OteLongBottomLine, oteLongBottomLevel, color.new(bullColor, 40), 1, line.style_solid, showOteVisual)
+    eng2OteLongFill := f_syncLineFill(eng2OteLongFill, eng2OteLongTopLine, eng2OteLongBottomLine, color.new(bullColor, 92), showOteVisual)
+    eng2OteShortTopLine := f_syncHLine(eng2OteShortTopLine, oteShortTopLevel, color.new(bearColor, 40), 1, line.style_solid, showOteVisual)
+    eng2OteShortBottomLine := f_syncHLine(eng2OteShortBottomLine, oteShortBottomLevel, color.new(bearColor, 40), 1, line.style_solid, showOteVisual)
+    eng2OteShortFill := f_syncLineFill(eng2OteShortFill, eng2OteShortTopLine, eng2OteShortBottomLine, color.new(bearColor, 92), showOteVisual)
+
+    eng2RiskLongEntryLine := f_syncHLine(eng2RiskLongEntryLine, riskLongEntryLevel, color.new(bullColor, 0), 2, line.style_solid, showLongRiskVisual)
+    eng2RiskShortEntryLine := f_syncHLine(eng2RiskShortEntryLine, riskShortEntryLevel, color.new(bearColor, 0), 2, line.style_solid, showShortRiskVisual)
+    eng2RiskLongStopLine := f_syncHLine(eng2RiskLongStopLine, riskBullStopLevel, color.new(bearColor, 0), 1, line.style_solid, showLongRiskVisual)
+    eng2RiskShortStopLine := f_syncHLine(eng2RiskShortStopLine, riskBearStopLevel, color.new(bullColor, 0), 1, line.style_solid, showShortRiskVisual)
+    eng2RiskLongTargetLine := f_syncHLine(eng2RiskLongTargetLine, riskLongTargetLevel, color.new(liqHighColor, 0), 1, line.style_solid, showLongRiskVisual)
+    eng2RiskShortTargetLine := f_syncHLine(eng2RiskShortTargetLine, riskShortTargetLevel, color.new(liqLowColor, 0), 1, line.style_solid, showShortRiskVisual)
+
+    // Right-edge labels
     eqHighLabel := f_syncRightEdgeLabel(eqHighLabel, eqHighLevel, "BSL", color.new(liqHighColor, 12), color.white, showEqHighRightLabel)
     eqLowLabel := f_syncRightEdgeLabel(eqLowLabel, eqLowLevel, "SSL", color.new(liqLowColor, 12), color.white, showEqLowRightLabel)
     protectedHighLabel := f_syncRightEdgeLabel(protectedHighLabel, protectedHighLevel, "Prot H", color.new(liqHighColor, 8), color.white, showProtectedHighRightLabel)
@@ -2792,24 +2810,8 @@ if barstate.islast
     longStopLabel := f_syncRightEdgeLabel(longStopLabel, riskBullStopLevel, "SL L", color.new(bearColor, 0), color.white, showLongStopRightLabel)
     shortStopLabel := f_syncRightEdgeLabel(shortStopLabel, riskBearStopLevel, "SL S", color.new(bullColor, 0), color.white, showShortStopRightLabel)
 
-oteLongTopPlot = plot(oteLongTopLevel, "OTE Long Top", color=color.new(bullColor, 40), linewidth=1, style=plot.style_linebr, display=overlayLineDisplay)
-oteLongBottomPlot = plot(oteLongBottomLevel, "OTE Long Bottom", color=color.new(bullColor, 40), linewidth=1, style=plot.style_linebr, display=overlayLineDisplay)
-oteShortTopPlot = plot(oteShortTopLevel, "OTE Short Top", color=color.new(bearColor, 40), linewidth=1, style=plot.style_linebr, display=overlayLineDisplay)
-oteShortBottomPlot = plot(oteShortBottomLevel, "OTE Short Bottom", color=color.new(bearColor, 40), linewidth=1, style=plot.style_linebr, display=overlayLineDisplay)
-fill(oteLongTopPlot, oteLongBottomPlot, color=showOteVisual ? color.new(bullColor, 92) : na)
-fill(oteShortTopPlot, oteShortBottomPlot, color=showOteVisual ? color.new(bearColor, 92) : na)
-
-plot(htfStructureHighLevel, "Context Structure High", color=color.new(color.fuchsia, 15), linewidth=2, style=plot.style_linebr, display=overlayLineDisplay)
-plot(htfStructureLowLevel, "Context Structure Low", color=color.new(color.fuchsia, 15), linewidth=2, style=plot.style_linebr, display=overlayLineDisplay)
-
-plot(riskLongEntryLevel, "Bullish Entry Cue", color=color.new(bullColor, 0), linewidth=2, style=plot.style_linebr, display=overlayLineDisplay)
-plot(riskShortEntryLevel, "Bearish Entry Cue", color=color.new(bearColor, 0), linewidth=2, style=plot.style_linebr, display=overlayLineDisplay)
-plot(riskBullStopLevel, "Bullish Stop Cue", color=color.new(bearColor, 0), linewidth=1, style=plot.style_linebr, display=overlayLineDisplay)
-plot(riskBearStopLevel, "Bearish Stop Cue", color=color.new(bullColor, 0), linewidth=1, style=plot.style_linebr, display=overlayLineDisplay)
-plot(riskLongTargetLevel, "Bullish TP Cue", color=color.new(liqHighColor, 0), linewidth=1, style=plot.style_linebr, display=overlayLineDisplay)
-plot(riskShortTargetLevel, "Bearish TP Cue", color=color.new(liqLowColor, 0), linewidth=1, style=plot.style_linebr, display=overlayLineDisplay)
-
-int backdropBias = displayExecBias != 0 ? displayExecBias : (eng1CtxRangeReady and displayCtxBias != 0 ? displayCtxBias : displayNarrBias)
+// Bias tint should follow the MTF narrative chain: Narrative -> Context -> Execution.
+int backdropBias = displayNarrBias != 0 ? displayNarrBias : (eng1CtxRangeReady and displayCtxBias != 0 ? displayCtxBias : displayExecBias)
 color backdropColor = backdropBias == 1 ? bullColor : backdropBias == -1 ? bearColor : neutralColor
 // Keep bias tint subtle so it doesn't overpower zones/candles.
 int backdropAlpha = backdropBias == 0 ? 95 : 92
