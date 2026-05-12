@@ -1,4 +1,4 @@
-## Interbank Price Delivery Algorithm (IPDA)
+# Interbank Price Delivery Algorithm (IPDA)
 
 ### 1. 4-Phase Price Delivery Cycle
 This algorithm works in a repeating cycle to move prices from one point to another. Each phase provides clues about what the algorithm will do next:
