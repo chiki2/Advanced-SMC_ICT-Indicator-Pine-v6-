@@ -1,39 +1,26 @@
 # Kontrak Inti
 
 ## SHARED CONTRACT
+```markdown
+```pinescript
 //------------------------------------------------------------------------------
 // SHARED CONTRACT
-
 //------------------------------------------------------------------------------
-
 string TF_M1  = "1"
-
 string TF_M5  = "5"
-
 string TF_M15 = "15"
-
 string TF_M30 = "30"
-
 string TF_H1  = "60"
-
 string TF_H4  = "240"
-
 string TF_D1  = "1D"
-
 
 int BUF_CAP = 300
 
-
 string eng_exec_tf = timeframe.main_period
-
 string eng_ctx_tf = f_ictContextHtf(timeframe.in_seconds())
-
 string eng_narr_tf = f_ictNarrativeHtf(timeframe.in_seconds())
 
-
 bool eng_exec_valid = eng_ctx_tf != "" and eng_narr_tf != ""
-
-
 
 
 ## Engine 1: Data Buffer
