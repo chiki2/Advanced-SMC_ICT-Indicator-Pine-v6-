@@ -20,14 +20,17 @@ string eng_ctx_tf = f_ictContextHtf(timeframe.in_seconds())
 string eng_narr_tf = f_ictNarrativeHtf(timeframe.in_seconds())
 
 bool eng_exec_valid = eng_ctx_tf != "" and eng_narr_tf != ""
+
 ```
 
 ## Engine 1: Data Buffer
 Gunakan template namespace ini untuk tiap TF: m1, m5, m15, m30, h1, h4, d1.
 
-### ENGINE 1A: RAW CLOSED-CANDLE BUFFER TEMPLATE
-Replace X with: m1, m5, m15, m30, h1, h4, d1
-
+```markdown
+//------------------------------------------------------------------------------
+// ENGINE 1A: RAW CLOSED-CANDLE BUFFER TEMPLATE
+//------------------------------------------------------------------------------
+// Replace X with: m1, m5, m15, m30, h1, h4, d1
 var array<int>   buf_X_time  = array.new_int()
 var array<float> buf_X_open  = array.new_float()
 var array<float> buf_X_high  = array.new_float()
@@ -37,9 +40,12 @@ var array<float> buf_X_close = array.new_float()
 var int X_last_closed_time = na
 var bool X_new_closed_bar = false
 
+```
 
-### ENGINE 1B: STRUCTURE SNAPSHOT TEMPLATE
-
+```markdown
+//------------------------------------------------------------------------------
+// ENGINE 1B: STRUCTURE SNAPSHOT TEMPLATE
+//------------------------------------------------------------------------------
 var float X_last_swing_high = na
 var int   X_last_swing_high_bar = na
 var float X_prev_swing_high = na
@@ -55,8 +61,12 @@ var bool  X_bull_choch = false
 var bool  X_bear_choch = false
 var int   X_trend_bias = 0
 
-### ENGINE 1C: LIQUIDITY / PD ARRAY SNAPSHOT TEMPLATE
+```
 
+```markdown
+//------------------------------------------------------------------------------
+// ENGINE 1C: LIQUIDITY / PD ARRAY SNAPSHOT TEMPLATE
+//------------------------------------------------------------------------------
 var float X_erl_high = na
 var float X_erl_low = na
 var float X_irl_high = na
@@ -74,8 +84,12 @@ var float X_ote_long_bottom = na
 var float X_ote_short_top = na
 var float X_ote_short_bottom = na
 
-### ENGINE 1D: ZONE SNAPSHOT TEMPLATE
+```
 
+```markdown
+//------------------------------------------------------------------------------
+// ENGINE 1D: ZONE SNAPSHOT TEMPLATE
+//------------------------------------------------------------------------------
 var float X_bull_ob_top = na
 var float X_bull_ob_bottom = na
 var float X_bull_ob_entry = na
@@ -96,8 +110,12 @@ var float X_bear_fvg_top = na
 var float X_bear_fvg_bottom = na
 var int   X_bear_fvg_bar = na
 
-### ENGINE 1E: EXECUTION SNAPSHOT TEMPLATE
+```
 
+```markdown
+//------------------------------------------------------------------------------
+// ENGINE 1E: EXECUTION SNAPSHOT TEMPLATE
+//------------------------------------------------------------------------------
 var bool X_bull_sweep = false
 var bool X_bear_sweep = false
 var bool X_bull_displacement = false
@@ -107,8 +125,12 @@ var bool X_bear_mss = false
 var float X_protected_high = na
 var float X_protected_low = na
 
-### ENGINE 1 HELPERS
+```
 
+```markdown
+//------------------------------------------------------------------------------
+// ENGINE 1 HELPERS
+//------------------------------------------------------------------------------
 f_buf_push_int(array<int> buf, int value, int cap) =>
 f_buf_push_float(array<float> buf, float value, int cap) =>
 
@@ -136,12 +158,14 @@ f_tf_build_ob(...) =>
 f_tf_build_execution(...) =>
     // returns: [bullSweep, bearSweep, bullDisp, bearDisp, bullMss, bearMss, protectedHigh, protectedLow]
 
+```
 	
 ## Engine 1: Active Layer Alias
 
-
-### ENGINE 1F: ACTIVE LAYER SNAPSHOT
-
+```markdown
+//------------------------------------------------------------------------------
+// ENGINE 1F: ACTIVE LAYER SNAPSHOT
+//------------------------------------------------------------------------------
 int   narr_bias = 0
 string narr_strength = "Flat"
 float narr_liq_high = na
@@ -177,15 +201,8 @@ bool  exe_bull_displacement = false
 bool  exe_bear_displacement = false
 float exe_protected_high = na
 float exe_protected_low = na
-f_select_narrative_snapshot(string tf) =>
-    // assign narr_* from h1/h4/d1 namespace
 
-f_select_context_snapshot(string tf) =>
-    // assign ctx_* from m15/m30/h1/h4 namespace
-
-f_select_execution_snapshot(string tf) =>
-    // assign exe_* from m1/m5/m15/m30 namespace
-	
+```	
 	
 ## Engine 2: Draw Engine
 
