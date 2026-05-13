@@ -2,7 +2,6 @@
 
 ## SHARED CONTRACT
 ```markdown
-```pinescript
 //------------------------------------------------------------------------------
 // SHARED CONTRACT
 //------------------------------------------------------------------------------
@@ -21,7 +20,7 @@ string eng_ctx_tf = f_ictContextHtf(timeframe.in_seconds())
 string eng_narr_tf = f_ictNarrativeHtf(timeframe.in_seconds())
 
 bool eng_exec_valid = eng_ctx_tf != "" and eng_narr_tf != ""
-
+```
 
 ## Engine 1: Data Buffer
 Gunakan template namespace ini untuk tiap TF: m1, m5, m15, m30, h1, h4, d1.
