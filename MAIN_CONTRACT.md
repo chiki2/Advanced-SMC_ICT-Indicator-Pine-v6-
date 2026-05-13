@@ -287,7 +287,8 @@ f_build_trade_plan(bool bullSide, string poiType, float poiTop, float poiBottom,
 
 f_update_trade_lifecycle(...) =>
     // returns: [state, touched, completed, invalidated, ambiguous, age]
-Aturan Engine 3
+	
+## Aturan Engine 3
 
 // Long setup is valid only if:
 poi_long_valid :=
@@ -352,5 +353,5 @@ f_dash_compact_text(...) =>
 5. Build context POI
 6. Validate execution confirmations
 7. Build trade plan + lifecycle
-// 8. Render chart from snapshots only
-// 9. Render dashboard from snapshots only
+8. Render chart from snapshots only
+9. Render dashboard from snapshots only
