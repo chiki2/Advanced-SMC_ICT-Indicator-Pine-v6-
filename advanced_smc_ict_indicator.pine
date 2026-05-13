@@ -100,6 +100,7 @@ effectiveZoneDisplayMode = profileCompact ? "Minimal" : zoneDisplayMode
 // so visual ownership is explicit and easy to audit.
 string draw_mode = effectiveZoneDisplayMode
 bool draw_full = draw_mode == "Full"
+bool draw_focused = draw_mode == "Focused"
 bool draw_minimal = draw_mode == "Minimal"
 bool draw_show_sessions = showSessionVisuals and draw_full and timeframe.isintraday
 bool draw_show_structure = showMarketStructure and draw_full and not compactMode
@@ -128,6 +129,12 @@ var label eqLowLabel = na
 var label eng2DealEqLabel = na
 var label longStopLabel = na
 var label shortStopLabel = na
+var label eng2LatestStructHighLabel = na
+var label eng2LatestStructLowLabel = na
+var label eng2LatestSwingEventLabel = na
+var label eng2LatestInternalEventLabel = na
+var line eng2LatestSwingEventLine = na
+var line eng2LatestInternalEventLine = na
 var label[] eng2StructureLabels = array.new_label()
 var line[] eng2StructureLines = array.new_line()
 // Internal vs Swing structure states (chart TF).
@@ -474,6 +481,36 @@ f_pushLine(line[] linesArr, line newLine, int cap) =>
     if not na(newLine)
         array.push(linesArr, newLine)
         f_trimLines(linesArr, cap)
+
+f_eng2_syncStructureLabel(label currentLabel, int xBar, float yPrice, string labelText, color textColor, string labelSize) =>
+    label updatedLabel = currentLabel
+    int safeX = f_safeBarIndexX(xBar)
+    if na(updatedLabel)
+        updatedLabel := label.new(x=safeX, y=yPrice, xloc=xloc.bar_index, yloc=yloc.price, text=labelText, style=label.style_none, color=color.new(color.black, 100), textcolor=textColor, size=labelSize, textalign=text.align_center)
+    else
+        label.set_x(updatedLabel, safeX)
+        label.set_y(updatedLabel, yPrice)
+        label.set_text(updatedLabel, labelText)
+        label.set_color(updatedLabel, color.new(color.black, 100))
+        label.set_textcolor(updatedLabel, textColor)
+        label.set_style(updatedLabel, label.style_none)
+        label.set_size(updatedLabel, labelSize)
+        label.set_textalign(updatedLabel, text.align_center)
+    updatedLabel
+
+f_eng2_syncStructureLine(line currentLine, int leftBar, float level, int rightBar, color lineColor, string lineStyle, int lineWidth) =>
+    line updatedLine = currentLine
+    int safeLeft = f_safeBarIndexX(leftBar)
+    int safeRight = f_safeBarIndexX(rightBar)
+    if na(updatedLine)
+        updatedLine := line.new(x1=safeLeft, y1=level, x2=safeRight, y2=level, xloc=xloc.bar_index, extend=extend.none, color=lineColor, style=lineStyle, width=lineWidth)
+    else
+        line.set_xy1(updatedLine, safeLeft, level)
+        line.set_xy2(updatedLine, safeRight, level)
+        line.set_color(updatedLine, lineColor)
+        line.set_style(updatedLine, lineStyle)
+        line.set_width(updatedLine, lineWidth)
+    updatedLine
 
 f_syncRightEdgeLabel(label currentLabel, float level, string labelText, color labelColor, color textColor, bool enabled) =>
     label updatedLabel = currentLabel
@@ -1632,6 +1669,22 @@ var float eng1_m1_eqh = na
 var int eng1_m1_eqh_bar = na
 var float eng1_m1_eql = na
 var int eng1_m1_eql_bar = na
+var float eng1_m1_bull_ob_top = na
+var float eng1_m1_bull_ob_bottom = na
+var float eng1_m1_bull_ob_entry = na
+var int eng1_m1_bull_ob_bar = na
+var bool eng1_m1_bull_ob_breaker = false
+var float eng1_m1_bear_ob_top = na
+var float eng1_m1_bear_ob_bottom = na
+var float eng1_m1_bear_ob_entry = na
+var int eng1_m1_bear_ob_bar = na
+var bool eng1_m1_bear_ob_breaker = false
+var float eng1_m1_bull_fvg_top = na
+var float eng1_m1_bull_fvg_bottom = na
+var int eng1_m1_bull_fvg_bar = na
+var float eng1_m1_bear_fvg_top = na
+var float eng1_m1_bear_fvg_bottom = na
+var int eng1_m1_bear_fvg_bar = na
 var float eng1_m1_protected_high = na
 var float eng1_m1_protected_low = na
 var int eng1_m1_trend_bias = 0
@@ -1656,6 +1709,22 @@ var float eng1_m5_eqh = na
 var int eng1_m5_eqh_bar = na
 var float eng1_m5_eql = na
 var int eng1_m5_eql_bar = na
+var float eng1_m5_bull_ob_top = na
+var float eng1_m5_bull_ob_bottom = na
+var float eng1_m5_bull_ob_entry = na
+var int eng1_m5_bull_ob_bar = na
+var bool eng1_m5_bull_ob_breaker = false
+var float eng1_m5_bear_ob_top = na
+var float eng1_m5_bear_ob_bottom = na
+var float eng1_m5_bear_ob_entry = na
+var int eng1_m5_bear_ob_bar = na
+var bool eng1_m5_bear_ob_breaker = false
+var float eng1_m5_bull_fvg_top = na
+var float eng1_m5_bull_fvg_bottom = na
+var int eng1_m5_bull_fvg_bar = na
+var float eng1_m5_bear_fvg_top = na
+var float eng1_m5_bear_fvg_bottom = na
+var int eng1_m5_bear_fvg_bar = na
 var float eng1_m5_protected_high = na
 var float eng1_m5_protected_low = na
 var int eng1_m5_trend_bias = 0
@@ -1720,6 +1789,22 @@ var float eng1_m30_eqh = na
 var int eng1_m30_eqh_bar = na
 var float eng1_m30_eql = na
 var int eng1_m30_eql_bar = na
+var float eng1_m30_bull_ob_top = na
+var float eng1_m30_bull_ob_bottom = na
+var float eng1_m30_bull_ob_entry = na
+var int eng1_m30_bull_ob_bar = na
+var bool eng1_m30_bull_ob_breaker = false
+var float eng1_m30_bear_ob_top = na
+var float eng1_m30_bear_ob_bottom = na
+var float eng1_m30_bear_ob_entry = na
+var int eng1_m30_bear_ob_bar = na
+var bool eng1_m30_bear_ob_breaker = false
+var float eng1_m30_bull_fvg_top = na
+var float eng1_m30_bull_fvg_bottom = na
+var int eng1_m30_bull_fvg_bar = na
+var float eng1_m30_bear_fvg_top = na
+var float eng1_m30_bear_fvg_bottom = na
+var int eng1_m30_bear_fvg_bar = na
 var float eng1_m30_protected_high = na
 var float eng1_m30_protected_low = na
 var int eng1_m30_trend_bias = 0
@@ -1760,9 +1845,17 @@ var int eng1_h1_bull_fvg_bar = na
 var float eng1_h1_bear_fvg_top = na
 var float eng1_h1_bear_fvg_bottom = na
 var int eng1_h1_bear_fvg_bar = na
+var float eng1_h1_protected_high = na
+var float eng1_h1_protected_low = na
 var int eng1_h1_trend_bias = 0
 var bool eng1_h1_eqh_active = false
 var bool eng1_h1_eql_active = false
+var bool eng1_h1_bull_sweep = false
+var bool eng1_h1_bear_sweep = false
+var bool eng1_h1_bull_mss = false
+var bool eng1_h1_bear_mss = false
+var bool eng1_h1_bull_displacement = false
+var bool eng1_h1_bear_displacement = false
 
 var float eng1_h4_last_swing_high = na
 var int eng1_h4_last_swing_high_bar = na
@@ -1792,9 +1885,17 @@ var int eng1_h4_bull_fvg_bar = na
 var float eng1_h4_bear_fvg_top = na
 var float eng1_h4_bear_fvg_bottom = na
 var int eng1_h4_bear_fvg_bar = na
+var float eng1_h4_protected_high = na
+var float eng1_h4_protected_low = na
 var int eng1_h4_trend_bias = 0
 var bool eng1_h4_eqh_active = false
 var bool eng1_h4_eql_active = false
+var bool eng1_h4_bull_sweep = false
+var bool eng1_h4_bear_sweep = false
+var bool eng1_h4_bull_mss = false
+var bool eng1_h4_bear_mss = false
+var bool eng1_h4_bull_displacement = false
+var bool eng1_h4_bear_displacement = false
 
 var float eng1_d1_last_swing_high = na
 var int eng1_d1_last_swing_high_bar = na
@@ -1810,13 +1911,31 @@ var float eng1_d1_eql = na
 var int eng1_d1_eql_bar = na
 var float eng1_d1_bull_ob_top = na
 var float eng1_d1_bull_ob_bottom = na
+var float eng1_d1_bull_ob_entry = na
 var int eng1_d1_bull_ob_bar = na
+var bool eng1_d1_bull_ob_breaker = false
 var float eng1_d1_bear_ob_top = na
 var float eng1_d1_bear_ob_bottom = na
+var float eng1_d1_bear_ob_entry = na
 var int eng1_d1_bear_ob_bar = na
+var bool eng1_d1_bear_ob_breaker = false
+var float eng1_d1_bull_fvg_top = na
+var float eng1_d1_bull_fvg_bottom = na
+var int eng1_d1_bull_fvg_bar = na
+var float eng1_d1_bear_fvg_top = na
+var float eng1_d1_bear_fvg_bottom = na
+var int eng1_d1_bear_fvg_bar = na
+var float eng1_d1_protected_high = na
+var float eng1_d1_protected_low = na
 var int eng1_d1_trend_bias = 0
 var bool eng1_d1_eqh_active = false
 var bool eng1_d1_eql_active = false
+var bool eng1_d1_bull_sweep = false
+var bool eng1_d1_bear_sweep = false
+var bool eng1_d1_bull_mss = false
+var bool eng1_d1_bear_mss = false
+var bool eng1_d1_bull_displacement = false
+var bool eng1_d1_bear_displacement = false
 
 // Engine 1 contract snapshots (BOS/CHOCH + liquidity layers + PD arrays)
 var bool eng1_m1_bull_bos = false
@@ -1998,159 +2117,6 @@ f_eng1_regime_strength_from_buffer(int bias, array<float> arrC, array<float> arr
         strength := f_regimeStrengthText(bias, currentClose, refClose, atrApprox)
     strength
 
-f_eng1_select_narrative_snapshot(string tf) =>
-    int narrBias = 0
-    float narrLiqHigh = na
-    float narrLiqLow = na
-    float narrBullSdTop = na
-    float narrBullSdBottom = na
-    int narrBullSdBar = na
-    float narrBearSdTop = na
-    float narrBearSdBottom = na
-    int narrBearSdBar = na
-    string narrStrength = "Flat"
-    if tf == ENG1_TF_H1
-        narrBias := eng1_h1_trend_bias
-        narrLiqHigh := eng1_h1_eqh_active ? eng1_h1_eqh : eng1_h1_last_swing_high
-        narrLiqLow := eng1_h1_eql_active ? eng1_h1_eql : eng1_h1_last_swing_low
-        narrBullSdTop := eng1_h1_bull_ob_top
-        narrBullSdBottom := eng1_h1_bull_ob_bottom
-        narrBullSdBar := eng1_h1_bull_ob_bar
-        narrBearSdTop := eng1_h1_bear_ob_top
-        narrBearSdBottom := eng1_h1_bear_ob_bottom
-        narrBearSdBar := eng1_h1_bear_ob_bar
-        narrStrength := f_eng1_regime_strength_from_buffer(narrBias, eng1_buf_h1_close, eng1_buf_h1_high, eng1_buf_h1_low)
-    else if tf == ENG1_TF_H4
-        narrBias := eng1_h4_trend_bias
-        narrLiqHigh := eng1_h4_eqh_active ? eng1_h4_eqh : eng1_h4_last_swing_high
-        narrLiqLow := eng1_h4_eql_active ? eng1_h4_eql : eng1_h4_last_swing_low
-        narrBullSdTop := eng1_h4_bull_ob_top
-        narrBullSdBottom := eng1_h4_bull_ob_bottom
-        narrBullSdBar := eng1_h4_bull_ob_bar
-        narrBearSdTop := eng1_h4_bear_ob_top
-        narrBearSdBottom := eng1_h4_bear_ob_bottom
-        narrBearSdBar := eng1_h4_bear_ob_bar
-        narrStrength := f_eng1_regime_strength_from_buffer(narrBias, eng1_buf_h4_close, eng1_buf_h4_high, eng1_buf_h4_low)
-    else if tf == ENG1_TF_D1
-        narrBias := eng1_d1_trend_bias
-        narrLiqHigh := eng1_d1_eqh_active ? eng1_d1_eqh : eng1_d1_last_swing_high
-        narrLiqLow := eng1_d1_eql_active ? eng1_d1_eql : eng1_d1_last_swing_low
-        narrBullSdTop := eng1_d1_bull_ob_top
-        narrBullSdBottom := eng1_d1_bull_ob_bottom
-        narrBullSdBar := eng1_d1_bull_ob_bar
-        narrBearSdTop := eng1_d1_bear_ob_top
-        narrBearSdBottom := eng1_d1_bear_ob_bottom
-        narrBearSdBar := eng1_d1_bear_ob_bar
-        narrStrength := f_eng1_regime_strength_from_buffer(narrBias, eng1_buf_d1_close, eng1_buf_d1_high, eng1_buf_d1_low)
-    [narrBias, narrLiqHigh, narrLiqLow, narrBullSdTop, narrBullSdBottom, narrBullSdBar, narrBearSdTop, narrBearSdBottom, narrBearSdBar, narrStrength]
-
-f_eng1_select_context_snapshot(string tf) =>
-    int ctxTrendBias = 0
-    bool ctxBullReversal = false
-    bool ctxBearReversal = false
-    float ctxBullObTop = na
-    float ctxBullObBottom = na
-    float ctxBullObEntry = na
-    int ctxBullObBar = na
-    float ctxBullFvgTop = na
-    float ctxBullFvgBottom = na
-    int ctxBullFvgBar = na
-    float ctxBearObTop = na
-    float ctxBearObBottom = na
-    float ctxBearObEntry = na
-    int ctxBearObBar = na
-    float ctxBearFvgTop = na
-    float ctxBearFvgBottom = na
-    int ctxBearFvgBar = na
-    float ctxLiqHigh = na
-    float ctxLiqLow = na
-    int ctxLiqHighBar = na
-    int ctxLiqLowBar = na
-    if tf == ENG1_TF_M15
-        ctxTrendBias := eng1_m15_trend_bias
-        ctxBullReversal := eng1_m15_bull_ob_breaker
-        ctxBearReversal := eng1_m15_bear_ob_breaker
-        ctxBullObTop := eng1_m15_bull_ob_top
-        ctxBullObBottom := eng1_m15_bull_ob_bottom
-        ctxBullObEntry := eng1_m15_bull_ob_entry
-        ctxBullObBar := eng1_m15_bull_ob_bar
-        ctxBullFvgTop := eng1_m15_bull_fvg_top
-        ctxBullFvgBottom := eng1_m15_bull_fvg_bottom
-        ctxBullFvgBar := eng1_m15_bull_fvg_bar
-        ctxBearObTop := eng1_m15_bear_ob_top
-        ctxBearObBottom := eng1_m15_bear_ob_bottom
-        ctxBearObEntry := eng1_m15_bear_ob_entry
-        ctxBearObBar := eng1_m15_bear_ob_bar
-        ctxBearFvgTop := eng1_m15_bear_fvg_top
-        ctxBearFvgBottom := eng1_m15_bear_fvg_bottom
-        ctxBearFvgBar := eng1_m15_bear_fvg_bar
-        ctxLiqHigh := eng1_m15_eqh_active ? eng1_m15_eqh : eng1_m15_last_swing_high
-        ctxLiqLow := eng1_m15_eql_active ? eng1_m15_eql : eng1_m15_last_swing_low
-        ctxLiqHighBar := eng1_m15_eqh_active ? eng1_m15_eqh_bar : eng1_m15_last_swing_high_bar
-        ctxLiqLowBar := eng1_m15_eql_active ? eng1_m15_eql_bar : eng1_m15_last_swing_low_bar
-    else if tf == ENG1_TF_H1
-        ctxTrendBias := eng1_h1_trend_bias
-        ctxBullReversal := eng1_h1_bull_ob_breaker
-        ctxBearReversal := eng1_h1_bear_ob_breaker
-        ctxBullObTop := eng1_h1_bull_ob_top
-        ctxBullObBottom := eng1_h1_bull_ob_bottom
-        ctxBullObEntry := eng1_h1_bull_ob_entry
-        ctxBullObBar := eng1_h1_bull_ob_bar
-        ctxBullFvgTop := eng1_h1_bull_fvg_top
-        ctxBullFvgBottom := eng1_h1_bull_fvg_bottom
-        ctxBullFvgBar := eng1_h1_bull_fvg_bar
-        ctxBearObTop := eng1_h1_bear_ob_top
-        ctxBearObBottom := eng1_h1_bear_ob_bottom
-        ctxBearObEntry := eng1_h1_bear_ob_entry
-        ctxBearObBar := eng1_h1_bear_ob_bar
-        ctxBearFvgTop := eng1_h1_bear_fvg_top
-        ctxBearFvgBottom := eng1_h1_bear_fvg_bottom
-        ctxBearFvgBar := eng1_h1_bear_fvg_bar
-        ctxLiqHigh := eng1_h1_eqh_active ? eng1_h1_eqh : eng1_h1_last_swing_high
-        ctxLiqLow := eng1_h1_eql_active ? eng1_h1_eql : eng1_h1_last_swing_low
-        ctxLiqHighBar := eng1_h1_eqh_active ? eng1_h1_eqh_bar : eng1_h1_last_swing_high_bar
-        ctxLiqLowBar := eng1_h1_eql_active ? eng1_h1_eql_bar : eng1_h1_last_swing_low_bar
-    else if tf == ENG1_TF_H4
-        ctxTrendBias := eng1_h4_trend_bias
-        ctxBullReversal := eng1_h4_bull_ob_breaker
-        ctxBearReversal := eng1_h4_bear_ob_breaker
-        ctxBullObTop := eng1_h4_bull_ob_top
-        ctxBullObBottom := eng1_h4_bull_ob_bottom
-        ctxBullObEntry := eng1_h4_bull_ob_entry
-        ctxBullObBar := eng1_h4_bull_ob_bar
-        ctxBullFvgTop := eng1_h4_bull_fvg_top
-        ctxBullFvgBottom := eng1_h4_bull_fvg_bottom
-        ctxBullFvgBar := eng1_h4_bull_fvg_bar
-        ctxBearObTop := eng1_h4_bear_ob_top
-        ctxBearObBottom := eng1_h4_bear_ob_bottom
-        ctxBearObEntry := eng1_h4_bear_ob_entry
-        ctxBearObBar := eng1_h4_bear_ob_bar
-        ctxBearFvgTop := eng1_h4_bear_fvg_top
-        ctxBearFvgBottom := eng1_h4_bear_fvg_bottom
-        ctxBearFvgBar := eng1_h4_bear_fvg_bar
-        ctxLiqHigh := eng1_h4_eqh_active ? eng1_h4_eqh : eng1_h4_last_swing_high
-        ctxLiqLow := eng1_h4_eql_active ? eng1_h4_eql : eng1_h4_last_swing_low
-        ctxLiqHighBar := eng1_h4_eqh_active ? eng1_h4_eqh_bar : eng1_h4_last_swing_high_bar
-        ctxLiqLowBar := eng1_h4_eql_active ? eng1_h4_eql_bar : eng1_h4_last_swing_low_bar
-    [ctxTrendBias, ctxBullReversal, ctxBearReversal, ctxBullObTop, ctxBullObBottom, ctxBullObEntry, ctxBullObBar, ctxBullFvgTop, ctxBullFvgBottom, ctxBullFvgBar, ctxBearObTop, ctxBearObBottom, ctxBearObEntry, ctxBearObBar, ctxBearFvgTop, ctxBearFvgBottom, ctxBearFvgBar, ctxLiqHigh, ctxLiqLow, ctxLiqHighBar, ctxLiqLowBar]
-
-f_eng1_select_context_breakout(string tf) =>
-    bool ctxBullBreakout = false
-    bool ctxBearBreakout = false
-    if tf == ENG1_TF_M15
-        ctxBullBreakout := eng1_m15_bull_bos
-        ctxBearBreakout := eng1_m15_bear_bos
-    else if tf == ENG1_TF_M30
-        ctxBullBreakout := eng1_m30_bull_bos
-        ctxBearBreakout := eng1_m30_bear_bos
-    else if tf == ENG1_TF_H1
-        ctxBullBreakout := eng1_h1_bull_bos
-        ctxBearBreakout := eng1_h1_bear_bos
-    else if tf == ENG1_TF_H4
-        ctxBullBreakout := eng1_h4_bull_bos
-        ctxBearBreakout := eng1_h4_bear_bos
-    [ctxBullBreakout, ctxBearBreakout]
-
 f_eng1_select_execution_trend_bias(string tf) =>
     int exeTrendBias = 0
     if tf == ENG1_TF_M1
@@ -2161,6 +2127,12 @@ f_eng1_select_execution_trend_bias(string tf) =>
         exeTrendBias := eng1_m15_trend_bias
     else if tf == ENG1_TF_M30
         exeTrendBias := eng1_m30_trend_bias
+    else if tf == ENG1_TF_H1
+        exeTrendBias := eng1_h1_trend_bias
+    else if tf == ENG1_TF_H4
+        exeTrendBias := eng1_h4_trend_bias
+    else if tf == ENG1_TF_D1
+        exeTrendBias := eng1_d1_trend_bias
     exeTrendBias
 
 f_eng1_select_execution_snapshot(string tf) =>
@@ -2208,6 +2180,33 @@ f_eng1_select_execution_snapshot(string tf) =>
         exeBearDisplacement := eng1_m30_bear_displacement
         exeProtectedHigh := eng1_m30_protected_high
         exeProtectedLow := eng1_m30_protected_low
+    else if tf == ENG1_TF_H1
+        exeBullSweep := eng1_h1_bull_sweep
+        exeBearSweep := eng1_h1_bear_sweep
+        exeBullMss := eng1_h1_bull_mss
+        exeBearMss := eng1_h1_bear_mss
+        exeBullDisplacement := eng1_h1_bull_displacement
+        exeBearDisplacement := eng1_h1_bear_displacement
+        exeProtectedHigh := eng1_h1_protected_high
+        exeProtectedLow := eng1_h1_protected_low
+    else if tf == ENG1_TF_H4
+        exeBullSweep := eng1_h4_bull_sweep
+        exeBearSweep := eng1_h4_bear_sweep
+        exeBullMss := eng1_h4_bull_mss
+        exeBearMss := eng1_h4_bear_mss
+        exeBullDisplacement := eng1_h4_bull_displacement
+        exeBearDisplacement := eng1_h4_bear_displacement
+        exeProtectedHigh := eng1_h4_protected_high
+        exeProtectedLow := eng1_h4_protected_low
+    else if tf == ENG1_TF_D1
+        exeBullSweep := eng1_d1_bull_sweep
+        exeBearSweep := eng1_d1_bear_sweep
+        exeBullMss := eng1_d1_bull_mss
+        exeBearMss := eng1_d1_bear_mss
+        exeBullDisplacement := eng1_d1_bull_displacement
+        exeBearDisplacement := eng1_d1_bear_displacement
+        exeProtectedHigh := eng1_d1_protected_high
+        exeProtectedLow := eng1_d1_protected_low
     [exeBullSweep, exeBearSweep, exeBullMss, exeBearMss, exeBullDisplacement, exeBearDisplacement, exeProtectedHigh, exeProtectedLow]
 
 f_eng1_select_execution_liquidity(string tf) =>
@@ -2235,6 +2234,21 @@ f_eng1_select_execution_liquidity(string tf) =>
         exeEql := eng1_m30_eql
         exeEqhActive := eng1_m30_eqh_active
         exeEqlActive := eng1_m30_eql_active
+    else if tf == ENG1_TF_H1
+        exeEqh := eng1_h1_eqh
+        exeEql := eng1_h1_eql
+        exeEqhActive := eng1_h1_eqh_active
+        exeEqlActive := eng1_h1_eql_active
+    else if tf == ENG1_TF_H4
+        exeEqh := eng1_h4_eqh
+        exeEql := eng1_h4_eql
+        exeEqhActive := eng1_h4_eqh_active
+        exeEqlActive := eng1_h4_eql_active
+    else if tf == ENG1_TF_D1
+        exeEqh := eng1_d1_eqh
+        exeEql := eng1_d1_eql
+        exeEqhActive := eng1_d1_eqh_active
+        exeEqlActive := eng1_d1_eql_active
     [exeEqh, exeEql, exeEqhActive, exeEqlActive]
 
 f_eng1_select_execution_levels(string tf) =>
@@ -2252,6 +2266,15 @@ f_eng1_select_execution_levels(string tf) =>
     else if tf == ENG1_TF_M30
         exeLiqHigh := eng1_m30_eqh_active ? eng1_m30_eqh : eng1_m30_last_swing_high
         exeLiqLow := eng1_m30_eql_active ? eng1_m30_eql : eng1_m30_last_swing_low
+    else if tf == ENG1_TF_H1
+        exeLiqHigh := eng1_h1_eqh_active ? eng1_h1_eqh : eng1_h1_last_swing_high
+        exeLiqLow := eng1_h1_eql_active ? eng1_h1_eql : eng1_h1_last_swing_low
+    else if tf == ENG1_TF_H4
+        exeLiqHigh := eng1_h4_eqh_active ? eng1_h4_eqh : eng1_h4_last_swing_high
+        exeLiqLow := eng1_h4_eql_active ? eng1_h4_eql : eng1_h4_last_swing_low
+    else if tf == ENG1_TF_D1
+        exeLiqHigh := eng1_d1_eqh_active ? eng1_d1_eqh : eng1_d1_last_swing_high
+        exeLiqLow := eng1_d1_eql_active ? eng1_d1_eql : eng1_d1_last_swing_low
     [exeLiqHigh, exeLiqLow]
 
 [eng1_m1_new_closed_bar_tmp, eng1_m1_last_closed_time_tmp] = f_eng1_update_ohlc_buffer(ENG1_TF_M1, eng1_m1_last_closed_time, eng1_buf_m1_time, eng1_buf_m1_open, eng1_buf_m1_high, eng1_buf_m1_low, eng1_buf_m1_close, ENG1_BUF_CAP)
@@ -2558,6 +2581,30 @@ if eng1_any_new_closed_bar or barstate.isfirst
         eng1_d1_ote_short_top := eng1_d1_ote_short_top_tmp
         eng1_d1_ote_short_bottom := eng1_d1_ote_short_bottom_tmp
     
+    if recalc_m1
+        [eng1_m1_bull_ob_top_tmp, eng1_m1_bull_ob_bottom_tmp, eng1_m1_bull_ob_entry_tmp, eng1_m1_bull_ob_bar_tmp, eng1_m1_bull_ob_breaker_tmp, eng1_m1_bear_ob_top_tmp, eng1_m1_bear_ob_bottom_tmp, eng1_m1_bear_ob_entry_tmp, eng1_m1_bear_ob_bar_tmp, eng1_m1_bear_ob_breaker_tmp] = f_eng1_build_ob(eng1_buf_m1_time, eng1_buf_m1_open, eng1_buf_m1_high, eng1_buf_m1_low, eng1_buf_m1_close)
+        eng1_m1_bull_ob_top := eng1_m1_bull_ob_top_tmp
+        eng1_m1_bull_ob_bottom := eng1_m1_bull_ob_bottom_tmp
+        eng1_m1_bull_ob_entry := eng1_m1_bull_ob_entry_tmp
+        eng1_m1_bull_ob_bar := eng1_m1_bull_ob_bar_tmp
+        eng1_m1_bull_ob_breaker := eng1_m1_bull_ob_breaker_tmp
+        eng1_m1_bear_ob_top := eng1_m1_bear_ob_top_tmp
+        eng1_m1_bear_ob_bottom := eng1_m1_bear_ob_bottom_tmp
+        eng1_m1_bear_ob_entry := eng1_m1_bear_ob_entry_tmp
+        eng1_m1_bear_ob_bar := eng1_m1_bear_ob_bar_tmp
+        eng1_m1_bear_ob_breaker := eng1_m1_bear_ob_breaker_tmp
+    if recalc_m5
+        [eng1_m5_bull_ob_top_tmp, eng1_m5_bull_ob_bottom_tmp, eng1_m5_bull_ob_entry_tmp, eng1_m5_bull_ob_bar_tmp, eng1_m5_bull_ob_breaker_tmp, eng1_m5_bear_ob_top_tmp, eng1_m5_bear_ob_bottom_tmp, eng1_m5_bear_ob_entry_tmp, eng1_m5_bear_ob_bar_tmp, eng1_m5_bear_ob_breaker_tmp] = f_eng1_build_ob(eng1_buf_m5_time, eng1_buf_m5_open, eng1_buf_m5_high, eng1_buf_m5_low, eng1_buf_m5_close)
+        eng1_m5_bull_ob_top := eng1_m5_bull_ob_top_tmp
+        eng1_m5_bull_ob_bottom := eng1_m5_bull_ob_bottom_tmp
+        eng1_m5_bull_ob_entry := eng1_m5_bull_ob_entry_tmp
+        eng1_m5_bull_ob_bar := eng1_m5_bull_ob_bar_tmp
+        eng1_m5_bull_ob_breaker := eng1_m5_bull_ob_breaker_tmp
+        eng1_m5_bear_ob_top := eng1_m5_bear_ob_top_tmp
+        eng1_m5_bear_ob_bottom := eng1_m5_bear_ob_bottom_tmp
+        eng1_m5_bear_ob_entry := eng1_m5_bear_ob_entry_tmp
+        eng1_m5_bear_ob_bar := eng1_m5_bear_ob_bar_tmp
+        eng1_m5_bear_ob_breaker := eng1_m5_bear_ob_breaker_tmp
     if recalc_m15
         [eng1_m15_bull_ob_top_tmp, eng1_m15_bull_ob_bottom_tmp, eng1_m15_bull_ob_entry_tmp, eng1_m15_bull_ob_bar_tmp, eng1_m15_bull_ob_breaker_tmp, eng1_m15_bear_ob_top_tmp, eng1_m15_bear_ob_bottom_tmp, eng1_m15_bear_ob_entry_tmp, eng1_m15_bear_ob_bar_tmp, eng1_m15_bear_ob_breaker_tmp] = f_eng1_build_ob(eng1_buf_m15_time, eng1_buf_m15_open, eng1_buf_m15_high, eng1_buf_m15_low, eng1_buf_m15_close)
         eng1_m15_bull_ob_top := eng1_m15_bull_ob_top_tmp
@@ -2570,6 +2617,18 @@ if eng1_any_new_closed_bar or barstate.isfirst
         eng1_m15_bear_ob_entry := eng1_m15_bear_ob_entry_tmp
         eng1_m15_bear_ob_bar := eng1_m15_bear_ob_bar_tmp
         eng1_m15_bear_ob_breaker := eng1_m15_bear_ob_breaker_tmp
+    if recalc_m30
+        [eng1_m30_bull_ob_top_tmp, eng1_m30_bull_ob_bottom_tmp, eng1_m30_bull_ob_entry_tmp, eng1_m30_bull_ob_bar_tmp, eng1_m30_bull_ob_breaker_tmp, eng1_m30_bear_ob_top_tmp, eng1_m30_bear_ob_bottom_tmp, eng1_m30_bear_ob_entry_tmp, eng1_m30_bear_ob_bar_tmp, eng1_m30_bear_ob_breaker_tmp] = f_eng1_build_ob(eng1_buf_m30_time, eng1_buf_m30_open, eng1_buf_m30_high, eng1_buf_m30_low, eng1_buf_m30_close)
+        eng1_m30_bull_ob_top := eng1_m30_bull_ob_top_tmp
+        eng1_m30_bull_ob_bottom := eng1_m30_bull_ob_bottom_tmp
+        eng1_m30_bull_ob_entry := eng1_m30_bull_ob_entry_tmp
+        eng1_m30_bull_ob_bar := eng1_m30_bull_ob_bar_tmp
+        eng1_m30_bull_ob_breaker := eng1_m30_bull_ob_breaker_tmp
+        eng1_m30_bear_ob_top := eng1_m30_bear_ob_top_tmp
+        eng1_m30_bear_ob_bottom := eng1_m30_bear_ob_bottom_tmp
+        eng1_m30_bear_ob_entry := eng1_m30_bear_ob_entry_tmp
+        eng1_m30_bear_ob_bar := eng1_m30_bear_ob_bar_tmp
+        eng1_m30_bear_ob_breaker := eng1_m30_bear_ob_breaker_tmp
     if recalc_h1
         [eng1_h1_bull_ob_top_tmp, eng1_h1_bull_ob_bottom_tmp, eng1_h1_bull_ob_entry_tmp, eng1_h1_bull_ob_bar_tmp, eng1_h1_bull_ob_breaker_tmp, eng1_h1_bear_ob_top_tmp, eng1_h1_bear_ob_bottom_tmp, eng1_h1_bear_ob_entry_tmp, eng1_h1_bear_ob_bar_tmp, eng1_h1_bear_ob_breaker_tmp] = f_eng1_build_ob(eng1_buf_h1_time, eng1_buf_h1_open, eng1_buf_h1_high, eng1_buf_h1_low, eng1_buf_h1_close)
         eng1_h1_bull_ob_top := eng1_h1_bull_ob_top_tmp
@@ -2595,14 +2654,34 @@ if eng1_any_new_closed_bar or barstate.isfirst
         eng1_h4_bear_ob_bar := eng1_h4_bear_ob_bar_tmp
         eng1_h4_bear_ob_breaker := eng1_h4_bear_ob_breaker_tmp
     if recalc_d1
-        [eng1_d1_bull_ob_top_tmp, eng1_d1_bull_ob_bottom_tmp, _, eng1_d1_bull_ob_bar_tmp, _, eng1_d1_bear_ob_top_tmp, eng1_d1_bear_ob_bottom_tmp, _, eng1_d1_bear_ob_bar_tmp, _] = f_eng1_build_ob(eng1_buf_d1_time, eng1_buf_d1_open, eng1_buf_d1_high, eng1_buf_d1_low, eng1_buf_d1_close)
+        [eng1_d1_bull_ob_top_tmp, eng1_d1_bull_ob_bottom_tmp, eng1_d1_bull_ob_entry_tmp, eng1_d1_bull_ob_bar_tmp, eng1_d1_bull_ob_breaker_tmp, eng1_d1_bear_ob_top_tmp, eng1_d1_bear_ob_bottom_tmp, eng1_d1_bear_ob_entry_tmp, eng1_d1_bear_ob_bar_tmp, eng1_d1_bear_ob_breaker_tmp] = f_eng1_build_ob(eng1_buf_d1_time, eng1_buf_d1_open, eng1_buf_d1_high, eng1_buf_d1_low, eng1_buf_d1_close)
         eng1_d1_bull_ob_top := eng1_d1_bull_ob_top_tmp
         eng1_d1_bull_ob_bottom := eng1_d1_bull_ob_bottom_tmp
+        eng1_d1_bull_ob_entry := eng1_d1_bull_ob_entry_tmp
         eng1_d1_bull_ob_bar := eng1_d1_bull_ob_bar_tmp
+        eng1_d1_bull_ob_breaker := eng1_d1_bull_ob_breaker_tmp
         eng1_d1_bear_ob_top := eng1_d1_bear_ob_top_tmp
         eng1_d1_bear_ob_bottom := eng1_d1_bear_ob_bottom_tmp
+        eng1_d1_bear_ob_entry := eng1_d1_bear_ob_entry_tmp
         eng1_d1_bear_ob_bar := eng1_d1_bear_ob_bar_tmp
+        eng1_d1_bear_ob_breaker := eng1_d1_bear_ob_breaker_tmp
 
+    if recalc_m1
+        [eng1_m1_bull_fvg_top_tmp, eng1_m1_bull_fvg_bottom_tmp, eng1_m1_bull_fvg_bar_tmp, eng1_m1_bear_fvg_top_tmp, eng1_m1_bear_fvg_bottom_tmp, eng1_m1_bear_fvg_bar_tmp] = f_eng1_build_fvg(eng1_buf_m1_time, eng1_buf_m1_open, eng1_buf_m1_high, eng1_buf_m1_low, eng1_buf_m1_close)
+        eng1_m1_bull_fvg_top := eng1_m1_bull_fvg_top_tmp
+        eng1_m1_bull_fvg_bottom := eng1_m1_bull_fvg_bottom_tmp
+        eng1_m1_bull_fvg_bar := eng1_m1_bull_fvg_bar_tmp
+        eng1_m1_bear_fvg_top := eng1_m1_bear_fvg_top_tmp
+        eng1_m1_bear_fvg_bottom := eng1_m1_bear_fvg_bottom_tmp
+        eng1_m1_bear_fvg_bar := eng1_m1_bear_fvg_bar_tmp
+    if recalc_m5
+        [eng1_m5_bull_fvg_top_tmp, eng1_m5_bull_fvg_bottom_tmp, eng1_m5_bull_fvg_bar_tmp, eng1_m5_bear_fvg_top_tmp, eng1_m5_bear_fvg_bottom_tmp, eng1_m5_bear_fvg_bar_tmp] = f_eng1_build_fvg(eng1_buf_m5_time, eng1_buf_m5_open, eng1_buf_m5_high, eng1_buf_m5_low, eng1_buf_m5_close)
+        eng1_m5_bull_fvg_top := eng1_m5_bull_fvg_top_tmp
+        eng1_m5_bull_fvg_bottom := eng1_m5_bull_fvg_bottom_tmp
+        eng1_m5_bull_fvg_bar := eng1_m5_bull_fvg_bar_tmp
+        eng1_m5_bear_fvg_top := eng1_m5_bear_fvg_top_tmp
+        eng1_m5_bear_fvg_bottom := eng1_m5_bear_fvg_bottom_tmp
+        eng1_m5_bear_fvg_bar := eng1_m5_bear_fvg_bar_tmp
     if recalc_m15
         [eng1_m15_bull_fvg_top_tmp, eng1_m15_bull_fvg_bottom_tmp, eng1_m15_bull_fvg_bar_tmp, eng1_m15_bear_fvg_top_tmp, eng1_m15_bear_fvg_bottom_tmp, eng1_m15_bear_fvg_bar_tmp] = f_eng1_build_fvg(eng1_buf_m15_time, eng1_buf_m15_open, eng1_buf_m15_high, eng1_buf_m15_low, eng1_buf_m15_close)
         eng1_m15_bull_fvg_top := eng1_m15_bull_fvg_top_tmp
@@ -2611,6 +2690,14 @@ if eng1_any_new_closed_bar or barstate.isfirst
         eng1_m15_bear_fvg_top := eng1_m15_bear_fvg_top_tmp
         eng1_m15_bear_fvg_bottom := eng1_m15_bear_fvg_bottom_tmp
         eng1_m15_bear_fvg_bar := eng1_m15_bear_fvg_bar_tmp
+    if recalc_m30
+        [eng1_m30_bull_fvg_top_tmp, eng1_m30_bull_fvg_bottom_tmp, eng1_m30_bull_fvg_bar_tmp, eng1_m30_bear_fvg_top_tmp, eng1_m30_bear_fvg_bottom_tmp, eng1_m30_bear_fvg_bar_tmp] = f_eng1_build_fvg(eng1_buf_m30_time, eng1_buf_m30_open, eng1_buf_m30_high, eng1_buf_m30_low, eng1_buf_m30_close)
+        eng1_m30_bull_fvg_top := eng1_m30_bull_fvg_top_tmp
+        eng1_m30_bull_fvg_bottom := eng1_m30_bull_fvg_bottom_tmp
+        eng1_m30_bull_fvg_bar := eng1_m30_bull_fvg_bar_tmp
+        eng1_m30_bear_fvg_top := eng1_m30_bear_fvg_top_tmp
+        eng1_m30_bear_fvg_bottom := eng1_m30_bear_fvg_bottom_tmp
+        eng1_m30_bear_fvg_bar := eng1_m30_bear_fvg_bar_tmp
     if recalc_h1
         [eng1_h1_bull_fvg_top_tmp, eng1_h1_bull_fvg_bottom_tmp, eng1_h1_bull_fvg_bar_tmp, eng1_h1_bear_fvg_top_tmp, eng1_h1_bear_fvg_bottom_tmp, eng1_h1_bear_fvg_bar_tmp] = f_eng1_build_fvg(eng1_buf_h1_time, eng1_buf_h1_open, eng1_buf_h1_high, eng1_buf_h1_low, eng1_buf_h1_close)
         eng1_h1_bull_fvg_top := eng1_h1_bull_fvg_top_tmp
@@ -2627,6 +2714,14 @@ if eng1_any_new_closed_bar or barstate.isfirst
         eng1_h4_bear_fvg_top := eng1_h4_bear_fvg_top_tmp
         eng1_h4_bear_fvg_bottom := eng1_h4_bear_fvg_bottom_tmp
         eng1_h4_bear_fvg_bar := eng1_h4_bear_fvg_bar_tmp
+    if recalc_d1
+        [eng1_d1_bull_fvg_top_tmp, eng1_d1_bull_fvg_bottom_tmp, eng1_d1_bull_fvg_bar_tmp, eng1_d1_bear_fvg_top_tmp, eng1_d1_bear_fvg_bottom_tmp, eng1_d1_bear_fvg_bar_tmp] = f_eng1_build_fvg(eng1_buf_d1_time, eng1_buf_d1_open, eng1_buf_d1_high, eng1_buf_d1_low, eng1_buf_d1_close)
+        eng1_d1_bull_fvg_top := eng1_d1_bull_fvg_top_tmp
+        eng1_d1_bull_fvg_bottom := eng1_d1_bull_fvg_bottom_tmp
+        eng1_d1_bull_fvg_bar := eng1_d1_bull_fvg_bar_tmp
+        eng1_d1_bear_fvg_top := eng1_d1_bear_fvg_top_tmp
+        eng1_d1_bear_fvg_bottom := eng1_d1_bear_fvg_bottom_tmp
+        eng1_d1_bear_fvg_bar := eng1_d1_bear_fvg_bar_tmp
 
     if recalc_m1
         [eng1_m1_bull_sweep_tmp, eng1_m1_bear_sweep_tmp, eng1_m1_bull_displacement_tmp, eng1_m1_bear_displacement_tmp, eng1_m1_bull_mss_tmp, eng1_m1_bear_mss_tmp, eng1_m1_protected_high_tmp, eng1_m1_protected_low_tmp] = f_eng1_build_execution(eng1_m1_last_swing_high, eng1_m1_last_swing_low, eng1_m1_protected_high, eng1_m1_protected_low, eng1_buf_m1_open, eng1_buf_m1_high, eng1_buf_m1_low, eng1_buf_m1_close)
@@ -2668,6 +2763,36 @@ if eng1_any_new_closed_bar or barstate.isfirst
         eng1_m30_bear_mss := eng1_m30_bear_mss_tmp
         eng1_m30_protected_high := eng1_m30_protected_high_tmp
         eng1_m30_protected_low := eng1_m30_protected_low_tmp
+    if recalc_h1
+        [eng1_h1_bull_sweep_tmp, eng1_h1_bear_sweep_tmp, eng1_h1_bull_displacement_tmp, eng1_h1_bear_displacement_tmp, eng1_h1_bull_mss_tmp, eng1_h1_bear_mss_tmp, eng1_h1_protected_high_tmp, eng1_h1_protected_low_tmp] = f_eng1_build_execution(eng1_h1_last_swing_high, eng1_h1_last_swing_low, eng1_h1_protected_high, eng1_h1_protected_low, eng1_buf_h1_open, eng1_buf_h1_high, eng1_buf_h1_low, eng1_buf_h1_close)
+        eng1_h1_bull_sweep := eng1_h1_bull_sweep_tmp
+        eng1_h1_bear_sweep := eng1_h1_bear_sweep_tmp
+        eng1_h1_bull_displacement := eng1_h1_bull_displacement_tmp
+        eng1_h1_bear_displacement := eng1_h1_bear_displacement_tmp
+        eng1_h1_bull_mss := eng1_h1_bull_mss_tmp
+        eng1_h1_bear_mss := eng1_h1_bear_mss_tmp
+        eng1_h1_protected_high := eng1_h1_protected_high_tmp
+        eng1_h1_protected_low := eng1_h1_protected_low_tmp
+    if recalc_h4
+        [eng1_h4_bull_sweep_tmp, eng1_h4_bear_sweep_tmp, eng1_h4_bull_displacement_tmp, eng1_h4_bear_displacement_tmp, eng1_h4_bull_mss_tmp, eng1_h4_bear_mss_tmp, eng1_h4_protected_high_tmp, eng1_h4_protected_low_tmp] = f_eng1_build_execution(eng1_h4_last_swing_high, eng1_h4_last_swing_low, eng1_h4_protected_high, eng1_h4_protected_low, eng1_buf_h4_open, eng1_buf_h4_high, eng1_buf_h4_low, eng1_buf_h4_close)
+        eng1_h4_bull_sweep := eng1_h4_bull_sweep_tmp
+        eng1_h4_bear_sweep := eng1_h4_bear_sweep_tmp
+        eng1_h4_bull_displacement := eng1_h4_bull_displacement_tmp
+        eng1_h4_bear_displacement := eng1_h4_bear_displacement_tmp
+        eng1_h4_bull_mss := eng1_h4_bull_mss_tmp
+        eng1_h4_bear_mss := eng1_h4_bear_mss_tmp
+        eng1_h4_protected_high := eng1_h4_protected_high_tmp
+        eng1_h4_protected_low := eng1_h4_protected_low_tmp
+    if recalc_d1
+        [eng1_d1_bull_sweep_tmp, eng1_d1_bear_sweep_tmp, eng1_d1_bull_displacement_tmp, eng1_d1_bear_displacement_tmp, eng1_d1_bull_mss_tmp, eng1_d1_bear_mss_tmp, eng1_d1_protected_high_tmp, eng1_d1_protected_low_tmp] = f_eng1_build_execution(eng1_d1_last_swing_high, eng1_d1_last_swing_low, eng1_d1_protected_high, eng1_d1_protected_low, eng1_buf_d1_open, eng1_buf_d1_high, eng1_buf_d1_low, eng1_buf_d1_close)
+        eng1_d1_bull_sweep := eng1_d1_bull_sweep_tmp
+        eng1_d1_bear_sweep := eng1_d1_bear_sweep_tmp
+        eng1_d1_bull_displacement := eng1_d1_bull_displacement_tmp
+        eng1_d1_bear_displacement := eng1_d1_bear_displacement_tmp
+        eng1_d1_bull_mss := eng1_d1_bull_mss_tmp
+        eng1_d1_bear_mss := eng1_d1_bear_mss_tmp
+        eng1_d1_protected_high := eng1_d1_protected_high_tmp
+        eng1_d1_protected_low := eng1_d1_protected_low_tmp
 
 if recalc_d1
     eng1_d1_lb20_high := f_eng1_window_high_safe(eng1_buf_d1_high, 20)
@@ -2677,47 +2802,202 @@ if recalc_d1
     eng1_d1_lb60_high := f_eng1_window_high_safe(eng1_buf_d1_high, 60)
     eng1_d1_lb60_low := f_eng1_window_low_safe(eng1_buf_d1_low, 60)
 
-[eng1_narr_bias_tmp, eng1_narr_liq_high_tmp, eng1_narr_liq_low_tmp, eng1_narr_bull_sd_top_tmp, eng1_narr_bull_sd_bottom_tmp, eng1_narr_bull_sd_bar_tmp, eng1_narr_bear_sd_top_tmp, eng1_narr_bear_sd_bottom_tmp, eng1_narr_bear_sd_bar_tmp, eng1_narr_strength_tmp] = f_eng1_select_narrative_snapshot(eng1_narr_tf)
-[eng1_ctx_trend_bias_tmp, eng1_ctx_bull_reversal_tmp, eng1_ctx_bear_reversal_tmp, eng1_ctx_bull_ob_top_tmp, eng1_ctx_bull_ob_bottom_tmp, eng1_ctx_bull_ob_entry_tmp, eng1_ctx_bull_ob_bar_tmp, eng1_ctx_bull_fvg_top_tmp, eng1_ctx_bull_fvg_bottom_tmp, eng1_ctx_bull_fvg_bar_tmp, eng1_ctx_bear_ob_top_tmp, eng1_ctx_bear_ob_bottom_tmp, eng1_ctx_bear_ob_entry_tmp, eng1_ctx_bear_ob_bar_tmp, eng1_ctx_bear_fvg_top_tmp, eng1_ctx_bear_fvg_bottom_tmp, eng1_ctx_bear_fvg_bar_tmp, eng1_ctx_liq_high_tmp, eng1_ctx_liq_low_tmp, eng1_ctx_liq_high_bar_tmp, eng1_ctx_liq_low_bar_tmp] = f_eng1_select_context_snapshot(eng1_ctx_tf)
-[eng1_ctx_bull_breakout_tmp, eng1_ctx_bear_breakout_tmp] = f_eng1_select_context_breakout(eng1_ctx_tf)
+eng1_narr_bias := 0
+eng1_narr_liq_high := na
+eng1_narr_liq_low := na
+eng1_narr_bull_sd_top := na
+eng1_narr_bull_sd_bottom := na
+eng1_narr_bull_sd_bar := na
+eng1_narr_bear_sd_top := na
+eng1_narr_bear_sd_bottom := na
+eng1_narr_bear_sd_bar := na
+eng1_narr_strength := "Flat"
+if eng1_narr_tf == ENG1_TF_H1
+    eng1_narr_bias := eng1_h1_trend_bias
+    eng1_narr_liq_high := eng1_h1_eqh_active ? eng1_h1_eqh : eng1_h1_last_swing_high
+    eng1_narr_liq_low := eng1_h1_eql_active ? eng1_h1_eql : eng1_h1_last_swing_low
+    eng1_narr_bull_sd_top := eng1_h1_bull_ob_top
+    eng1_narr_bull_sd_bottom := eng1_h1_bull_ob_bottom
+    eng1_narr_bull_sd_bar := eng1_h1_bull_ob_bar
+    eng1_narr_bear_sd_top := eng1_h1_bear_ob_top
+    eng1_narr_bear_sd_bottom := eng1_h1_bear_ob_bottom
+    eng1_narr_bear_sd_bar := eng1_h1_bear_ob_bar
+    eng1_narr_strength := f_eng1_regime_strength_from_buffer(eng1_narr_bias, eng1_buf_h1_close, eng1_buf_h1_high, eng1_buf_h1_low)
+else if eng1_narr_tf == ENG1_TF_H4
+    eng1_narr_bias := eng1_h4_trend_bias
+    eng1_narr_liq_high := eng1_h4_eqh_active ? eng1_h4_eqh : eng1_h4_last_swing_high
+    eng1_narr_liq_low := eng1_h4_eql_active ? eng1_h4_eql : eng1_h4_last_swing_low
+    eng1_narr_bull_sd_top := eng1_h4_bull_ob_top
+    eng1_narr_bull_sd_bottom := eng1_h4_bull_ob_bottom
+    eng1_narr_bull_sd_bar := eng1_h4_bull_ob_bar
+    eng1_narr_bear_sd_top := eng1_h4_bear_ob_top
+    eng1_narr_bear_sd_bottom := eng1_h4_bear_ob_bottom
+    eng1_narr_bear_sd_bar := eng1_h4_bear_ob_bar
+    eng1_narr_strength := f_eng1_regime_strength_from_buffer(eng1_narr_bias, eng1_buf_h4_close, eng1_buf_h4_high, eng1_buf_h4_low)
+else if eng1_narr_tf == ENG1_TF_D1
+    eng1_narr_bias := eng1_d1_trend_bias
+    eng1_narr_liq_high := eng1_d1_eqh_active ? eng1_d1_eqh : eng1_d1_last_swing_high
+    eng1_narr_liq_low := eng1_d1_eql_active ? eng1_d1_eql : eng1_d1_last_swing_low
+    eng1_narr_bull_sd_top := eng1_d1_bull_ob_top
+    eng1_narr_bull_sd_bottom := eng1_d1_bull_ob_bottom
+    eng1_narr_bull_sd_bar := eng1_d1_bull_ob_bar
+    eng1_narr_bear_sd_top := eng1_d1_bear_ob_top
+    eng1_narr_bear_sd_bottom := eng1_d1_bear_ob_bottom
+    eng1_narr_bear_sd_bar := eng1_d1_bear_ob_bar
+    eng1_narr_strength := f_eng1_regime_strength_from_buffer(eng1_narr_bias, eng1_buf_d1_close, eng1_buf_d1_high, eng1_buf_d1_low)
+eng1_ctx_trend_bias := 0
+eng1_ctx_bull_reversal := false
+eng1_ctx_bear_reversal := false
+eng1_ctx_bull_ob_top := na
+eng1_ctx_bull_ob_bottom := na
+eng1_ctx_bull_ob_entry := na
+eng1_ctx_bull_ob_bar := na
+eng1_ctx_bull_fvg_top := na
+eng1_ctx_bull_fvg_bottom := na
+eng1_ctx_bull_fvg_bar := na
+eng1_ctx_bear_ob_top := na
+eng1_ctx_bear_ob_bottom := na
+eng1_ctx_bear_ob_entry := na
+eng1_ctx_bear_ob_bar := na
+eng1_ctx_bear_fvg_top := na
+eng1_ctx_bear_fvg_bottom := na
+eng1_ctx_bear_fvg_bar := na
+eng1_ctx_liq_high := na
+eng1_ctx_liq_low := na
+eng1_ctx_liq_high_bar := na
+eng1_ctx_liq_low_bar := na
+if eng1_ctx_tf == ENG1_TF_M15
+    eng1_ctx_trend_bias := eng1_m15_trend_bias
+    eng1_ctx_bull_reversal := eng1_m15_bull_ob_breaker
+    eng1_ctx_bear_reversal := eng1_m15_bear_ob_breaker
+    eng1_ctx_bull_ob_top := eng1_m15_bull_ob_top
+    eng1_ctx_bull_ob_bottom := eng1_m15_bull_ob_bottom
+    eng1_ctx_bull_ob_entry := eng1_m15_bull_ob_entry
+    eng1_ctx_bull_ob_bar := eng1_m15_bull_ob_bar
+    eng1_ctx_bull_fvg_top := eng1_m15_bull_fvg_top
+    eng1_ctx_bull_fvg_bottom := eng1_m15_bull_fvg_bottom
+    eng1_ctx_bull_fvg_bar := eng1_m15_bull_fvg_bar
+    eng1_ctx_bear_ob_top := eng1_m15_bear_ob_top
+    eng1_ctx_bear_ob_bottom := eng1_m15_bear_ob_bottom
+    eng1_ctx_bear_ob_entry := eng1_m15_bear_ob_entry
+    eng1_ctx_bear_ob_bar := eng1_m15_bear_ob_bar
+    eng1_ctx_bear_fvg_top := eng1_m15_bear_fvg_top
+    eng1_ctx_bear_fvg_bottom := eng1_m15_bear_fvg_bottom
+    eng1_ctx_bear_fvg_bar := eng1_m15_bear_fvg_bar
+    eng1_ctx_liq_high := eng1_m15_eqh_active ? eng1_m15_eqh : eng1_m15_last_swing_high
+    eng1_ctx_liq_low := eng1_m15_eql_active ? eng1_m15_eql : eng1_m15_last_swing_low
+    eng1_ctx_liq_high_bar := eng1_m15_eqh_active ? eng1_m15_eqh_bar : eng1_m15_last_swing_high_bar
+    eng1_ctx_liq_low_bar := eng1_m15_eql_active ? eng1_m15_eql_bar : eng1_m15_last_swing_low_bar
+else if eng1_ctx_tf == ENG1_TF_M30
+    eng1_ctx_trend_bias := eng1_m30_trend_bias
+    eng1_ctx_bull_reversal := eng1_m30_bull_ob_breaker
+    eng1_ctx_bear_reversal := eng1_m30_bear_ob_breaker
+    eng1_ctx_bull_ob_top := eng1_m30_bull_ob_top
+    eng1_ctx_bull_ob_bottom := eng1_m30_bull_ob_bottom
+    eng1_ctx_bull_ob_entry := eng1_m30_bull_ob_entry
+    eng1_ctx_bull_ob_bar := eng1_m30_bull_ob_bar
+    eng1_ctx_bull_fvg_top := eng1_m30_bull_fvg_top
+    eng1_ctx_bull_fvg_bottom := eng1_m30_bull_fvg_bottom
+    eng1_ctx_bull_fvg_bar := eng1_m30_bull_fvg_bar
+    eng1_ctx_bear_ob_top := eng1_m30_bear_ob_top
+    eng1_ctx_bear_ob_bottom := eng1_m30_bear_ob_bottom
+    eng1_ctx_bear_ob_entry := eng1_m30_bear_ob_entry
+    eng1_ctx_bear_ob_bar := eng1_m30_bear_ob_bar
+    eng1_ctx_bear_fvg_top := eng1_m30_bear_fvg_top
+    eng1_ctx_bear_fvg_bottom := eng1_m30_bear_fvg_bottom
+    eng1_ctx_bear_fvg_bar := eng1_m30_bear_fvg_bar
+    eng1_ctx_liq_high := eng1_m30_eqh_active ? eng1_m30_eqh : eng1_m30_last_swing_high
+    eng1_ctx_liq_low := eng1_m30_eql_active ? eng1_m30_eql : eng1_m30_last_swing_low
+    eng1_ctx_liq_high_bar := eng1_m30_eqh_active ? eng1_m30_eqh_bar : eng1_m30_last_swing_high_bar
+    eng1_ctx_liq_low_bar := eng1_m30_eql_active ? eng1_m30_eql_bar : eng1_m30_last_swing_low_bar
+else if eng1_ctx_tf == ENG1_TF_H1
+    eng1_ctx_trend_bias := eng1_h1_trend_bias
+    eng1_ctx_bull_reversal := eng1_h1_bull_ob_breaker
+    eng1_ctx_bear_reversal := eng1_h1_bear_ob_breaker
+    eng1_ctx_bull_ob_top := eng1_h1_bull_ob_top
+    eng1_ctx_bull_ob_bottom := eng1_h1_bull_ob_bottom
+    eng1_ctx_bull_ob_entry := eng1_h1_bull_ob_entry
+    eng1_ctx_bull_ob_bar := eng1_h1_bull_ob_bar
+    eng1_ctx_bull_fvg_top := eng1_h1_bull_fvg_top
+    eng1_ctx_bull_fvg_bottom := eng1_h1_bull_fvg_bottom
+    eng1_ctx_bull_fvg_bar := eng1_h1_bull_fvg_bar
+    eng1_ctx_bear_ob_top := eng1_h1_bear_ob_top
+    eng1_ctx_bear_ob_bottom := eng1_h1_bear_ob_bottom
+    eng1_ctx_bear_ob_entry := eng1_h1_bear_ob_entry
+    eng1_ctx_bear_ob_bar := eng1_h1_bear_ob_bar
+    eng1_ctx_bear_fvg_top := eng1_h1_bear_fvg_top
+    eng1_ctx_bear_fvg_bottom := eng1_h1_bear_fvg_bottom
+    eng1_ctx_bear_fvg_bar := eng1_h1_bear_fvg_bar
+    eng1_ctx_liq_high := eng1_h1_eqh_active ? eng1_h1_eqh : eng1_h1_last_swing_high
+    eng1_ctx_liq_low := eng1_h1_eql_active ? eng1_h1_eql : eng1_h1_last_swing_low
+    eng1_ctx_liq_high_bar := eng1_h1_eqh_active ? eng1_h1_eqh_bar : eng1_h1_last_swing_high_bar
+    eng1_ctx_liq_low_bar := eng1_h1_eql_active ? eng1_h1_eql_bar : eng1_h1_last_swing_low_bar
+else if eng1_ctx_tf == ENG1_TF_H4
+    eng1_ctx_trend_bias := eng1_h4_trend_bias
+    eng1_ctx_bull_reversal := eng1_h4_bull_ob_breaker
+    eng1_ctx_bear_reversal := eng1_h4_bear_ob_breaker
+    eng1_ctx_bull_ob_top := eng1_h4_bull_ob_top
+    eng1_ctx_bull_ob_bottom := eng1_h4_bull_ob_bottom
+    eng1_ctx_bull_ob_entry := eng1_h4_bull_ob_entry
+    eng1_ctx_bull_ob_bar := eng1_h4_bull_ob_bar
+    eng1_ctx_bull_fvg_top := eng1_h4_bull_fvg_top
+    eng1_ctx_bull_fvg_bottom := eng1_h4_bull_fvg_bottom
+    eng1_ctx_bull_fvg_bar := eng1_h4_bull_fvg_bar
+    eng1_ctx_bear_ob_top := eng1_h4_bear_ob_top
+    eng1_ctx_bear_ob_bottom := eng1_h4_bear_ob_bottom
+    eng1_ctx_bear_ob_entry := eng1_h4_bear_ob_entry
+    eng1_ctx_bear_ob_bar := eng1_h4_bear_ob_bar
+    eng1_ctx_bear_fvg_top := eng1_h4_bear_fvg_top
+    eng1_ctx_bear_fvg_bottom := eng1_h4_bear_fvg_bottom
+    eng1_ctx_bear_fvg_bar := eng1_h4_bear_fvg_bar
+    eng1_ctx_liq_high := eng1_h4_eqh_active ? eng1_h4_eqh : eng1_h4_last_swing_high
+    eng1_ctx_liq_low := eng1_h4_eql_active ? eng1_h4_eql : eng1_h4_last_swing_low
+    eng1_ctx_liq_high_bar := eng1_h4_eqh_active ? eng1_h4_eqh_bar : eng1_h4_last_swing_high_bar
+    eng1_ctx_liq_low_bar := eng1_h4_eql_active ? eng1_h4_eql_bar : eng1_h4_last_swing_low_bar
+else if eng1_ctx_tf == ENG1_TF_D1
+    eng1_ctx_trend_bias := eng1_d1_trend_bias
+    eng1_ctx_bull_reversal := eng1_d1_bull_ob_breaker
+    eng1_ctx_bear_reversal := eng1_d1_bear_ob_breaker
+    eng1_ctx_bull_ob_top := eng1_d1_bull_ob_top
+    eng1_ctx_bull_ob_bottom := eng1_d1_bull_ob_bottom
+    eng1_ctx_bull_ob_entry := eng1_d1_bull_ob_entry
+    eng1_ctx_bull_ob_bar := eng1_d1_bull_ob_bar
+    eng1_ctx_bull_fvg_top := eng1_d1_bull_fvg_top
+    eng1_ctx_bull_fvg_bottom := eng1_d1_bull_fvg_bottom
+    eng1_ctx_bull_fvg_bar := eng1_d1_bull_fvg_bar
+    eng1_ctx_bear_ob_top := eng1_d1_bear_ob_top
+    eng1_ctx_bear_ob_bottom := eng1_d1_bear_ob_bottom
+    eng1_ctx_bear_ob_entry := eng1_d1_bear_ob_entry
+    eng1_ctx_bear_ob_bar := eng1_d1_bear_ob_bar
+    eng1_ctx_bear_fvg_top := eng1_d1_bear_fvg_top
+    eng1_ctx_bear_fvg_bottom := eng1_d1_bear_fvg_bottom
+    eng1_ctx_bear_fvg_bar := eng1_d1_bear_fvg_bar
+    eng1_ctx_liq_high := eng1_d1_eqh_active ? eng1_d1_eqh : eng1_d1_last_swing_high
+    eng1_ctx_liq_low := eng1_d1_eql_active ? eng1_d1_eql : eng1_d1_last_swing_low
+    eng1_ctx_liq_high_bar := eng1_d1_eqh_active ? eng1_d1_eqh_bar : eng1_d1_last_swing_high_bar
+    eng1_ctx_liq_low_bar := eng1_d1_eql_active ? eng1_d1_eql_bar : eng1_d1_last_swing_low_bar
+eng1_ctx_bull_breakout := false
+eng1_ctx_bear_breakout := false
+if eng1_ctx_tf == ENG1_TF_M15
+    eng1_ctx_bull_breakout := eng1_m15_bull_bos
+    eng1_ctx_bear_breakout := eng1_m15_bear_bos
+else if eng1_ctx_tf == ENG1_TF_M30
+    eng1_ctx_bull_breakout := eng1_m30_bull_bos
+    eng1_ctx_bear_breakout := eng1_m30_bear_bos
+else if eng1_ctx_tf == ENG1_TF_H1
+    eng1_ctx_bull_breakout := eng1_h1_bull_bos
+    eng1_ctx_bear_breakout := eng1_h1_bear_bos
+else if eng1_ctx_tf == ENG1_TF_H4
+    eng1_ctx_bull_breakout := eng1_h4_bull_bos
+    eng1_ctx_bear_breakout := eng1_h4_bear_bos
+else if eng1_ctx_tf == ENG1_TF_D1
+    eng1_ctx_bull_breakout := eng1_d1_bull_bos
+    eng1_ctx_bear_breakout := eng1_d1_bear_bos
 [eng1_exe_bull_sweep_tmp, eng1_exe_bear_sweep_tmp, eng1_exe_bull_mss_tmp, eng1_exe_bear_mss_tmp, eng1_exe_bull_displacement_tmp, eng1_exe_bear_displacement_tmp, eng1_exe_protected_high_tmp, eng1_exe_protected_low_tmp] = f_eng1_select_execution_snapshot(eng1_exec_tf)
 [eng1_exe_liq_high_tmp, eng1_exe_liq_low_tmp] = f_eng1_select_execution_levels(eng1_exec_tf)
 [eng1_exe_eqh_tmp, eng1_exe_eql_tmp, eng1_exe_eqh_active_tmp, eng1_exe_eql_active_tmp] = f_eng1_select_execution_liquidity(eng1_exec_tf)
 
 if eng1_exec_valid
-    eng1_narr_bias := eng1_narr_bias_tmp
-    eng1_narr_liq_high := eng1_narr_liq_high_tmp
-    eng1_narr_liq_low := eng1_narr_liq_low_tmp
-    eng1_narr_bull_sd_top := eng1_narr_bull_sd_top_tmp
-    eng1_narr_bull_sd_bottom := eng1_narr_bull_sd_bottom_tmp
-    eng1_narr_bull_sd_bar := eng1_narr_bull_sd_bar_tmp
-    eng1_narr_bear_sd_top := eng1_narr_bear_sd_top_tmp
-    eng1_narr_bear_sd_bottom := eng1_narr_bear_sd_bottom_tmp
-    eng1_narr_bear_sd_bar := eng1_narr_bear_sd_bar_tmp
-    eng1_narr_strength := eng1_narr_strength_tmp
-    eng1_ctx_trend_bias := eng1_ctx_trend_bias_tmp
-    eng1_ctx_bull_breakout := eng1_ctx_bull_breakout_tmp
-    eng1_ctx_bear_breakout := eng1_ctx_bear_breakout_tmp
-    eng1_ctx_bull_reversal := eng1_ctx_bull_reversal_tmp
-    eng1_ctx_bear_reversal := eng1_ctx_bear_reversal_tmp
-    eng1_ctx_bull_ob_top := eng1_ctx_bull_ob_top_tmp
-    eng1_ctx_bull_ob_bottom := eng1_ctx_bull_ob_bottom_tmp
-    eng1_ctx_bull_ob_entry := eng1_ctx_bull_ob_entry_tmp
-    eng1_ctx_bull_ob_bar := eng1_ctx_bull_ob_bar_tmp
-    eng1_ctx_bull_fvg_top := eng1_ctx_bull_fvg_top_tmp
-    eng1_ctx_bull_fvg_bottom := eng1_ctx_bull_fvg_bottom_tmp
-    eng1_ctx_bull_fvg_bar := eng1_ctx_bull_fvg_bar_tmp
-    eng1_ctx_bear_ob_top := eng1_ctx_bear_ob_top_tmp
-    eng1_ctx_bear_ob_bottom := eng1_ctx_bear_ob_bottom_tmp
-    eng1_ctx_bear_ob_entry := eng1_ctx_bear_ob_entry_tmp
-    eng1_ctx_bear_ob_bar := eng1_ctx_bear_ob_bar_tmp
-    eng1_ctx_bear_fvg_top := eng1_ctx_bear_fvg_top_tmp
-    eng1_ctx_bear_fvg_bottom := eng1_ctx_bear_fvg_bottom_tmp
-    eng1_ctx_bear_fvg_bar := eng1_ctx_bear_fvg_bar_tmp
-    eng1_ctx_liq_high := eng1_ctx_liq_high_tmp
-    eng1_ctx_liq_low := eng1_ctx_liq_low_tmp
-    eng1_ctx_liq_high_bar := eng1_ctx_liq_high_bar_tmp
-    eng1_ctx_liq_low_bar := eng1_ctx_liq_low_bar_tmp
     eng1_exe_bull_sweep := eng1_exe_bull_sweep_tmp
     eng1_exe_bear_sweep := eng1_exe_bear_sweep_tmp
     eng1_exe_bull_mss := eng1_exe_bull_mss_tmp
@@ -3039,14 +3319,53 @@ float eng2SwingPivotLow = ta.pivotlow(low, eng2SwingLen, eng2SwingLen)
 bool eng2StructureVisualsEnabled = eng1_exec_valid and draw_show_structure
 // Keep the structure label queue reasonably small to avoid scattered clutter on the chart.
 // This is intentionally lower than max_* limits to reduce "label/line carpet" in long sessions.
-int eng2StructureLabelCap = 42
-int eng2StructureLineCap = 54
+bool eng2StructureLatestOnly = timeframe.isintraday and chartTfSeconds <= timeframe.in_seconds("5")
+int eng2StructureLabelCap = eng2StructureLatestOnly ? 0 : 42
+int eng2StructureLineCap = eng2StructureLatestOnly ? 0 : 54
 float eng2StructTol = math.max(atr * equalToleranceAtr, syminfo.mintick * 2.0)
 float eng2PivotLabelOffset = math.max(atr * 0.18, syminfo.mintick * 8.0)
 f_draw_structure_markers(eng2StructureVisualsEnabled, eng2StructureLabelCap, eng2StructureLineCap)
 
+if eng2StructureVisualsEnabled and not eng2StructureLatestOnly
+    if not na(eng2LatestStructHighLabel)
+        label.delete(eng2LatestStructHighLabel)
+        eng2LatestStructHighLabel := na
+    if not na(eng2LatestStructLowLabel)
+        label.delete(eng2LatestStructLowLabel)
+        eng2LatestStructLowLabel := na
+    if not na(eng2LatestSwingEventLabel)
+        label.delete(eng2LatestSwingEventLabel)
+        eng2LatestSwingEventLabel := na
+    if not na(eng2LatestInternalEventLabel)
+        label.delete(eng2LatestInternalEventLabel)
+        eng2LatestInternalEventLabel := na
+    if not na(eng2LatestSwingEventLine)
+        line.delete(eng2LatestSwingEventLine)
+        eng2LatestSwingEventLine := na
+    if not na(eng2LatestInternalEventLine)
+        line.delete(eng2LatestInternalEventLine)
+        eng2LatestInternalEventLine := na
+
 // Make the toggle literal: when disabled, clear all structure visuals.
 if not eng2StructureVisualsEnabled
+    if not na(eng2LatestStructHighLabel)
+        label.delete(eng2LatestStructHighLabel)
+        eng2LatestStructHighLabel := na
+    if not na(eng2LatestStructLowLabel)
+        label.delete(eng2LatestStructLowLabel)
+        eng2LatestStructLowLabel := na
+    if not na(eng2LatestSwingEventLabel)
+        label.delete(eng2LatestSwingEventLabel)
+        eng2LatestSwingEventLabel := na
+    if not na(eng2LatestInternalEventLabel)
+        label.delete(eng2LatestInternalEventLabel)
+        eng2LatestInternalEventLabel := na
+    if not na(eng2LatestSwingEventLine)
+        line.delete(eng2LatestSwingEventLine)
+        eng2LatestSwingEventLine := na
+    if not na(eng2LatestInternalEventLine)
+        line.delete(eng2LatestInternalEventLine)
+        eng2LatestInternalEventLine := na
     // Reset internal structure state so switching back to Full recomputes cleanly.
     eng2StructLastHigh := na
     eng2StructLastLow := na
@@ -3100,8 +3419,11 @@ if eng2StructureVisualsEnabled and not na(eng2PivotHigh)
     if pivotLabelAllowed
         color pivotTextColor = pivotTextRaw == "HH" ? bullColor : bearColor
         float pivotLabelY = eng2PivotHigh + eng2PivotLabelOffset
-        label pivotLabel = label.new(x=pivotBar, y=pivotLabelY, xloc=xloc.bar_index, yloc=yloc.price, text=pivotTextRaw, style=label.style_none, color=color.new(color.black, 100), textcolor=pivotTextColor, size=size.tiny, textalign=text.align_center)
-        f_pushLabel(eng2StructureLabels, pivotLabel, eng2StructureLabelCap)
+        if eng2StructureLatestOnly
+            eng2LatestStructHighLabel := f_eng2_syncStructureLabel(eng2LatestStructHighLabel, pivotBar, pivotLabelY, pivotTextRaw, pivotTextColor, size.tiny)
+        else
+            label pivotLabel = label.new(x=pivotBar, y=pivotLabelY, xloc=xloc.bar_index, yloc=yloc.price, text=pivotTextRaw, style=label.style_none, color=color.new(color.black, 100), textcolor=pivotTextColor, size=size.tiny, textalign=text.align_center)
+            f_pushLabel(eng2StructureLabels, pivotLabel, eng2StructureLabelCap)
     // Important: EQH should not reset the "broken" latch. Otherwise BOS/MSS can spam
     // the same horizontal level each time we see another equal pivot.
     if not isEq or na(eng2StructLastHigh)
@@ -3117,8 +3439,11 @@ if eng2StructureVisualsEnabled and not na(eng2PivotLow)
     if pivotLabelAllowed
         color pivotTextColor = pivotTextRaw == "LL" ? bearColor : bullColor
         float pivotLabelY = eng2PivotLow - eng2PivotLabelOffset
-        label pivotLabel = label.new(x=pivotBar, y=pivotLabelY, xloc=xloc.bar_index, yloc=yloc.price, text=pivotTextRaw, style=label.style_none, color=color.new(color.black, 100), textcolor=pivotTextColor, size=size.tiny, textalign=text.align_center)
-        f_pushLabel(eng2StructureLabels, pivotLabel, eng2StructureLabelCap)
+        if eng2StructureLatestOnly
+            eng2LatestStructLowLabel := f_eng2_syncStructureLabel(eng2LatestStructLowLabel, pivotBar, pivotLabelY, pivotTextRaw, pivotTextColor, size.tiny)
+        else
+            label pivotLabel = label.new(x=pivotBar, y=pivotLabelY, xloc=xloc.bar_index, yloc=yloc.price, text=pivotTextRaw, style=label.style_none, color=color.new(color.black, 100), textcolor=pivotTextColor, size=size.tiny, textalign=text.align_center)
+            f_pushLabel(eng2StructureLabels, pivotLabel, eng2StructureLabelCap)
     if not isEq or na(eng2StructLastLow)
         eng2StructLastLow := eng2PivotLow
         eng2StructLastLowBar := pivotBar
@@ -3151,11 +3476,15 @@ if eng2SwingBreakUp
         float labelOffset = eng2PivotLabelOffset * 0.35
         float labelY = eng2SwingLastHigh - labelOffset
         string eventLineStyle = isMss ? line.style_dashed : line.style_solid
-        line eventLine = line.new(x1=originBar, y1=eng2SwingLastHigh, x2=bar_index, y2=eng2SwingLastHigh, xloc=xloc.bar_index, extend=extend.none, color=color.new(bullColor, 0), style=eventLineStyle, width=2)
-        f_pushLine(eng2StructureLines, eventLine, eng2StructureLineCap)
-        // Label is placed on the break bar (not midpoint) to match common ICT structure visuals.
-        label eventLabel = label.new(x=bar_index, y=labelY, xloc=xloc.bar_index, yloc=yloc.price, text=eventText, style=label.style_none, color=color.new(color.black, 100), textcolor=color.new(bullColor, 0), size=size.small, textalign=text.align_center)
-        f_pushLabel(eng2StructureLabels, eventLabel, eng2StructureLabelCap)
+        if eng2StructureLatestOnly
+            eng2LatestSwingEventLine := f_eng2_syncStructureLine(eng2LatestSwingEventLine, originBar, eng2SwingLastHigh, bar_index, color.new(bullColor, 0), eventLineStyle, 2)
+            eng2LatestSwingEventLabel := f_eng2_syncStructureLabel(eng2LatestSwingEventLabel, bar_index, labelY, eventText, color.new(bullColor, 0), size.small)
+        else
+            line eventLine = line.new(x1=originBar, y1=eng2SwingLastHigh, x2=bar_index, y2=eng2SwingLastHigh, xloc=xloc.bar_index, extend=extend.none, color=color.new(bullColor, 0), style=eventLineStyle, width=2)
+            f_pushLine(eng2StructureLines, eventLine, eng2StructureLineCap)
+            // Label is placed on the break bar (not midpoint) to match common ICT structure visuals.
+            label eventLabel = label.new(x=bar_index, y=labelY, xloc=xloc.bar_index, yloc=yloc.price, text=eventText, style=label.style_none, color=color.new(color.black, 100), textcolor=color.new(bullColor, 0), size=size.small, textalign=text.align_center)
+            f_pushLabel(eng2StructureLabels, eventLabel, eng2StructureLabelCap)
         eng2SwingLastEventLevel := eng2SwingLastHigh
         eng2SwingLastEventBar := bar_index
         eng2SwingLastEventText := eventText
@@ -3178,10 +3507,14 @@ if eng2SwingBreakDn
         float labelOffset = eng2PivotLabelOffset * 0.35
         float labelY = eng2SwingLastLow + labelOffset
         string eventLineStyle = isMss ? line.style_dashed : line.style_solid
-        line eventLine = line.new(x1=originBar, y1=eng2SwingLastLow, x2=bar_index, y2=eng2SwingLastLow, xloc=xloc.bar_index, extend=extend.none, color=color.new(bearColor, 0), style=eventLineStyle, width=2)
-        f_pushLine(eng2StructureLines, eventLine, eng2StructureLineCap)
-        label eventLabel = label.new(x=bar_index, y=labelY, xloc=xloc.bar_index, yloc=yloc.price, text=eventText, style=label.style_none, color=color.new(color.black, 100), textcolor=color.new(bearColor, 0), size=size.small, textalign=text.align_center)
-        f_pushLabel(eng2StructureLabels, eventLabel, eng2StructureLabelCap)
+        if eng2StructureLatestOnly
+            eng2LatestSwingEventLine := f_eng2_syncStructureLine(eng2LatestSwingEventLine, originBar, eng2SwingLastLow, bar_index, color.new(bearColor, 0), eventLineStyle, 2)
+            eng2LatestSwingEventLabel := f_eng2_syncStructureLabel(eng2LatestSwingEventLabel, bar_index, labelY, eventText, color.new(bearColor, 0), size.small)
+        else
+            line eventLine = line.new(x1=originBar, y1=eng2SwingLastLow, x2=bar_index, y2=eng2SwingLastLow, xloc=xloc.bar_index, extend=extend.none, color=color.new(bearColor, 0), style=eventLineStyle, width=2)
+            f_pushLine(eng2StructureLines, eventLine, eng2StructureLineCap)
+            label eventLabel = label.new(x=bar_index, y=labelY, xloc=xloc.bar_index, yloc=yloc.price, text=eventText, style=label.style_none, color=color.new(color.black, 100), textcolor=color.new(bearColor, 0), size=size.small, textalign=text.align_center)
+            f_pushLabel(eng2StructureLabels, eventLabel, eng2StructureLabelCap)
         eng2SwingLastEventLevel := eng2SwingLastLow
         eng2SwingLastEventBar := bar_index
         eng2SwingLastEventText := eventText
@@ -3207,10 +3540,14 @@ if eng2InternalBreakUp and not eng2SkipInternalUp
         float labelY = eng2StructLastHigh - labelOffset
         color lineColor = color.new(bullColor, isMss ? 0 : 15)
         string eventLineStyle = isMss ? line.style_dashed : line.style_solid
-        line eventLine = line.new(x1=originBar, y1=eng2StructLastHigh, x2=bar_index, y2=eng2StructLastHigh, xloc=xloc.bar_index, extend=extend.none, color=lineColor, style=eventLineStyle, width=1)
-        f_pushLine(eng2StructureLines, eventLine, eng2StructureLineCap)
-        label eventLabel = label.new(x=bar_index, y=labelY, xloc=xloc.bar_index, yloc=yloc.price, text=eventText, style=label.style_none, color=color.new(color.black, 100), textcolor=lineColor, size=size.tiny, textalign=text.align_center)
-        f_pushLabel(eng2StructureLabels, eventLabel, eng2StructureLabelCap)
+        if eng2StructureLatestOnly
+            eng2LatestInternalEventLine := f_eng2_syncStructureLine(eng2LatestInternalEventLine, originBar, eng2StructLastHigh, bar_index, lineColor, eventLineStyle, 1)
+            eng2LatestInternalEventLabel := f_eng2_syncStructureLabel(eng2LatestInternalEventLabel, bar_index, labelY, eventText, lineColor, size.tiny)
+        else
+            line eventLine = line.new(x1=originBar, y1=eng2StructLastHigh, x2=bar_index, y2=eng2StructLastHigh, xloc=xloc.bar_index, extend=extend.none, color=lineColor, style=eventLineStyle, width=1)
+            f_pushLine(eng2StructureLines, eventLine, eng2StructureLineCap)
+            label eventLabel = label.new(x=bar_index, y=labelY, xloc=xloc.bar_index, yloc=yloc.price, text=eventText, style=label.style_none, color=color.new(color.black, 100), textcolor=lineColor, size=size.tiny, textalign=text.align_center)
+            f_pushLabel(eng2StructureLabels, eventLabel, eng2StructureLabelCap)
         eng2InternalLastEventLevel := eng2StructLastHigh
         eng2InternalLastEventBar := bar_index
         eng2InternalLastEventText := eventText
@@ -3229,10 +3566,14 @@ if eng2InternalBreakDn and not eng2SkipInternalDn
         float labelY = eng2StructLastLow + labelOffset
         color lineColor = color.new(bearColor, isMss ? 0 : 15)
         string eventLineStyle = isMss ? line.style_dashed : line.style_solid
-        line eventLine = line.new(x1=originBar, y1=eng2StructLastLow, x2=bar_index, y2=eng2StructLastLow, xloc=xloc.bar_index, extend=extend.none, color=lineColor, style=eventLineStyle, width=1)
-        f_pushLine(eng2StructureLines, eventLine, eng2StructureLineCap)
-        label eventLabel = label.new(x=bar_index, y=labelY, xloc=xloc.bar_index, yloc=yloc.price, text=eventText, style=label.style_none, color=color.new(color.black, 100), textcolor=lineColor, size=size.tiny, textalign=text.align_center)
-        f_pushLabel(eng2StructureLabels, eventLabel, eng2StructureLabelCap)
+        if eng2StructureLatestOnly
+            eng2LatestInternalEventLine := f_eng2_syncStructureLine(eng2LatestInternalEventLine, originBar, eng2StructLastLow, bar_index, lineColor, eventLineStyle, 1)
+            eng2LatestInternalEventLabel := f_eng2_syncStructureLabel(eng2LatestInternalEventLabel, bar_index, labelY, eventText, lineColor, size.tiny)
+        else
+            line eventLine = line.new(x1=originBar, y1=eng2StructLastLow, x2=bar_index, y2=eng2StructLastLow, xloc=xloc.bar_index, extend=extend.none, color=lineColor, style=eventLineStyle, width=1)
+            f_pushLine(eng2StructureLines, eventLine, eng2StructureLineCap)
+            label eventLabel = label.new(x=bar_index, y=labelY, xloc=xloc.bar_index, yloc=yloc.price, text=eventText, style=label.style_none, color=color.new(color.black, 100), textcolor=lineColor, size=size.tiny, textalign=text.align_center)
+            f_pushLabel(eng2StructureLabels, eventLabel, eng2StructureLabelCap)
         eng2InternalLastEventLevel := eng2StructLastLow
         eng2InternalLastEventBar := bar_index
         eng2InternalLastEventText := eventText
@@ -3261,11 +3602,13 @@ float eng1CtxOteShortBottom = eng1CtxRangeReady ? eng1CtxRangeLow + eng1CtxRange
 // Dealing Range (location layer): derived from Engine 1 context snapshot so it stays aligned with MTF ownership.
 int eng2DealHighBarChart = f_timeToChartBar(eng1_ctx_liq_high_bar)
 int eng2DealLowBarChart = f_timeToChartBar(eng1_ctx_liq_low_bar)
+int eng2DealHighBarSafe = not na(eng1_ctx_liq_high_bar) ? f_createdBarFallback(eng2DealHighBarChart) : na
+int eng2DealLowBarSafe = not na(eng1_ctx_liq_low_bar) ? f_createdBarFallback(eng2DealLowBarChart) : na
 float eng2DealHighCandidate = eng1CtxRangeReady ? eng1CtxRangeHigh : na
 float eng2DealLowCandidate = eng1CtxRangeReady ? eng1CtxRangeLow : na
 bool eng2DealRangeChanged = eng1CtxRangeReady and (na(eng2DealHigh) or na(eng2DealLow) or not f_levelsClose(eng2DealHigh, eng2DealHighCandidate, eng2StructTol) or not f_levelsClose(eng2DealLow, eng2DealLowCandidate, eng2StructTol))
-bool eng2DealMappedBarsReady = not na(eng2DealHighBarChart) and not na(eng2DealLowBarChart)
-int eng2DealLeftCandidate = eng2DealMappedBarsReady ? math.min(eng2DealHighBarChart, eng2DealLowBarChart) : na
+bool eng2DealMappedBarsReady = not na(eng2DealHighBarSafe) and not na(eng2DealLowBarSafe)
+int eng2DealLeftCandidate = eng2DealMappedBarsReady ? math.min(eng2DealHighBarSafe, eng2DealLowBarSafe) : na
 bool eng2DealReady = eng1CtxRangeReady and not na(eng2DealLeftCandidate) and not na(eng2DealHighCandidate) and not na(eng2DealLowCandidate) and eng2DealHighCandidate > eng2DealLowCandidate
 float eng2DealSizeCandidate = eng2DealReady ? (eng2DealHighCandidate - eng2DealLowCandidate) : na
 bool eng2DealSignificant = eng2DealReady and not na(eng2DealSizeCandidate) and eng2DealSizeCandidate >= atr * 0.75
@@ -3331,10 +3674,10 @@ int eng1BullObCreatedBarRaw = f_timeToChartBar(eng1_ctx_bull_ob_bar)
 int eng1BullFvgCreatedBarRaw = f_timeToChartBar(eng1_ctx_bull_fvg_bar)
 int eng1BearObCreatedBarRaw = f_timeToChartBar(eng1_ctx_bear_ob_bar)
 int eng1BearFvgCreatedBarRaw = f_timeToChartBar(eng1_ctx_bear_fvg_bar)
-int eng1BullObCreatedBar = not na(eng1_ctx_bull_ob_bar) ? eng1BullObCreatedBarRaw : na
-int eng1BullFvgCreatedBar = not na(eng1_ctx_bull_fvg_bar) ? eng1BullFvgCreatedBarRaw : na
-int eng1BearObCreatedBar = not na(eng1_ctx_bear_ob_bar) ? eng1BearObCreatedBarRaw : na
-int eng1BearFvgCreatedBar = not na(eng1_ctx_bear_fvg_bar) ? eng1BearFvgCreatedBarRaw : na
+int eng1BullObCreatedBar = not na(eng1_ctx_bull_ob_bar) ? f_createdBarFallback(eng1BullObCreatedBarRaw) : na
+int eng1BullFvgCreatedBar = not na(eng1_ctx_bull_fvg_bar) ? f_createdBarFallback(eng1BullFvgCreatedBarRaw) : na
+int eng1BearObCreatedBar = not na(eng1_ctx_bear_ob_bar) ? f_createdBarFallback(eng1BearObCreatedBarRaw) : na
+int eng1BearFvgCreatedBar = not na(eng1_ctx_bear_fvg_bar) ? f_createdBarFallback(eng1BearFvgCreatedBarRaw) : na
 
 // Touch latch: avoid historical scan on every bar.
 var int eng3BullObTouchBar = na
@@ -3501,8 +3844,9 @@ bool exe_long_pd_pass = tradeLongIsOb ? bullObPdPass : tradeLongIsFvg ? bullFvgP
 bool exe_short_pd_pass = tradeShortIsOb ? bearObPdPass : tradeShortIsFvg ? bearFvgPdPass : false
 bool exe_long_ote_pass = tradeLongIsOb ? bullObOtePass : tradeLongIsFvg ? bullFvgOtePass : false
 bool exe_short_ote_pass = tradeShortIsOb ? bearObOtePass : tradeShortIsFvg ? bearFvgOtePass : false
-bool exe_long_kz_pass = not strictModeEnabled or strictKillzoneActive
-bool exe_short_kz_pass = not strictModeEnabled or strictKillzoneActive
+bool ipdaTimePriorityPass = not timeframe.isintraday or ipdaObservationActive or ipdaAmKillzoneActive or ipdaPmKillzoneActive
+bool exe_long_kz_pass = strictModeEnabled ? strictKillzoneActive : ipdaTimePriorityPass
+bool exe_short_kz_pass = strictModeEnabled ? strictKillzoneActive : ipdaTimePriorityPass
 bool exe_long_dol_pass = strictModeEnabled ? longQualifiedExternalDol : not na(activeLongTarget)
 bool exe_short_dol_pass = strictModeEnabled ? shortQualifiedExternalDol : not na(activeShortTarget)
 
@@ -3515,8 +3859,9 @@ int longSetupAge = not na(tradeLongCreatedBar) ? bar_index - tradeLongCreatedBar
 bool longChased = not tradeLongTouched and not na(tradeLongValidTop) and close > tradeLongValidTop + atr * setupChaseAtr
 float execBarRange = high - low
 float execBarBodyShare = f_eng1_body_share(open, high, low, close)
-bool longDispFallback = close > open and execBarRange >= atr * 0.80 and execBarBodyShare >= 0.50
-bool shortDispFallback = close < open and execBarRange >= atr * 0.80 and execBarBodyShare >= 0.50
+bool eng3ConfirmedFallbackAllowed = barstate.isconfirmed
+bool longDispFallback = eng3ConfirmedFallbackAllowed and close > open and execBarRange >= atr * 0.80 and execBarBodyShare >= 0.50
+bool shortDispFallback = eng3ConfirmedFallbackAllowed and close < open and execBarRange >= atr * 0.80 and execBarBodyShare >= 0.50
 bool longDirectionalFallback = displayExecBias == 0 and ((eng1_exe_bull_mss and not eng1_exe_bear_mss) or (eng1_exe_bull_displacement and not eng1_exe_bear_displacement))
 bool shortDirectionalFallback = displayExecBias == 0 and ((eng1_exe_bear_mss and not eng1_exe_bull_mss) or (eng1_exe_bear_displacement and not eng1_exe_bull_displacement))
 bool effectiveLongDirectional = displayExecBias == 1 or longDirectionalFallback
@@ -3524,13 +3869,13 @@ bool ipdaLongAsiaRaid = ipdaAmKillzoneActive and not na(asiaSessionLow) and low 
 bool ipdaLongPmRaid = ipdaPmTradeAllowed and not na(newYorkAmSessionLow) and low < newYorkAmSessionLow and close > newYorkAmSessionLow
 bool ipdaLongLookbackRaid = (not na(ipdaLookback20Low) and low < ipdaLookback20Low and close > ipdaLookback20Low) or (not na(ipdaLookback40Low) and low < ipdaLookback40Low and close > ipdaLookback40Low) or (not na(ipdaLookback60Low) and low < ipdaLookback60Low and close > ipdaLookback60Low)
 bool effectiveLongSweepSeen = eng1_exe_bull_sweep or ipdaLongAsiaRaid or ipdaLongPmRaid or ipdaLongLookbackRaid
-bool longMssFallbackBreak = not na(effectiveProtectedHigh) and close > effectiveProtectedHigh and close[1] <= effectiveProtectedHigh
+bool longMssFallbackBreak = eng3ConfirmedFallbackAllowed and not na(effectiveProtectedHigh) and close > effectiveProtectedHigh and close[1] <= effectiveProtectedHigh
 int longMssFallbackAge = ta.barssince(longMssFallbackBreak)
 bool longMssFallbackRecent = not na(longMssFallbackAge) and longMssFallbackAge <= strictMssLookbackEffective
 bool effectiveLongMssSeen = eng1_exe_bull_mss or longMssFallbackRecent
 bool effectiveLongDisplacementSeen = eng1_exe_bull_displacement or longDispFallback
 bool effectiveLongStructureInvalidated = displayExecBias == -1 and ((eng1_ctx_trend_bias == -1) or eng1_ctx_bear_reversal or eng1_exe_bear_mss)
-bool ipdaLongTimePriorityPass = not timeframe.isintraday or ipdaObservationActive or ipdaAmKillzoneActive or ipdaPmKillzoneActive
+bool ipdaLongTimePriorityPass = ipdaTimePriorityPass
 bool ipdaLongExpansionPhase = effectiveLongDisplacementSeen and (eng2DealBroken or (not na(effectiveRangeEquilibrium) and close > effectiveRangeEquilibrium))
 bool ipdaLongRetracementPhase = (longPriceInZone or longPriceNearZone) and (tradeLongIsOb or tradeLongIsFvg)
 bool ipdaLongReversalPhase = eng1_ctx_bull_reversal or (displayCtxBias == -1 and displayExecBias == 1)
@@ -3585,13 +3930,13 @@ bool ipdaShortAsiaRaid = ipdaAmKillzoneActive and not na(asiaSessionHigh) and hi
 bool ipdaShortPmRaid = ipdaPmTradeAllowed and not na(newYorkAmSessionHigh) and high > newYorkAmSessionHigh and close < newYorkAmSessionHigh
 bool ipdaShortLookbackRaid = (not na(ipdaLookback20High) and high > ipdaLookback20High and close < ipdaLookback20High) or (not na(ipdaLookback40High) and high > ipdaLookback40High and close < ipdaLookback40High) or (not na(ipdaLookback60High) and high > ipdaLookback60High and close < ipdaLookback60High)
 bool effectiveShortSweepSeen = eng1_exe_bear_sweep or ipdaShortAsiaRaid or ipdaShortPmRaid or ipdaShortLookbackRaid
-bool shortMssFallbackBreak = not na(effectiveProtectedLow) and close < effectiveProtectedLow and close[1] >= effectiveProtectedLow
+bool shortMssFallbackBreak = eng3ConfirmedFallbackAllowed and not na(effectiveProtectedLow) and close < effectiveProtectedLow and close[1] >= effectiveProtectedLow
 int shortMssFallbackAge = ta.barssince(shortMssFallbackBreak)
 bool shortMssFallbackRecent = not na(shortMssFallbackAge) and shortMssFallbackAge <= strictMssLookbackEffective
 bool effectiveShortMssSeen = eng1_exe_bear_mss or shortMssFallbackRecent
 bool effectiveShortDisplacementSeen = eng1_exe_bear_displacement or shortDispFallback
 bool effectiveShortStructureInvalidated = displayExecBias == 1 and ((eng1_ctx_trend_bias == 1) or eng1_ctx_bull_reversal or eng1_exe_bull_mss)
-bool ipdaShortTimePriorityPass = not timeframe.isintraday or ipdaObservationActive or ipdaAmKillzoneActive or ipdaPmKillzoneActive
+bool ipdaShortTimePriorityPass = ipdaTimePriorityPass
 bool ipdaShortExpansionPhase = effectiveShortDisplacementSeen and (eng2DealBroken or (not na(effectiveRangeEquilibrium) and close < effectiveRangeEquilibrium))
 bool ipdaShortRetracementPhase = (shortPriceInZone or shortPriceNearZone) and (tradeShortIsOb or tradeShortIsFvg)
 bool ipdaShortReversalPhase = eng1_ctx_bear_reversal or (displayCtxBias == 1 and displayExecBias == -1)
