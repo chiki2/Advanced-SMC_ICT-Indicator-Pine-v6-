@@ -343,14 +343,14 @@ f_dash_next_text(string modeSummary, string mtfSummary, string oteSummary) =>
 f_dash_compact_text(...) =>
 
 
-Urutan Eksekusi
+## Urutan Eksekusi
 
-// 1. Resolve TF mapping
-// 2. Update raw closed-candle buffers for all fixed TFs
-// 3. Build per-TF snapshots
-// 4. Select narrative/context/execution active snapshots
-// 5. Build context POI
-// 6. Validate execution confirmations
-// 7. Build trade plan + lifecycle
+1. Resolve TF mapping
+2. Update raw closed-candle buffers for all fixed TFs
+3. Build per-TF snapshots
+4. Select narrative/context/execution active snapshots
+5. Build context POI
+6. Validate execution confirmations
+7. Build trade plan + lifecycle
 // 8. Render chart from snapshots only
 // 9. Render dashboard from snapshots only
