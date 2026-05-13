@@ -2,11 +2,17 @@
 
 ## SHARED CONTRACT
 string TF_M1  = "1"
+
 string TF_M5  = "5"
+
 string TF_M15 = "15"
+
 string TF_M30 = "30"
+
 string TF_H1  = "60"
+
 string TF_H4  = "240"
+
 string TF_D1  = "1D"
 
 int BUF_CAP = 300
