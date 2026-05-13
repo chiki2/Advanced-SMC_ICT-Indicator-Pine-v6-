@@ -1,8 +1,6 @@
-Kontrak Inti
+# Kontrak Inti
 
-//------------------------------------------------------------------------------
-// SHARED CONTRACT
-//------------------------------------------------------------------------------
+## SHARED CONTRACT
 string TF_M1  = "1"
 string TF_M5  = "5"
 string TF_M15 = "15"
@@ -20,13 +18,12 @@ string eng_narr_tf = f_ictNarrativeHtf(timeframe.in_seconds())
 bool eng_exec_valid = eng_ctx_tf != "" and eng_narr_tf != ""
 
 
-Engine 1: Data Buffer
+## Engine 1: Data Buffer
 Gunakan template namespace ini untuk tiap TF: m1, m5, m15, m30, h1, h4, d1.
 
-//------------------------------------------------------------------------------
-// ENGINE 1A: RAW CLOSED-CANDLE BUFFER TEMPLATE
-//------------------------------------------------------------------------------
-// Replace X with: m1, m5, m15, m30, h1, h4, d1
+### ENGINE 1A: RAW CLOSED-CANDLE BUFFER TEMPLATE
+Replace X with: m1, m5, m15, m30, h1, h4, d1
+
 var array<int>   buf_X_time  = array.new_int()
 var array<float> buf_X_open  = array.new_float()
 var array<float> buf_X_high  = array.new_float()
@@ -35,9 +32,10 @@ var array<float> buf_X_close = array.new_float()
 
 var int X_last_closed_time = na
 var bool X_new_closed_bar = false
-//------------------------------------------------------------------------------
-// ENGINE 1B: STRUCTURE SNAPSHOT TEMPLATE
-//------------------------------------------------------------------------------
+
+
+### ENGINE 1B: STRUCTURE SNAPSHOT TEMPLATE
+
 var float X_last_swing_high = na
 var int   X_last_swing_high_bar = na
 var float X_prev_swing_high = na
@@ -52,9 +50,9 @@ var bool  X_bear_bos = false
 var bool  X_bull_choch = false
 var bool  X_bear_choch = false
 var int   X_trend_bias = 0
-//------------------------------------------------------------------------------
-// ENGINE 1C: LIQUIDITY / PD ARRAY SNAPSHOT TEMPLATE
-//------------------------------------------------------------------------------
+
+### ENGINE 1C: LIQUIDITY / PD ARRAY SNAPSHOT TEMPLATE
+
 var float X_erl_high = na
 var float X_erl_low = na
 var float X_irl_high = na
@@ -71,9 +69,9 @@ var float X_ote_long_top = na
 var float X_ote_long_bottom = na
 var float X_ote_short_top = na
 var float X_ote_short_bottom = na
-//------------------------------------------------------------------------------
-// ENGINE 1D: ZONE SNAPSHOT TEMPLATE
-//------------------------------------------------------------------------------
+
+### ENGINE 1D: ZONE SNAPSHOT TEMPLATE
+
 var float X_bull_ob_top = na
 var float X_bull_ob_bottom = na
 var float X_bull_ob_entry = na
@@ -93,9 +91,9 @@ var int   X_bull_fvg_bar = na
 var float X_bear_fvg_top = na
 var float X_bear_fvg_bottom = na
 var int   X_bear_fvg_bar = na
-//------------------------------------------------------------------------------
-// ENGINE 1E: EXECUTION SNAPSHOT TEMPLATE
-//------------------------------------------------------------------------------
+
+### ENGINE 1E: EXECUTION SNAPSHOT TEMPLATE
+
 var bool X_bull_sweep = false
 var bool X_bear_sweep = false
 var bool X_bull_displacement = false
@@ -104,9 +102,9 @@ var bool X_bull_mss = false
 var bool X_bear_mss = false
 var float X_protected_high = na
 var float X_protected_low = na
-//------------------------------------------------------------------------------
-// ENGINE 1 HELPERS
-//------------------------------------------------------------------------------
+
+### ENGINE 1 HELPERS
+
 f_buf_push_int(array<int> buf, int value, int cap) =>
 f_buf_push_float(array<float> buf, float value, int cap) =>
 
@@ -135,11 +133,11 @@ f_tf_build_execution(...) =>
     // returns: [bullSweep, bearSweep, bullDisp, bearDisp, bullMss, bearMss, protectedHigh, protectedLow]
 
 	
-Engine 1: Active Layer Alias
+## Engine 1: Active Layer Alias
 
-//------------------------------------------------------------------------------
-// ENGINE 1F: ACTIVE LAYER SNAPSHOT
-//------------------------------------------------------------------------------
+
+### ENGINE 1F: ACTIVE LAYER SNAPSHOT
+
 int   narr_bias = 0
 string narr_strength = "Flat"
 float narr_liq_high = na
@@ -185,11 +183,11 @@ f_select_execution_snapshot(string tf) =>
     // assign exe_* from m1/m5/m15/m30 namespace
 	
 	
-Engine 2: Draw Engine
+## Engine 2: Draw Engine
 
-//------------------------------------------------------------------------------
-// ENGINE 2: DRAW STATE
-//------------------------------------------------------------------------------
+
+### ENGINE 2: DRAW STATE
+
 string draw_mode = effectiveZoneDisplayMode  // Full / Focused / Minimal
 bool draw_full = draw_mode == "Full"
 bool draw_focused = draw_mode == "Focused"
@@ -220,11 +218,11 @@ f_draw_right_edge_label(...) =>
 f_draw_cleanup_hidden_objects() =>
 
 
-Engine 3: Setup Engine
+## Engine 3: Setup Engine
 
-//------------------------------------------------------------------------------
-// ENGINE 3A: CONTEXT POI CONTRACT
-//------------------------------------------------------------------------------
+
+### ENGINE 3A: CONTEXT POI CONTRACT
+
 bool  poi_long_valid = false
 bool  poi_short_valid = false
 string poi_long_type = ""     // "OB" / "FVG" / "Breaker"
@@ -237,9 +235,9 @@ float poi_short_top = na
 float poi_short_bottom = na
 float poi_short_entry = na
 int   poi_short_bar = na
-//------------------------------------------------------------------------------
-// ENGINE 3B: EXECUTION CONFIRM CONTRACT
-//------------------------------------------------------------------------------
+
+### ENGINE 3B: EXECUTION CONFIRM CONTRACT
+
 bool exe_long_confirm = false
 bool exe_short_confirm = false
 bool exe_long_pd_pass = false
@@ -250,9 +248,9 @@ bool exe_long_kz_pass = false
 bool exe_short_kz_pass = false
 bool exe_long_dol_pass = false
 bool exe_short_dol_pass = false
-//------------------------------------------------------------------------------
-// ENGINE 3C: TRADE PLAN / LIFECYCLE
-//------------------------------------------------------------------------------
+
+### ENGINE 3C: TRADE PLAN / LIFECYCLE
+
 string stp_long_state = "Waiting"
 string stp_short_state = "Waiting"
 
@@ -308,11 +306,11 @@ exe_long_confirm :=
 // Same for short
 
 
-Engine 4: Dashboard Engine
+## Engine 4: Dashboard Engine
 
-//------------------------------------------------------------------------------
-// ENGINE 4: DASHBOARD SNAPSHOT
-//------------------------------------------------------------------------------
+
+### ENGINE 4: DASHBOARD SNAPSHOT
+
 string dash_bias_market = ""
 string dash_setup_long = ""
 string dash_setup_short = ""
