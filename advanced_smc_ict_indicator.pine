@@ -3321,7 +3321,6 @@ string eng1StageSummary = (eng1NarrativeReady ? "N" : "n") + "/" + (eng1ContextR
 // ENGINE 3 (SETUP ENGINE)
 // Resolve context POI, validate execution confirmations, and manage lifecycle.
 //------------------------------------------------------------------------------
-int eng1ContextTouchScan = math.max(expiryBarsEffective, freshBarsEffective) + strictMssLookbackEffective + 10
 bool eng1BullContextAllowed = f_eng3_validate_narrative_side(true, eng1_exec_valid, eng1_narr_bias, eng1_ctx_trend_bias, eng1_ctx_bull_reversal, eng1_ctx_bear_reversal)
 bool eng1BearContextAllowed = f_eng3_validate_narrative_side(false, eng1_exec_valid, eng1_narr_bias, eng1_ctx_trend_bias, eng1_ctx_bull_reversal, eng1_ctx_bear_reversal)
 bool eng1HasBullObContext = eng1BullContextAllowed and not na(eng1_ctx_bull_ob_entry)
@@ -3371,7 +3370,7 @@ if not eng3BullObTrackValid
     eng3BullObTouchTop := na
     eng3BullObTouchBottom := na
 else if eng3BullObTrackChanged
-    eng3BullObTouchedState := f_zoneTouchedSinceBar(eng1_ctx_bull_ob_top, eng1_ctx_bull_ob_bottom, eng1BullObCreatedBar, eng1ContextTouchScan)
+    eng3BullObTouchedState := high >= eng1_ctx_bull_ob_bottom and low <= eng1_ctx_bull_ob_top
     eng3BullObTouchBar := eng1BullObCreatedBar
     eng3BullObTouchTop := eng1_ctx_bull_ob_top
     eng3BullObTouchBottom := eng1_ctx_bull_ob_bottom
@@ -3384,7 +3383,7 @@ if not eng3BullFvgTrackValid
     eng3BullFvgTouchTop := na
     eng3BullFvgTouchBottom := na
 else if eng3BullFvgTrackChanged
-    eng3BullFvgTouchedState := f_zoneTouchedSinceBar(eng1_ctx_bull_fvg_top, eng1_ctx_bull_fvg_bottom, eng1BullFvgCreatedBar, eng1ContextTouchScan)
+    eng3BullFvgTouchedState := high >= eng1_ctx_bull_fvg_bottom and low <= eng1_ctx_bull_fvg_top
     eng3BullFvgTouchBar := eng1BullFvgCreatedBar
     eng3BullFvgTouchTop := eng1_ctx_bull_fvg_top
     eng3BullFvgTouchBottom := eng1_ctx_bull_fvg_bottom
@@ -3397,7 +3396,7 @@ if not eng3BearObTrackValid
     eng3BearObTouchTop := na
     eng3BearObTouchBottom := na
 else if eng3BearObTrackChanged
-    eng3BearObTouchedState := f_zoneTouchedSinceBar(eng1_ctx_bear_ob_top, eng1_ctx_bear_ob_bottom, eng1BearObCreatedBar, eng1ContextTouchScan)
+    eng3BearObTouchedState := high >= eng1_ctx_bear_ob_bottom and low <= eng1_ctx_bear_ob_top
     eng3BearObTouchBar := eng1BearObCreatedBar
     eng3BearObTouchTop := eng1_ctx_bear_ob_top
     eng3BearObTouchBottom := eng1_ctx_bear_ob_bottom
@@ -3410,7 +3409,7 @@ if not eng3BearFvgTrackValid
     eng3BearFvgTouchTop := na
     eng3BearFvgTouchBottom := na
 else if eng3BearFvgTrackChanged
-    eng3BearFvgTouchedState := f_zoneTouchedSinceBar(eng1_ctx_bear_fvg_top, eng1_ctx_bear_fvg_bottom, eng1BearFvgCreatedBar, eng1ContextTouchScan)
+    eng3BearFvgTouchedState := high >= eng1_ctx_bear_fvg_bottom and low <= eng1_ctx_bear_fvg_top
     eng3BearFvgTouchBar := eng1BearFvgCreatedBar
     eng3BearFvgTouchTop := eng1_ctx_bear_fvg_top
     eng3BearFvgTouchBottom := eng1_ctx_bear_fvg_bottom
