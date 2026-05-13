@@ -205,10 +205,10 @@ float exe_protected_low = na
 ```	
 	
 ## Engine 2: Draw Engine
-
-
-### ENGINE 2: DRAW STATE
-
+```markdown
+//------------------------------------------------------------------------------
+// ENGINE 2: DRAW STATE
+//------------------------------------------------------------------------------
 string draw_mode = effectiveZoneDisplayMode  // Full / Focused / Minimal
 bool draw_full = draw_mode == "Full"
 bool draw_focused = draw_mode == "Focused"
@@ -221,6 +221,10 @@ bool draw_show_htf = showHtf
 bool draw_show_protected = showProtectedLevels
 bool draw_show_ote = strictShowOte and not draw_minimal
 bool draw_show_right_labels = displayLiquidityRightLabels
+
+```
+
+```markdown
 // Active visual contract only
 bool draw_long_selected = false
 bool draw_short_selected = false
@@ -230,6 +234,10 @@ float draw_short_zone_top = na
 float draw_short_zone_bottom = na
 string draw_long_zone_type = ""
 string draw_short_zone_type = ""
+
+```
+
+```markdown
 f_draw_zone_visible(string mode, bool isSelected, bool isBull, string preferredDirection) =>
 f_draw_level_visible(string mode, bool isPrimary, bool isBull, string preferredDirection) =>
 f_draw_zone_box(box bx, label lb, float top, float bottom, string zoneType, bool isBull, bool selected, bool terminal) =>
@@ -238,12 +246,13 @@ f_draw_structure_markers(...) =>
 f_draw_right_edge_label(...) =>
 f_draw_cleanup_hidden_objects() =>
 
+```
 
 ## Engine 3: Setup Engine
-
-
-### ENGINE 3A: CONTEXT POI CONTRACT
-
+```markdown
+//------------------------------------------------------------------------------
+// ENGINE 3A: CONTEXT POI CONTRACT
+//------------------------------------------------------------------------------
 bool  poi_long_valid = false
 bool  poi_short_valid = false
 string poi_long_type = ""     // "OB" / "FVG" / "Breaker"
@@ -257,8 +266,12 @@ float poi_short_bottom = na
 float poi_short_entry = na
 int   poi_short_bar = na
 
-### ENGINE 3B: EXECUTION CONFIRM CONTRACT
+```
 
+```markdown
+//------------------------------------------------------------------------------
+// ENGINE 3B: EXECUTION CONFIRM CONTRACT
+//------------------------------------------------------------------------------
 bool exe_long_confirm = false
 bool exe_short_confirm = false
 bool exe_long_pd_pass = false
@@ -270,8 +283,29 @@ bool exe_short_kz_pass = false
 bool exe_long_dol_pass = false
 bool exe_short_dol_pass = false
 
-### ENGINE 3C: TRADE PLAN / LIFECYCLE
+```
 
+```markdown
+//------------------------------------------------------------------------------
+// ENGINE 3B: EXECUTION CONFIRM CONTRACT
+//------------------------------------------------------------------------------
+bool exe_long_confirm = false
+bool exe_short_confirm = false
+bool exe_long_pd_pass = false
+bool exe_short_pd_pass = false
+bool exe_long_ote_pass = false
+bool exe_short_ote_pass = false
+bool exe_long_kz_pass = false
+bool exe_short_kz_pass = false
+bool exe_long_dol_pass = false
+bool exe_short_dol_pass = false
+
+```
+
+```markdown
+//------------------------------------------------------------------------------
+// ENGINE 3C: TRADE PLAN / LIFECYCLE
+//------------------------------------------------------------------------------
 string stp_long_state = "Waiting"
 string stp_short_state = "Waiting"
 
@@ -294,6 +328,10 @@ bool  stp_long_ambiguous = false
 bool  stp_short_ambiguous = false
 int   stp_long_age = na
 int   stp_short_age = na
+
+```
+
+```markdown
 f_select_context_poi(bool bullSide) =>
     // choose from ctx_* only, never from execution-owned arrays
 
@@ -308,9 +346,11 @@ f_build_trade_plan(bool bullSide, string poiType, float poiTop, float poiBottom,
 
 f_update_trade_lifecycle(...) =>
     // returns: [state, touched, completed, invalidated, ambiguous, age]
-	
-## Aturan Engine 3
 
+```
+
+## Aturan Engine 3
+```markdown
 // Long setup is valid only if:
 poi_long_valid :=
     f_validate_narrative_side(true) and
@@ -327,12 +367,13 @@ exe_long_confirm :=
 
 // Same for short
 
+```
 
 ## Engine 4: Dashboard Engine
-
-
-### ENGINE 4: DASHBOARD SNAPSHOT
-
+```markdown
+//------------------------------------------------------------------------------
+// ENGINE 4: DASHBOARD SNAPSHOT
+//------------------------------------------------------------------------------
 string dash_bias_market = ""
 string dash_setup_long = ""
 string dash_setup_short = ""
@@ -354,6 +395,11 @@ string dash_compact_zone = ""
 string dash_compact_metric = ""
 string dash_compact_life = ""
 string dash_compact_mode = ""
+
+
+```
+
+```markdown
 f_dash_bias_text(int execBias, int ctxBias, int narrBias, string narrStrength) =>
 f_dash_setup_text(string state, string poiType, bool retired) =>
 f_dash_zone_text(float top, float bottom, float entry, bool retired) =>
@@ -363,6 +409,8 @@ f_dash_draw_text(float drawLevel, bool retired) =>
 f_dash_life_text(int age, bool touched, bool retired) =>
 f_dash_next_text(string modeSummary, string mtfSummary, string oteSummary) =>
 f_dash_compact_text(...) =>
+
+```
 
 
 ## Urutan Eksekusi
