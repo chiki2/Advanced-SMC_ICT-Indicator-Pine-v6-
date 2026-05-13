@@ -100,7 +100,6 @@ effectiveZoneDisplayMode = profileCompact ? "Minimal" : zoneDisplayMode
 // so visual ownership is explicit and easy to audit.
 string draw_mode = effectiveZoneDisplayMode
 bool draw_full = draw_mode == "Full"
-bool draw_focused = draw_mode == "Focused"
 bool draw_minimal = draw_mode == "Minimal"
 bool draw_show_sessions = showSessionVisuals and draw_full and timeframe.isintraday
 bool draw_show_structure = showMarketStructure and draw_full and not compactMode
@@ -380,24 +379,20 @@ f_zoneQualityBorderAlpha(string qualityTier, string executionState) =>
 f_zoneQualityBorderWidth(string qualityTier) =>
     qualityTier == "Q3" ? 3 : 2
 
+var int eng1_chart_first_bar_index = na
+if barstate.isfirst
+    eng1_chart_first_bar_index := bar_index
+
 f_timeToChartBar(int sourceTime) =>
     bool hasSourceTime = not na(sourceTime)
     bool crossed = hasSourceTime and time >= sourceTime and nz(time[1], time) < sourceTime
     int crossedBar = ta.valuewhen(crossed, bar_index, 0)
-    int mappedBar = hasSourceTime ? crossedBar : na
-    if hasSourceTime and na(mappedBar) and time >= sourceTime
-        mappedBar := 0
-    mappedBar
+    int mappedBar = not na(crossedBar) ? crossedBar : hasSourceTime and sourceTime <= time ? eng1_chart_first_bar_index : na
+    hasSourceTime ? mappedBar : na
 
-f_zoneTouchedSinceBar(float zoneTop, float zoneBottom, int createdBar, int maxScanBars) =>
-    bool touched = false
-    if not na(zoneTop) and not na(zoneBottom) and not na(createdBar) and createdBar <= bar_index
-        int barsToScan = math.min(math.max(bar_index - createdBar, 0), math.max(maxScanBars, 0))
-        for i = 0 to barsToScan
-            if high[i] >= zoneBottom and low[i] <= zoneTop
-                touched := true
-                break
-    touched
+f_createdBarFallback(int createdBar) =>
+    int firstChartBar = not na(eng1_chart_first_bar_index) ? eng1_chart_first_bar_index : 0
+    not na(createdBar) ? createdBar : firstChartBar
 
 f_zoneIntersects(float zoneTop, float zoneBottom, float refTop, float refBottom) =>
     not na(zoneTop) and not na(zoneBottom) and not na(refTop) and not na(refBottom) and math.max(zoneBottom, refBottom) <= math.min(zoneTop, refTop)
@@ -763,6 +758,43 @@ f_eng4_confirmation_text(bool hasSetup, bool strictEnabled, bool timePass, bool 
     string confirmationText = hasSetup ? f_confirmationStateText(strictEnabled, timePass, biasPass, contextPass, sweepPass, mssPass, displacementPass, pdPass, otePass, dolPass, false) + " | " + f_setupPathText(true, isFvg, isOb, usesDolTarget, false) : "-"
     f_eng4_context_text(confirmationText, executionState, retired)
 
+//------------------------------------------------------------------------------
+// ENGINE 4 CONTRACT HELPERS (MAIN_CONTRACT)
+// Keep these wrappers thin so dashboard contract names stay stable without
+// duplicating logic or adding new scoring branches.
+//------------------------------------------------------------------------------
+f_dash_bias_text(int execBias, int ctxBias, int narrBias, string narrStrength) =>
+    f_biasSummary(execBias, true, ctxBias, narrBias, narrStrength)
+
+f_dash_setup_text(string state, string poiType, bool retired) =>
+    string mergedState = state
+    if poiType != "" and poiType != "-" and not str.contains(state, poiType)
+        mergedState := state + " | " + poiType
+    f_eng4_setup_text(mergedState, retired)
+
+f_dash_zone_text(float top, float bottom, float entry, bool retired) =>
+    f_eng4_zone_text(top, bottom, entry, retired)
+
+f_dash_risk_text(float stop, float target, bool retired) =>
+    f_eng4_risk_text(stop, target, retired)
+
+f_dash_rr_text(float rr, float confidence, bool retired) =>
+    f_eng4_rr_text(rr, confidence, retired)
+
+f_dash_draw_text(float drawLevel, bool retired) =>
+    f_eng4_level_text(drawLevel, retired)
+
+f_dash_life_text(int age, bool touched, bool retired) =>
+    f_eng4_life_text(age, touched, retired)
+
+f_dash_next_text(string modeSummary, string mtfSummary, string oteSummary) =>
+    string nextText = modeSummary
+    if mtfSummary != ""
+        nextText += " | " + mtfSummary
+    if oteSummary != ""
+        nextText += " | " + oteSummary
+    nextText
+
 f_trimSessionVisuals(int keepCount) =>
     int cap = math.max(keepCount, 0)
     while array.size(sessionRangeBoxes) > cap
@@ -1063,6 +1095,7 @@ int ENG1_BUF_CAP = 300
 int ENG1_SWING_LEN = 3
 int ENG1_STRUCTURE_SCAN_CAP = 140
 int ENG1_FVG_SCAN_CAP = 90
+int ENG1_OB_SCAN_CAP = 28
 int ENG1_PD_LOOKBACK = 60
 
 eng1_exec_tf = timeframe.main_period
@@ -1207,6 +1240,8 @@ f_eng1_build_structure_liquidity(array<int> arrT, array<float> arrH, array<float
         if eqhAnchorIdx > 0
             for i = 0 to eqhAnchorIdx - 1
                 eqhActive := eqhActive and array.get(arrH, i) <= eqh
+                if not eqhActive
+                    break
     if not na(lastLow) and not na(prevLow) and not na(lastLowIdx) and not na(prevLowIdx) and math.abs(lastLow - prevLow) <= tolerance
         eql := math.min(lastLow, prevLow)
         int eqlAnchorIdx = math.min(lastLowIdx, prevLowIdx)
@@ -1215,6 +1250,8 @@ f_eng1_build_structure_liquidity(array<int> arrT, array<float> arrH, array<float
         if eqlAnchorIdx > 0
             for i = 0 to eqlAnchorIdx - 1
                 eqlActive := eqlActive and array.get(arrL, i) >= eql
+                if not eqlActive
+                    break
 
     [lastHigh, lastHighBar, prevHigh, prevHighBar, lastLow, lastLowBar, prevLow, prevLowBar, trendBiasLocal, eqh, eqhBar, eql, eqlBar, eqhActive, eqlActive]
 
@@ -1282,12 +1319,6 @@ f_eng1_break_up(float level, float candleClose) =>
 
 f_eng1_break_down(float level, float candleClose) =>
     candleClose < level
-
-f_eng1_window_high(array<float> arrH, int lookback) =>
-    f_eng1_window_high_safe(arrH, lookback)
-
-f_eng1_window_low(array<float> arrL, int lookback) =>
-    f_eng1_window_low_safe(arrL, lookback)
 
 f_eng1_segment_high(array<float> arrH, int startIdx, int endIdx) =>
     float highest = na
@@ -1401,7 +1432,7 @@ f_eng1_build_ob(array<int> arrT, array<float> arrO, array<float> arrH, array<flo
     if size >= 5
         float avgRange = f_eng1_avg_range(arrH, arrL, 20)
         float displacementThreshold = na(avgRange) ? syminfo.mintick * 10.0 : math.max(avgRange * obImpulseAtr, syminfo.mintick * 10.0)
-        int searchCap = math.min(size - 2, obSearchBars + obValidationLookback + ENG1_SWING_LEN + 2)
+        int searchCap = math.min(size - 2, math.min(obSearchBars + obValidationLookback + ENG1_SWING_LEN + 2, ENG1_OB_SCAN_CAP))
         for idx = 1 to searchCap
             float obOpen = array.get(arrO, idx)
             float obHigh = array.get(arrH, idx)
@@ -1436,6 +1467,8 @@ f_eng1_build_ob(array<int> arrT, array<float> arrO, array<float> arrH, array<flo
                         bullBreakSeen := true
                     if bullBreakSeen and f_eng1_break_down(obLow, newerClose)
                         bullInvalidated := true
+                    if bullInvalidated
+                        break
                 bool bullPattern = bullDispSeen and bullBreakSeen
                 if bullPattern
                     [candidateTop, candidateBottom] = f_eng1_ob_bounds(true, obOpen, obHigh, obLow)
@@ -1473,6 +1506,8 @@ f_eng1_build_ob(array<int> arrT, array<float> arrO, array<float> arrH, array<flo
                         bearBreakSeen := true
                     if bearBreakSeen and f_eng1_break_up(obHigh, newerClose)
                         bearInvalidated := true
+                    if bearInvalidated
+                        break
                 bool bearPattern = bearDispSeen and bearBreakSeen
                 if bearPattern
                     [candidateTop, candidateBottom] = f_eng1_ob_bounds(false, obOpen, obHigh, obLow)
@@ -1945,6 +1980,12 @@ var float eng1_exe_eqh = na
 var float eng1_exe_eql = na
 var bool eng1_exe_eqh_active = false
 var bool eng1_exe_eql_active = false
+var float eng1_d1_lb20_high = na
+var float eng1_d1_lb20_low = na
+var float eng1_d1_lb40_high = na
+var float eng1_d1_lb40_low = na
+var float eng1_d1_lb60_high = na
+var float eng1_d1_lb60_low = na
 
 f_eng1_regime_strength_from_buffer(int bias, array<float> arrC, array<float> arrH, array<float> arrL) =>
     string strength = "Flat"
@@ -2235,6 +2276,13 @@ eng1_h1_new_closed_bar := eng1_h1_new_closed_bar_tmp
 eng1_h4_new_closed_bar := eng1_h4_new_closed_bar_tmp
 eng1_d1_new_closed_bar := eng1_d1_new_closed_bar_tmp
 bool eng1_any_new_closed_bar = eng1_m1_new_closed_bar or eng1_m5_new_closed_bar or eng1_m15_new_closed_bar or eng1_m30_new_closed_bar or eng1_h1_new_closed_bar or eng1_h4_new_closed_bar or eng1_d1_new_closed_bar
+bool recalc_m1 = eng1_m1_new_closed_bar or barstate.isfirst
+bool recalc_m5 = eng1_m5_new_closed_bar or barstate.isfirst
+bool recalc_m15 = eng1_m15_new_closed_bar or barstate.isfirst
+bool recalc_m30 = eng1_m30_new_closed_bar or barstate.isfirst
+bool recalc_h1 = eng1_h1_new_closed_bar or barstate.isfirst
+bool recalc_h4 = eng1_h4_new_closed_bar or barstate.isfirst
+bool recalc_d1 = eng1_d1_new_closed_bar or barstate.isfirst
 
 if eng1_any_new_closed_bar or barstate.isfirst
     int eng1_m1_prior_trend_bias = eng1_m1_trend_bias
@@ -2244,354 +2292,390 @@ if eng1_any_new_closed_bar or barstate.isfirst
     int eng1_h1_prior_trend_bias = eng1_h1_trend_bias
     int eng1_h4_prior_trend_bias = eng1_h4_trend_bias
     int eng1_d1_prior_trend_bias = eng1_d1_trend_bias
-    [eng1_m1_last_swing_high_tmp, eng1_m1_last_swing_high_bar_tmp, eng1_m1_prev_swing_high_tmp, eng1_m1_prev_swing_high_bar_tmp, eng1_m1_last_swing_low_tmp, eng1_m1_last_swing_low_bar_tmp, eng1_m1_prev_swing_low_tmp, eng1_m1_prev_swing_low_bar_tmp, eng1_m1_trend_bias_tmp, eng1_m1_eqh_tmp, eng1_m1_eqh_bar_tmp, eng1_m1_eql_tmp, eng1_m1_eql_bar_tmp, eng1_m1_eqh_active_tmp, eng1_m1_eql_active_tmp] = f_eng1_build_structure_liquidity(eng1_buf_m1_time, eng1_buf_m1_high, eng1_buf_m1_low, eng1_buf_m1_close, ENG1_SWING_LEN)
-    [eng1_m5_last_swing_high_tmp, eng1_m5_last_swing_high_bar_tmp, eng1_m5_prev_swing_high_tmp, eng1_m5_prev_swing_high_bar_tmp, eng1_m5_last_swing_low_tmp, eng1_m5_last_swing_low_bar_tmp, eng1_m5_prev_swing_low_tmp, eng1_m5_prev_swing_low_bar_tmp, eng1_m5_trend_bias_tmp, eng1_m5_eqh_tmp, eng1_m5_eqh_bar_tmp, eng1_m5_eql_tmp, eng1_m5_eql_bar_tmp, eng1_m5_eqh_active_tmp, eng1_m5_eql_active_tmp] = f_eng1_build_structure_liquidity(eng1_buf_m5_time, eng1_buf_m5_high, eng1_buf_m5_low, eng1_buf_m5_close, ENG1_SWING_LEN)
-    [eng1_m15_last_swing_high_tmp, eng1_m15_last_swing_high_bar_tmp, eng1_m15_prev_swing_high_tmp, eng1_m15_prev_swing_high_bar_tmp, eng1_m15_last_swing_low_tmp, eng1_m15_last_swing_low_bar_tmp, eng1_m15_prev_swing_low_tmp, eng1_m15_prev_swing_low_bar_tmp, eng1_m15_trend_bias_tmp, eng1_m15_eqh_tmp, eng1_m15_eqh_bar_tmp, eng1_m15_eql_tmp, eng1_m15_eql_bar_tmp, eng1_m15_eqh_active_tmp, eng1_m15_eql_active_tmp] = f_eng1_build_structure_liquidity(eng1_buf_m15_time, eng1_buf_m15_high, eng1_buf_m15_low, eng1_buf_m15_close, ENG1_SWING_LEN)
-    [eng1_m30_last_swing_high_tmp, eng1_m30_last_swing_high_bar_tmp, eng1_m30_prev_swing_high_tmp, eng1_m30_prev_swing_high_bar_tmp, eng1_m30_last_swing_low_tmp, eng1_m30_last_swing_low_bar_tmp, eng1_m30_prev_swing_low_tmp, eng1_m30_prev_swing_low_bar_tmp, eng1_m30_trend_bias_tmp, eng1_m30_eqh_tmp, eng1_m30_eqh_bar_tmp, eng1_m30_eql_tmp, eng1_m30_eql_bar_tmp, eng1_m30_eqh_active_tmp, eng1_m30_eql_active_tmp] = f_eng1_build_structure_liquidity(eng1_buf_m30_time, eng1_buf_m30_high, eng1_buf_m30_low, eng1_buf_m30_close, ENG1_SWING_LEN)
-    [eng1_h1_last_swing_high_tmp, eng1_h1_last_swing_high_bar_tmp, eng1_h1_prev_swing_high_tmp, eng1_h1_prev_swing_high_bar_tmp, eng1_h1_last_swing_low_tmp, eng1_h1_last_swing_low_bar_tmp, eng1_h1_prev_swing_low_tmp, eng1_h1_prev_swing_low_bar_tmp, eng1_h1_trend_bias_tmp, eng1_h1_eqh_tmp, eng1_h1_eqh_bar_tmp, eng1_h1_eql_tmp, eng1_h1_eql_bar_tmp, eng1_h1_eqh_active_tmp, eng1_h1_eql_active_tmp] = f_eng1_build_structure_liquidity(eng1_buf_h1_time, eng1_buf_h1_high, eng1_buf_h1_low, eng1_buf_h1_close, ENG1_SWING_LEN)
-    [eng1_h4_last_swing_high_tmp, eng1_h4_last_swing_high_bar_tmp, eng1_h4_prev_swing_high_tmp, eng1_h4_prev_swing_high_bar_tmp, eng1_h4_last_swing_low_tmp, eng1_h4_last_swing_low_bar_tmp, eng1_h4_prev_swing_low_tmp, eng1_h4_prev_swing_low_bar_tmp, eng1_h4_trend_bias_tmp, eng1_h4_eqh_tmp, eng1_h4_eqh_bar_tmp, eng1_h4_eql_tmp, eng1_h4_eql_bar_tmp, eng1_h4_eqh_active_tmp, eng1_h4_eql_active_tmp] = f_eng1_build_structure_liquidity(eng1_buf_h4_time, eng1_buf_h4_high, eng1_buf_h4_low, eng1_buf_h4_close, ENG1_SWING_LEN)
-    [eng1_d1_last_swing_high_tmp, eng1_d1_last_swing_high_bar_tmp, eng1_d1_prev_swing_high_tmp, eng1_d1_prev_swing_high_bar_tmp, eng1_d1_last_swing_low_tmp, eng1_d1_last_swing_low_bar_tmp, eng1_d1_prev_swing_low_tmp, eng1_d1_prev_swing_low_bar_tmp, eng1_d1_trend_bias_tmp, eng1_d1_eqh_tmp, eng1_d1_eqh_bar_tmp, eng1_d1_eql_tmp, eng1_d1_eql_bar_tmp, eng1_d1_eqh_active_tmp, eng1_d1_eql_active_tmp] = f_eng1_build_structure_liquidity(eng1_buf_d1_time, eng1_buf_d1_high, eng1_buf_d1_low, eng1_buf_d1_close, ENG1_SWING_LEN)
-    eng1_m1_last_swing_high := eng1_m1_last_swing_high_tmp
-    eng1_m1_last_swing_high_bar := eng1_m1_last_swing_high_bar_tmp
-    eng1_m1_prev_swing_high := eng1_m1_prev_swing_high_tmp
-    eng1_m1_prev_swing_high_bar := eng1_m1_prev_swing_high_bar_tmp
-    eng1_m1_last_swing_low := eng1_m1_last_swing_low_tmp
-    eng1_m1_last_swing_low_bar := eng1_m1_last_swing_low_bar_tmp
-    eng1_m1_prev_swing_low := eng1_m1_prev_swing_low_tmp
-    eng1_m1_prev_swing_low_bar := eng1_m1_prev_swing_low_bar_tmp
-    eng1_m1_trend_bias := eng1_m1_trend_bias_tmp
-    
-    eng1_m5_last_swing_high := eng1_m5_last_swing_high_tmp
-    eng1_m5_last_swing_high_bar := eng1_m5_last_swing_high_bar_tmp
-    eng1_m5_prev_swing_high := eng1_m5_prev_swing_high_tmp
-    eng1_m5_prev_swing_high_bar := eng1_m5_prev_swing_high_bar_tmp
-    eng1_m5_last_swing_low := eng1_m5_last_swing_low_tmp
-    eng1_m5_last_swing_low_bar := eng1_m5_last_swing_low_bar_tmp
-    eng1_m5_prev_swing_low := eng1_m5_prev_swing_low_tmp
-    eng1_m5_prev_swing_low_bar := eng1_m5_prev_swing_low_bar_tmp
-    eng1_m5_trend_bias := eng1_m5_trend_bias_tmp
-    
-    eng1_m15_last_swing_high := eng1_m15_last_swing_high_tmp
-    eng1_m15_last_swing_high_bar := eng1_m15_last_swing_high_bar_tmp
-    eng1_m15_prev_swing_high := eng1_m15_prev_swing_high_tmp
-    eng1_m15_prev_swing_high_bar := eng1_m15_prev_swing_high_bar_tmp
-    eng1_m15_last_swing_low := eng1_m15_last_swing_low_tmp
-    eng1_m15_last_swing_low_bar := eng1_m15_last_swing_low_bar_tmp
-    eng1_m15_prev_swing_low := eng1_m15_prev_swing_low_tmp
-    eng1_m15_prev_swing_low_bar := eng1_m15_prev_swing_low_bar_tmp
-    eng1_m15_trend_bias := eng1_m15_trend_bias_tmp
-    
-    eng1_m30_last_swing_high := eng1_m30_last_swing_high_tmp
-    eng1_m30_last_swing_high_bar := eng1_m30_last_swing_high_bar_tmp
-    eng1_m30_prev_swing_high := eng1_m30_prev_swing_high_tmp
-    eng1_m30_prev_swing_high_bar := eng1_m30_prev_swing_high_bar_tmp
-    eng1_m30_last_swing_low := eng1_m30_last_swing_low_tmp
-    eng1_m30_last_swing_low_bar := eng1_m30_last_swing_low_bar_tmp
-    eng1_m30_prev_swing_low := eng1_m30_prev_swing_low_tmp
-    eng1_m30_prev_swing_low_bar := eng1_m30_prev_swing_low_bar_tmp
-    eng1_m30_trend_bias := eng1_m30_trend_bias_tmp
-    
-    eng1_h1_last_swing_high := eng1_h1_last_swing_high_tmp
-    eng1_h1_last_swing_high_bar := eng1_h1_last_swing_high_bar_tmp
-    eng1_h1_prev_swing_high := eng1_h1_prev_swing_high_tmp
-    eng1_h1_prev_swing_high_bar := eng1_h1_prev_swing_high_bar_tmp
-    eng1_h1_last_swing_low := eng1_h1_last_swing_low_tmp
-    eng1_h1_last_swing_low_bar := eng1_h1_last_swing_low_bar_tmp
-    eng1_h1_prev_swing_low := eng1_h1_prev_swing_low_tmp
-    eng1_h1_prev_swing_low_bar := eng1_h1_prev_swing_low_bar_tmp
-    eng1_h1_trend_bias := eng1_h1_trend_bias_tmp
-    
-    eng1_h4_last_swing_high := eng1_h4_last_swing_high_tmp
-    eng1_h4_last_swing_high_bar := eng1_h4_last_swing_high_bar_tmp
-    eng1_h4_prev_swing_high := eng1_h4_prev_swing_high_tmp
-    eng1_h4_prev_swing_high_bar := eng1_h4_prev_swing_high_bar_tmp
-    eng1_h4_last_swing_low := eng1_h4_last_swing_low_tmp
-    eng1_h4_last_swing_low_bar := eng1_h4_last_swing_low_bar_tmp
-    eng1_h4_prev_swing_low := eng1_h4_prev_swing_low_tmp
-    eng1_h4_prev_swing_low_bar := eng1_h4_prev_swing_low_bar_tmp
-    eng1_h4_trend_bias := eng1_h4_trend_bias_tmp
-    
-    eng1_d1_last_swing_high := eng1_d1_last_swing_high_tmp
-    eng1_d1_last_swing_high_bar := eng1_d1_last_swing_high_bar_tmp
-    eng1_d1_prev_swing_high := eng1_d1_prev_swing_high_tmp
-    eng1_d1_prev_swing_high_bar := eng1_d1_prev_swing_high_bar_tmp
-    eng1_d1_last_swing_low := eng1_d1_last_swing_low_tmp
-    eng1_d1_last_swing_low_bar := eng1_d1_last_swing_low_bar_tmp
-    eng1_d1_prev_swing_low := eng1_d1_prev_swing_low_tmp
-    eng1_d1_prev_swing_low_bar := eng1_d1_prev_swing_low_bar_tmp
-    eng1_d1_trend_bias := eng1_d1_trend_bias_tmp
-    
-    eng1_m1_eqh := eng1_m1_eqh_tmp
-    eng1_m1_eqh_bar := eng1_m1_eqh_bar_tmp
-    eng1_m1_eql := eng1_m1_eql_tmp
-    eng1_m1_eql_bar := eng1_m1_eql_bar_tmp
-    eng1_m1_eqh_active := eng1_m1_eqh_active_tmp
-    eng1_m1_eql_active := eng1_m1_eql_active_tmp
-    eng1_m5_eqh := eng1_m5_eqh_tmp
-    eng1_m5_eqh_bar := eng1_m5_eqh_bar_tmp
-    eng1_m5_eql := eng1_m5_eql_tmp
-    eng1_m5_eql_bar := eng1_m5_eql_bar_tmp
-    eng1_m5_eqh_active := eng1_m5_eqh_active_tmp
-    eng1_m5_eql_active := eng1_m5_eql_active_tmp
-    eng1_m15_eqh := eng1_m15_eqh_tmp
-    eng1_m15_eqh_bar := eng1_m15_eqh_bar_tmp
-    eng1_m15_eql := eng1_m15_eql_tmp
-    eng1_m15_eql_bar := eng1_m15_eql_bar_tmp
-    eng1_m15_eqh_active := eng1_m15_eqh_active_tmp
-    eng1_m15_eql_active := eng1_m15_eql_active_tmp
-    eng1_m30_eqh := eng1_m30_eqh_tmp
-    eng1_m30_eqh_bar := eng1_m30_eqh_bar_tmp
-    eng1_m30_eql := eng1_m30_eql_tmp
-    eng1_m30_eql_bar := eng1_m30_eql_bar_tmp
-    eng1_m30_eqh_active := eng1_m30_eqh_active_tmp
-    eng1_m30_eql_active := eng1_m30_eql_active_tmp
-    eng1_h1_eqh := eng1_h1_eqh_tmp
-    eng1_h1_eqh_bar := eng1_h1_eqh_bar_tmp
-    eng1_h1_eql := eng1_h1_eql_tmp
-    eng1_h1_eql_bar := eng1_h1_eql_bar_tmp
-    eng1_h1_eqh_active := eng1_h1_eqh_active_tmp
-    eng1_h1_eql_active := eng1_h1_eql_active_tmp
-    eng1_h4_eqh := eng1_h4_eqh_tmp
-    eng1_h4_eqh_bar := eng1_h4_eqh_bar_tmp
-    eng1_h4_eql := eng1_h4_eql_tmp
-    eng1_h4_eql_bar := eng1_h4_eql_bar_tmp
-    eng1_h4_eqh_active := eng1_h4_eqh_active_tmp
-    eng1_h4_eql_active := eng1_h4_eql_active_tmp
-    eng1_d1_eqh := eng1_d1_eqh_tmp
-    eng1_d1_eqh_bar := eng1_d1_eqh_bar_tmp
-    eng1_d1_eql := eng1_d1_eql_tmp
-    eng1_d1_eql_bar := eng1_d1_eql_bar_tmp
-    eng1_d1_eqh_active := eng1_d1_eqh_active_tmp
-    eng1_d1_eql_active := eng1_d1_eql_active_tmp
+    if recalc_m1
+        [eng1_m1_last_swing_high_tmp, eng1_m1_last_swing_high_bar_tmp, eng1_m1_prev_swing_high_tmp, eng1_m1_prev_swing_high_bar_tmp, eng1_m1_last_swing_low_tmp, eng1_m1_last_swing_low_bar_tmp, eng1_m1_prev_swing_low_tmp, eng1_m1_prev_swing_low_bar_tmp, eng1_m1_trend_bias_tmp, eng1_m1_eqh_tmp, eng1_m1_eqh_bar_tmp, eng1_m1_eql_tmp, eng1_m1_eql_bar_tmp, eng1_m1_eqh_active_tmp, eng1_m1_eql_active_tmp] = f_eng1_build_structure_liquidity(eng1_buf_m1_time, eng1_buf_m1_high, eng1_buf_m1_low, eng1_buf_m1_close, ENG1_SWING_LEN)
+        eng1_m1_last_swing_high := eng1_m1_last_swing_high_tmp
+        eng1_m1_last_swing_high_bar := eng1_m1_last_swing_high_bar_tmp
+        eng1_m1_prev_swing_high := eng1_m1_prev_swing_high_tmp
+        eng1_m1_prev_swing_high_bar := eng1_m1_prev_swing_high_bar_tmp
+        eng1_m1_last_swing_low := eng1_m1_last_swing_low_tmp
+        eng1_m1_last_swing_low_bar := eng1_m1_last_swing_low_bar_tmp
+        eng1_m1_prev_swing_low := eng1_m1_prev_swing_low_tmp
+        eng1_m1_prev_swing_low_bar := eng1_m1_prev_swing_low_bar_tmp
+        eng1_m1_trend_bias := eng1_m1_trend_bias_tmp
+        eng1_m1_eqh := eng1_m1_eqh_tmp
+        eng1_m1_eqh_bar := eng1_m1_eqh_bar_tmp
+        eng1_m1_eql := eng1_m1_eql_tmp
+        eng1_m1_eql_bar := eng1_m1_eql_bar_tmp
+        eng1_m1_eqh_active := eng1_m1_eqh_active_tmp
+        eng1_m1_eql_active := eng1_m1_eql_active_tmp
 
-    [eng1_m1_bull_bos_tmp, eng1_m1_bear_bos_tmp, eng1_m1_bull_choch_tmp, eng1_m1_bear_choch_tmp] = f_eng1_structure_break_signals(eng1_m1_last_swing_high_tmp, eng1_m1_last_swing_low_tmp, eng1_m1_prior_trend_bias, eng1_buf_m1_close)
-    [eng1_m5_bull_bos_tmp, eng1_m5_bear_bos_tmp, eng1_m5_bull_choch_tmp, eng1_m5_bear_choch_tmp] = f_eng1_structure_break_signals(eng1_m5_last_swing_high_tmp, eng1_m5_last_swing_low_tmp, eng1_m5_prior_trend_bias, eng1_buf_m5_close)
-    [eng1_m15_bull_bos_tmp, eng1_m15_bear_bos_tmp, eng1_m15_bull_choch_tmp, eng1_m15_bear_choch_tmp] = f_eng1_structure_break_signals(eng1_m15_last_swing_high_tmp, eng1_m15_last_swing_low_tmp, eng1_m15_prior_trend_bias, eng1_buf_m15_close)
-    [eng1_m30_bull_bos_tmp, eng1_m30_bear_bos_tmp, eng1_m30_bull_choch_tmp, eng1_m30_bear_choch_tmp] = f_eng1_structure_break_signals(eng1_m30_last_swing_high_tmp, eng1_m30_last_swing_low_tmp, eng1_m30_prior_trend_bias, eng1_buf_m30_close)
-    [eng1_h1_bull_bos_tmp, eng1_h1_bear_bos_tmp, eng1_h1_bull_choch_tmp, eng1_h1_bear_choch_tmp] = f_eng1_structure_break_signals(eng1_h1_last_swing_high_tmp, eng1_h1_last_swing_low_tmp, eng1_h1_prior_trend_bias, eng1_buf_h1_close)
-    [eng1_h4_bull_bos_tmp, eng1_h4_bear_bos_tmp, eng1_h4_bull_choch_tmp, eng1_h4_bear_choch_tmp] = f_eng1_structure_break_signals(eng1_h4_last_swing_high_tmp, eng1_h4_last_swing_low_tmp, eng1_h4_prior_trend_bias, eng1_buf_h4_close)
-    [eng1_d1_bull_bos_tmp, eng1_d1_bear_bos_tmp, eng1_d1_bull_choch_tmp, eng1_d1_bear_choch_tmp] = f_eng1_structure_break_signals(eng1_d1_last_swing_high_tmp, eng1_d1_last_swing_low_tmp, eng1_d1_prior_trend_bias, eng1_buf_d1_close)
-    eng1_m1_bull_bos := eng1_m1_bull_bos_tmp
-    eng1_m1_bear_bos := eng1_m1_bear_bos_tmp
-    eng1_m1_bull_choch := eng1_m1_bull_choch_tmp
-    eng1_m1_bear_choch := eng1_m1_bear_choch_tmp
-    eng1_m5_bull_bos := eng1_m5_bull_bos_tmp
-    eng1_m5_bear_bos := eng1_m5_bear_bos_tmp
-    eng1_m5_bull_choch := eng1_m5_bull_choch_tmp
-    eng1_m5_bear_choch := eng1_m5_bear_choch_tmp
-    eng1_m15_bull_bos := eng1_m15_bull_bos_tmp
-    eng1_m15_bear_bos := eng1_m15_bear_bos_tmp
-    eng1_m15_bull_choch := eng1_m15_bull_choch_tmp
-    eng1_m15_bear_choch := eng1_m15_bear_choch_tmp
-    eng1_m30_bull_bos := eng1_m30_bull_bos_tmp
-    eng1_m30_bear_bos := eng1_m30_bear_bos_tmp
-    eng1_m30_bull_choch := eng1_m30_bull_choch_tmp
-    eng1_m30_bear_choch := eng1_m30_bear_choch_tmp
-    eng1_h1_bull_bos := eng1_h1_bull_bos_tmp
-    eng1_h1_bear_bos := eng1_h1_bear_bos_tmp
-    eng1_h1_bull_choch := eng1_h1_bull_choch_tmp
-    eng1_h1_bear_choch := eng1_h1_bear_choch_tmp
-    eng1_h4_bull_bos := eng1_h4_bull_bos_tmp
-    eng1_h4_bear_bos := eng1_h4_bear_bos_tmp
-    eng1_h4_bull_choch := eng1_h4_bull_choch_tmp
-    eng1_h4_bear_choch := eng1_h4_bear_choch_tmp
-    eng1_d1_bull_bos := eng1_d1_bull_bos_tmp
-    eng1_d1_bear_bos := eng1_d1_bear_bos_tmp
-    eng1_d1_bull_choch := eng1_d1_bull_choch_tmp
-    eng1_d1_bear_choch := eng1_d1_bear_choch_tmp
+    if recalc_m5
+        [eng1_m5_last_swing_high_tmp, eng1_m5_last_swing_high_bar_tmp, eng1_m5_prev_swing_high_tmp, eng1_m5_prev_swing_high_bar_tmp, eng1_m5_last_swing_low_tmp, eng1_m5_last_swing_low_bar_tmp, eng1_m5_prev_swing_low_tmp, eng1_m5_prev_swing_low_bar_tmp, eng1_m5_trend_bias_tmp, eng1_m5_eqh_tmp, eng1_m5_eqh_bar_tmp, eng1_m5_eql_tmp, eng1_m5_eql_bar_tmp, eng1_m5_eqh_active_tmp, eng1_m5_eql_active_tmp] = f_eng1_build_structure_liquidity(eng1_buf_m5_time, eng1_buf_m5_high, eng1_buf_m5_low, eng1_buf_m5_close, ENG1_SWING_LEN)
+        eng1_m5_last_swing_high := eng1_m5_last_swing_high_tmp
+        eng1_m5_last_swing_high_bar := eng1_m5_last_swing_high_bar_tmp
+        eng1_m5_prev_swing_high := eng1_m5_prev_swing_high_tmp
+        eng1_m5_prev_swing_high_bar := eng1_m5_prev_swing_high_bar_tmp
+        eng1_m5_last_swing_low := eng1_m5_last_swing_low_tmp
+        eng1_m5_last_swing_low_bar := eng1_m5_last_swing_low_bar_tmp
+        eng1_m5_prev_swing_low := eng1_m5_prev_swing_low_tmp
+        eng1_m5_prev_swing_low_bar := eng1_m5_prev_swing_low_bar_tmp
+        eng1_m5_trend_bias := eng1_m5_trend_bias_tmp
+        eng1_m5_eqh := eng1_m5_eqh_tmp
+        eng1_m5_eqh_bar := eng1_m5_eqh_bar_tmp
+        eng1_m5_eql := eng1_m5_eql_tmp
+        eng1_m5_eql_bar := eng1_m5_eql_bar_tmp
+        eng1_m5_eqh_active := eng1_m5_eqh_active_tmp
+        eng1_m5_eql_active := eng1_m5_eql_active_tmp
 
-    [eng1_m1_erl_high_tmp, eng1_m1_erl_low_tmp, eng1_m1_irl_high_tmp, eng1_m1_irl_low_tmp] = f_eng1_build_liquidity_layers(eng1_m1_last_swing_high_tmp, eng1_m1_prev_swing_high_tmp, eng1_m1_last_swing_low_tmp, eng1_m1_prev_swing_low_tmp, eng1_m1_eqh_tmp, eng1_m1_eql_tmp, eng1_m1_eqh_active_tmp, eng1_m1_eql_active_tmp)
-    [eng1_m5_erl_high_tmp, eng1_m5_erl_low_tmp, eng1_m5_irl_high_tmp, eng1_m5_irl_low_tmp] = f_eng1_build_liquidity_layers(eng1_m5_last_swing_high_tmp, eng1_m5_prev_swing_high_tmp, eng1_m5_last_swing_low_tmp, eng1_m5_prev_swing_low_tmp, eng1_m5_eqh_tmp, eng1_m5_eql_tmp, eng1_m5_eqh_active_tmp, eng1_m5_eql_active_tmp)
-    [eng1_m15_erl_high_tmp, eng1_m15_erl_low_tmp, eng1_m15_irl_high_tmp, eng1_m15_irl_low_tmp] = f_eng1_build_liquidity_layers(eng1_m15_last_swing_high_tmp, eng1_m15_prev_swing_high_tmp, eng1_m15_last_swing_low_tmp, eng1_m15_prev_swing_low_tmp, eng1_m15_eqh_tmp, eng1_m15_eql_tmp, eng1_m15_eqh_active_tmp, eng1_m15_eql_active_tmp)
-    [eng1_m30_erl_high_tmp, eng1_m30_erl_low_tmp, eng1_m30_irl_high_tmp, eng1_m30_irl_low_tmp] = f_eng1_build_liquidity_layers(eng1_m30_last_swing_high_tmp, eng1_m30_prev_swing_high_tmp, eng1_m30_last_swing_low_tmp, eng1_m30_prev_swing_low_tmp, eng1_m30_eqh_tmp, eng1_m30_eql_tmp, eng1_m30_eqh_active_tmp, eng1_m30_eql_active_tmp)
-    [eng1_h1_erl_high_tmp, eng1_h1_erl_low_tmp, eng1_h1_irl_high_tmp, eng1_h1_irl_low_tmp] = f_eng1_build_liquidity_layers(eng1_h1_last_swing_high_tmp, eng1_h1_prev_swing_high_tmp, eng1_h1_last_swing_low_tmp, eng1_h1_prev_swing_low_tmp, eng1_h1_eqh_tmp, eng1_h1_eql_tmp, eng1_h1_eqh_active_tmp, eng1_h1_eql_active_tmp)
-    [eng1_h4_erl_high_tmp, eng1_h4_erl_low_tmp, eng1_h4_irl_high_tmp, eng1_h4_irl_low_tmp] = f_eng1_build_liquidity_layers(eng1_h4_last_swing_high_tmp, eng1_h4_prev_swing_high_tmp, eng1_h4_last_swing_low_tmp, eng1_h4_prev_swing_low_tmp, eng1_h4_eqh_tmp, eng1_h4_eql_tmp, eng1_h4_eqh_active_tmp, eng1_h4_eql_active_tmp)
-    [eng1_d1_erl_high_tmp, eng1_d1_erl_low_tmp, eng1_d1_irl_high_tmp, eng1_d1_irl_low_tmp] = f_eng1_build_liquidity_layers(eng1_d1_last_swing_high_tmp, eng1_d1_prev_swing_high_tmp, eng1_d1_last_swing_low_tmp, eng1_d1_prev_swing_low_tmp, eng1_d1_eqh_tmp, eng1_d1_eql_tmp, eng1_d1_eqh_active_tmp, eng1_d1_eql_active_tmp)
-    eng1_m1_erl_high := eng1_m1_erl_high_tmp
-    eng1_m1_erl_low := eng1_m1_erl_low_tmp
-    eng1_m1_irl_high := eng1_m1_irl_high_tmp
-    eng1_m1_irl_low := eng1_m1_irl_low_tmp
-    eng1_m5_erl_high := eng1_m5_erl_high_tmp
-    eng1_m5_erl_low := eng1_m5_erl_low_tmp
-    eng1_m5_irl_high := eng1_m5_irl_high_tmp
-    eng1_m5_irl_low := eng1_m5_irl_low_tmp
-    eng1_m15_erl_high := eng1_m15_erl_high_tmp
-    eng1_m15_erl_low := eng1_m15_erl_low_tmp
-    eng1_m15_irl_high := eng1_m15_irl_high_tmp
-    eng1_m15_irl_low := eng1_m15_irl_low_tmp
-    eng1_m30_erl_high := eng1_m30_erl_high_tmp
-    eng1_m30_erl_low := eng1_m30_erl_low_tmp
-    eng1_m30_irl_high := eng1_m30_irl_high_tmp
-    eng1_m30_irl_low := eng1_m30_irl_low_tmp
-    eng1_h1_erl_high := eng1_h1_erl_high_tmp
-    eng1_h1_erl_low := eng1_h1_erl_low_tmp
-    eng1_h1_irl_high := eng1_h1_irl_high_tmp
-    eng1_h1_irl_low := eng1_h1_irl_low_tmp
-    eng1_h4_erl_high := eng1_h4_erl_high_tmp
-    eng1_h4_erl_low := eng1_h4_erl_low_tmp
-    eng1_h4_irl_high := eng1_h4_irl_high_tmp
-    eng1_h4_irl_low := eng1_h4_irl_low_tmp
-    eng1_d1_erl_high := eng1_d1_erl_high_tmp
-    eng1_d1_erl_low := eng1_d1_erl_low_tmp
-    eng1_d1_irl_high := eng1_d1_irl_high_tmp
-    eng1_d1_irl_low := eng1_d1_irl_low_tmp
+    if recalc_m15
+        [eng1_m15_last_swing_high_tmp, eng1_m15_last_swing_high_bar_tmp, eng1_m15_prev_swing_high_tmp, eng1_m15_prev_swing_high_bar_tmp, eng1_m15_last_swing_low_tmp, eng1_m15_last_swing_low_bar_tmp, eng1_m15_prev_swing_low_tmp, eng1_m15_prev_swing_low_bar_tmp, eng1_m15_trend_bias_tmp, eng1_m15_eqh_tmp, eng1_m15_eqh_bar_tmp, eng1_m15_eql_tmp, eng1_m15_eql_bar_tmp, eng1_m15_eqh_active_tmp, eng1_m15_eql_active_tmp] = f_eng1_build_structure_liquidity(eng1_buf_m15_time, eng1_buf_m15_high, eng1_buf_m15_low, eng1_buf_m15_close, ENG1_SWING_LEN)
+        eng1_m15_last_swing_high := eng1_m15_last_swing_high_tmp
+        eng1_m15_last_swing_high_bar := eng1_m15_last_swing_high_bar_tmp
+        eng1_m15_prev_swing_high := eng1_m15_prev_swing_high_tmp
+        eng1_m15_prev_swing_high_bar := eng1_m15_prev_swing_high_bar_tmp
+        eng1_m15_last_swing_low := eng1_m15_last_swing_low_tmp
+        eng1_m15_last_swing_low_bar := eng1_m15_last_swing_low_bar_tmp
+        eng1_m15_prev_swing_low := eng1_m15_prev_swing_low_tmp
+        eng1_m15_prev_swing_low_bar := eng1_m15_prev_swing_low_bar_tmp
+        eng1_m15_trend_bias := eng1_m15_trend_bias_tmp
+        eng1_m15_eqh := eng1_m15_eqh_tmp
+        eng1_m15_eqh_bar := eng1_m15_eqh_bar_tmp
+        eng1_m15_eql := eng1_m15_eql_tmp
+        eng1_m15_eql_bar := eng1_m15_eql_bar_tmp
+        eng1_m15_eqh_active := eng1_m15_eqh_active_tmp
+        eng1_m15_eql_active := eng1_m15_eql_active_tmp
 
-    [eng1_m1_range_high_tmp, eng1_m1_range_low_tmp, eng1_m1_equilibrium_tmp, eng1_m1_ote_long_top_tmp, eng1_m1_ote_long_bottom_tmp, eng1_m1_ote_short_top_tmp, eng1_m1_ote_short_bottom_tmp] = f_eng1_build_pd_arrays(eng1_buf_m1_high, eng1_buf_m1_low, ENG1_PD_LOOKBACK)
-    [eng1_m5_range_high_tmp, eng1_m5_range_low_tmp, eng1_m5_equilibrium_tmp, eng1_m5_ote_long_top_tmp, eng1_m5_ote_long_bottom_tmp, eng1_m5_ote_short_top_tmp, eng1_m5_ote_short_bottom_tmp] = f_eng1_build_pd_arrays(eng1_buf_m5_high, eng1_buf_m5_low, ENG1_PD_LOOKBACK)
-    [eng1_m15_range_high_tmp, eng1_m15_range_low_tmp, eng1_m15_equilibrium_tmp, eng1_m15_ote_long_top_tmp, eng1_m15_ote_long_bottom_tmp, eng1_m15_ote_short_top_tmp, eng1_m15_ote_short_bottom_tmp] = f_eng1_build_pd_arrays(eng1_buf_m15_high, eng1_buf_m15_low, ENG1_PD_LOOKBACK)
-    [eng1_m30_range_high_tmp, eng1_m30_range_low_tmp, eng1_m30_equilibrium_tmp, eng1_m30_ote_long_top_tmp, eng1_m30_ote_long_bottom_tmp, eng1_m30_ote_short_top_tmp, eng1_m30_ote_short_bottom_tmp] = f_eng1_build_pd_arrays(eng1_buf_m30_high, eng1_buf_m30_low, ENG1_PD_LOOKBACK)
-    [eng1_h1_range_high_tmp, eng1_h1_range_low_tmp, eng1_h1_equilibrium_tmp, eng1_h1_ote_long_top_tmp, eng1_h1_ote_long_bottom_tmp, eng1_h1_ote_short_top_tmp, eng1_h1_ote_short_bottom_tmp] = f_eng1_build_pd_arrays(eng1_buf_h1_high, eng1_buf_h1_low, ENG1_PD_LOOKBACK)
-    [eng1_h4_range_high_tmp, eng1_h4_range_low_tmp, eng1_h4_equilibrium_tmp, eng1_h4_ote_long_top_tmp, eng1_h4_ote_long_bottom_tmp, eng1_h4_ote_short_top_tmp, eng1_h4_ote_short_bottom_tmp] = f_eng1_build_pd_arrays(eng1_buf_h4_high, eng1_buf_h4_low, ENG1_PD_LOOKBACK)
-    [eng1_d1_range_high_tmp, eng1_d1_range_low_tmp, eng1_d1_equilibrium_tmp, eng1_d1_ote_long_top_tmp, eng1_d1_ote_long_bottom_tmp, eng1_d1_ote_short_top_tmp, eng1_d1_ote_short_bottom_tmp] = f_eng1_build_pd_arrays(eng1_buf_d1_high, eng1_buf_d1_low, ENG1_PD_LOOKBACK)
-    eng1_m1_range_high := eng1_m1_range_high_tmp
-    eng1_m1_range_low := eng1_m1_range_low_tmp
-    eng1_m1_equilibrium := eng1_m1_equilibrium_tmp
-    eng1_m1_ote_long_top := eng1_m1_ote_long_top_tmp
-    eng1_m1_ote_long_bottom := eng1_m1_ote_long_bottom_tmp
-    eng1_m1_ote_short_top := eng1_m1_ote_short_top_tmp
-    eng1_m1_ote_short_bottom := eng1_m1_ote_short_bottom_tmp
-    eng1_m5_range_high := eng1_m5_range_high_tmp
-    eng1_m5_range_low := eng1_m5_range_low_tmp
-    eng1_m5_equilibrium := eng1_m5_equilibrium_tmp
-    eng1_m5_ote_long_top := eng1_m5_ote_long_top_tmp
-    eng1_m5_ote_long_bottom := eng1_m5_ote_long_bottom_tmp
-    eng1_m5_ote_short_top := eng1_m5_ote_short_top_tmp
-    eng1_m5_ote_short_bottom := eng1_m5_ote_short_bottom_tmp
-    eng1_m15_range_high := eng1_m15_range_high_tmp
-    eng1_m15_range_low := eng1_m15_range_low_tmp
-    eng1_m15_equilibrium := eng1_m15_equilibrium_tmp
-    eng1_m15_ote_long_top := eng1_m15_ote_long_top_tmp
-    eng1_m15_ote_long_bottom := eng1_m15_ote_long_bottom_tmp
-    eng1_m15_ote_short_top := eng1_m15_ote_short_top_tmp
-    eng1_m15_ote_short_bottom := eng1_m15_ote_short_bottom_tmp
-    eng1_m30_range_high := eng1_m30_range_high_tmp
-    eng1_m30_range_low := eng1_m30_range_low_tmp
-    eng1_m30_equilibrium := eng1_m30_equilibrium_tmp
-    eng1_m30_ote_long_top := eng1_m30_ote_long_top_tmp
-    eng1_m30_ote_long_bottom := eng1_m30_ote_long_bottom_tmp
-    eng1_m30_ote_short_top := eng1_m30_ote_short_top_tmp
-    eng1_m30_ote_short_bottom := eng1_m30_ote_short_bottom_tmp
-    eng1_h1_range_high := eng1_h1_range_high_tmp
-    eng1_h1_range_low := eng1_h1_range_low_tmp
-    eng1_h1_equilibrium := eng1_h1_equilibrium_tmp
-    eng1_h1_ote_long_top := eng1_h1_ote_long_top_tmp
-    eng1_h1_ote_long_bottom := eng1_h1_ote_long_bottom_tmp
-    eng1_h1_ote_short_top := eng1_h1_ote_short_top_tmp
-    eng1_h1_ote_short_bottom := eng1_h1_ote_short_bottom_tmp
-    eng1_h4_range_high := eng1_h4_range_high_tmp
-    eng1_h4_range_low := eng1_h4_range_low_tmp
-    eng1_h4_equilibrium := eng1_h4_equilibrium_tmp
-    eng1_h4_ote_long_top := eng1_h4_ote_long_top_tmp
-    eng1_h4_ote_long_bottom := eng1_h4_ote_long_bottom_tmp
-    eng1_h4_ote_short_top := eng1_h4_ote_short_top_tmp
-    eng1_h4_ote_short_bottom := eng1_h4_ote_short_bottom_tmp
-    eng1_d1_range_high := eng1_d1_range_high_tmp
-    eng1_d1_range_low := eng1_d1_range_low_tmp
-    eng1_d1_equilibrium := eng1_d1_equilibrium_tmp
-    eng1_d1_ote_long_top := eng1_d1_ote_long_top_tmp
-    eng1_d1_ote_long_bottom := eng1_d1_ote_long_bottom_tmp
-    eng1_d1_ote_short_top := eng1_d1_ote_short_top_tmp
-    eng1_d1_ote_short_bottom := eng1_d1_ote_short_bottom_tmp
+    if recalc_m30
+        [eng1_m30_last_swing_high_tmp, eng1_m30_last_swing_high_bar_tmp, eng1_m30_prev_swing_high_tmp, eng1_m30_prev_swing_high_bar_tmp, eng1_m30_last_swing_low_tmp, eng1_m30_last_swing_low_bar_tmp, eng1_m30_prev_swing_low_tmp, eng1_m30_prev_swing_low_bar_tmp, eng1_m30_trend_bias_tmp, eng1_m30_eqh_tmp, eng1_m30_eqh_bar_tmp, eng1_m30_eql_tmp, eng1_m30_eql_bar_tmp, eng1_m30_eqh_active_tmp, eng1_m30_eql_active_tmp] = f_eng1_build_structure_liquidity(eng1_buf_m30_time, eng1_buf_m30_high, eng1_buf_m30_low, eng1_buf_m30_close, ENG1_SWING_LEN)
+        eng1_m30_last_swing_high := eng1_m30_last_swing_high_tmp
+        eng1_m30_last_swing_high_bar := eng1_m30_last_swing_high_bar_tmp
+        eng1_m30_prev_swing_high := eng1_m30_prev_swing_high_tmp
+        eng1_m30_prev_swing_high_bar := eng1_m30_prev_swing_high_bar_tmp
+        eng1_m30_last_swing_low := eng1_m30_last_swing_low_tmp
+        eng1_m30_last_swing_low_bar := eng1_m30_last_swing_low_bar_tmp
+        eng1_m30_prev_swing_low := eng1_m30_prev_swing_low_tmp
+        eng1_m30_prev_swing_low_bar := eng1_m30_prev_swing_low_bar_tmp
+        eng1_m30_trend_bias := eng1_m30_trend_bias_tmp
+        eng1_m30_eqh := eng1_m30_eqh_tmp
+        eng1_m30_eqh_bar := eng1_m30_eqh_bar_tmp
+        eng1_m30_eql := eng1_m30_eql_tmp
+        eng1_m30_eql_bar := eng1_m30_eql_bar_tmp
+        eng1_m30_eqh_active := eng1_m30_eqh_active_tmp
+        eng1_m30_eql_active := eng1_m30_eql_active_tmp
+
+    if recalc_h1
+        [eng1_h1_last_swing_high_tmp, eng1_h1_last_swing_high_bar_tmp, eng1_h1_prev_swing_high_tmp, eng1_h1_prev_swing_high_bar_tmp, eng1_h1_last_swing_low_tmp, eng1_h1_last_swing_low_bar_tmp, eng1_h1_prev_swing_low_tmp, eng1_h1_prev_swing_low_bar_tmp, eng1_h1_trend_bias_tmp, eng1_h1_eqh_tmp, eng1_h1_eqh_bar_tmp, eng1_h1_eql_tmp, eng1_h1_eql_bar_tmp, eng1_h1_eqh_active_tmp, eng1_h1_eql_active_tmp] = f_eng1_build_structure_liquidity(eng1_buf_h1_time, eng1_buf_h1_high, eng1_buf_h1_low, eng1_buf_h1_close, ENG1_SWING_LEN)
+        eng1_h1_last_swing_high := eng1_h1_last_swing_high_tmp
+        eng1_h1_last_swing_high_bar := eng1_h1_last_swing_high_bar_tmp
+        eng1_h1_prev_swing_high := eng1_h1_prev_swing_high_tmp
+        eng1_h1_prev_swing_high_bar := eng1_h1_prev_swing_high_bar_tmp
+        eng1_h1_last_swing_low := eng1_h1_last_swing_low_tmp
+        eng1_h1_last_swing_low_bar := eng1_h1_last_swing_low_bar_tmp
+        eng1_h1_prev_swing_low := eng1_h1_prev_swing_low_tmp
+        eng1_h1_prev_swing_low_bar := eng1_h1_prev_swing_low_bar_tmp
+        eng1_h1_trend_bias := eng1_h1_trend_bias_tmp
+        eng1_h1_eqh := eng1_h1_eqh_tmp
+        eng1_h1_eqh_bar := eng1_h1_eqh_bar_tmp
+        eng1_h1_eql := eng1_h1_eql_tmp
+        eng1_h1_eql_bar := eng1_h1_eql_bar_tmp
+        eng1_h1_eqh_active := eng1_h1_eqh_active_tmp
+        eng1_h1_eql_active := eng1_h1_eql_active_tmp
+
+    if recalc_h4
+        [eng1_h4_last_swing_high_tmp, eng1_h4_last_swing_high_bar_tmp, eng1_h4_prev_swing_high_tmp, eng1_h4_prev_swing_high_bar_tmp, eng1_h4_last_swing_low_tmp, eng1_h4_last_swing_low_bar_tmp, eng1_h4_prev_swing_low_tmp, eng1_h4_prev_swing_low_bar_tmp, eng1_h4_trend_bias_tmp, eng1_h4_eqh_tmp, eng1_h4_eqh_bar_tmp, eng1_h4_eql_tmp, eng1_h4_eql_bar_tmp, eng1_h4_eqh_active_tmp, eng1_h4_eql_active_tmp] = f_eng1_build_structure_liquidity(eng1_buf_h4_time, eng1_buf_h4_high, eng1_buf_h4_low, eng1_buf_h4_close, ENG1_SWING_LEN)
+        eng1_h4_last_swing_high := eng1_h4_last_swing_high_tmp
+        eng1_h4_last_swing_high_bar := eng1_h4_last_swing_high_bar_tmp
+        eng1_h4_prev_swing_high := eng1_h4_prev_swing_high_tmp
+        eng1_h4_prev_swing_high_bar := eng1_h4_prev_swing_high_bar_tmp
+        eng1_h4_last_swing_low := eng1_h4_last_swing_low_tmp
+        eng1_h4_last_swing_low_bar := eng1_h4_last_swing_low_bar_tmp
+        eng1_h4_prev_swing_low := eng1_h4_prev_swing_low_tmp
+        eng1_h4_prev_swing_low_bar := eng1_h4_prev_swing_low_bar_tmp
+        eng1_h4_trend_bias := eng1_h4_trend_bias_tmp
+        eng1_h4_eqh := eng1_h4_eqh_tmp
+        eng1_h4_eqh_bar := eng1_h4_eqh_bar_tmp
+        eng1_h4_eql := eng1_h4_eql_tmp
+        eng1_h4_eql_bar := eng1_h4_eql_bar_tmp
+        eng1_h4_eqh_active := eng1_h4_eqh_active_tmp
+        eng1_h4_eql_active := eng1_h4_eql_active_tmp
+
+    if recalc_d1
+        [eng1_d1_last_swing_high_tmp, eng1_d1_last_swing_high_bar_tmp, eng1_d1_prev_swing_high_tmp, eng1_d1_prev_swing_high_bar_tmp, eng1_d1_last_swing_low_tmp, eng1_d1_last_swing_low_bar_tmp, eng1_d1_prev_swing_low_tmp, eng1_d1_prev_swing_low_bar_tmp, eng1_d1_trend_bias_tmp, eng1_d1_eqh_tmp, eng1_d1_eqh_bar_tmp, eng1_d1_eql_tmp, eng1_d1_eql_bar_tmp, eng1_d1_eqh_active_tmp, eng1_d1_eql_active_tmp] = f_eng1_build_structure_liquidity(eng1_buf_d1_time, eng1_buf_d1_high, eng1_buf_d1_low, eng1_buf_d1_close, ENG1_SWING_LEN)
+        eng1_d1_last_swing_high := eng1_d1_last_swing_high_tmp
+        eng1_d1_last_swing_high_bar := eng1_d1_last_swing_high_bar_tmp
+        eng1_d1_prev_swing_high := eng1_d1_prev_swing_high_tmp
+        eng1_d1_prev_swing_high_bar := eng1_d1_prev_swing_high_bar_tmp
+        eng1_d1_last_swing_low := eng1_d1_last_swing_low_tmp
+        eng1_d1_last_swing_low_bar := eng1_d1_last_swing_low_bar_tmp
+        eng1_d1_prev_swing_low := eng1_d1_prev_swing_low_tmp
+        eng1_d1_prev_swing_low_bar := eng1_d1_prev_swing_low_bar_tmp
+        eng1_d1_trend_bias := eng1_d1_trend_bias_tmp
+        eng1_d1_eqh := eng1_d1_eqh_tmp
+        eng1_d1_eqh_bar := eng1_d1_eqh_bar_tmp
+        eng1_d1_eql := eng1_d1_eql_tmp
+        eng1_d1_eql_bar := eng1_d1_eql_bar_tmp
+        eng1_d1_eqh_active := eng1_d1_eqh_active_tmp
+        eng1_d1_eql_active := eng1_d1_eql_active_tmp
+
+    if recalc_m1
+        [eng1_m1_bull_bos_tmp, eng1_m1_bear_bos_tmp, eng1_m1_bull_choch_tmp, eng1_m1_bear_choch_tmp] = f_eng1_structure_break_signals(eng1_m1_last_swing_high, eng1_m1_last_swing_low, eng1_m1_prior_trend_bias, eng1_buf_m1_close)
+        eng1_m1_bull_bos := eng1_m1_bull_bos_tmp
+        eng1_m1_bear_bos := eng1_m1_bear_bos_tmp
+        eng1_m1_bull_choch := eng1_m1_bull_choch_tmp
+        eng1_m1_bear_choch := eng1_m1_bear_choch_tmp
+        [eng1_m1_erl_high_tmp, eng1_m1_erl_low_tmp, eng1_m1_irl_high_tmp, eng1_m1_irl_low_tmp] = f_eng1_build_liquidity_layers(eng1_m1_last_swing_high, eng1_m1_prev_swing_high, eng1_m1_last_swing_low, eng1_m1_prev_swing_low, eng1_m1_eqh, eng1_m1_eql, eng1_m1_eqh_active, eng1_m1_eql_active)
+        eng1_m1_erl_high := eng1_m1_erl_high_tmp
+        eng1_m1_erl_low := eng1_m1_erl_low_tmp
+        eng1_m1_irl_high := eng1_m1_irl_high_tmp
+        eng1_m1_irl_low := eng1_m1_irl_low_tmp
+        [eng1_m1_range_high_tmp, eng1_m1_range_low_tmp, eng1_m1_equilibrium_tmp, eng1_m1_ote_long_top_tmp, eng1_m1_ote_long_bottom_tmp, eng1_m1_ote_short_top_tmp, eng1_m1_ote_short_bottom_tmp] = f_eng1_build_pd_arrays(eng1_buf_m1_high, eng1_buf_m1_low, ENG1_PD_LOOKBACK)
+        eng1_m1_range_high := eng1_m1_range_high_tmp
+        eng1_m1_range_low := eng1_m1_range_low_tmp
+        eng1_m1_equilibrium := eng1_m1_equilibrium_tmp
+        eng1_m1_ote_long_top := eng1_m1_ote_long_top_tmp
+        eng1_m1_ote_long_bottom := eng1_m1_ote_long_bottom_tmp
+        eng1_m1_ote_short_top := eng1_m1_ote_short_top_tmp
+        eng1_m1_ote_short_bottom := eng1_m1_ote_short_bottom_tmp
+
+    if recalc_m5
+        [eng1_m5_bull_bos_tmp, eng1_m5_bear_bos_tmp, eng1_m5_bull_choch_tmp, eng1_m5_bear_choch_tmp] = f_eng1_structure_break_signals(eng1_m5_last_swing_high, eng1_m5_last_swing_low, eng1_m5_prior_trend_bias, eng1_buf_m5_close)
+        eng1_m5_bull_bos := eng1_m5_bull_bos_tmp
+        eng1_m5_bear_bos := eng1_m5_bear_bos_tmp
+        eng1_m5_bull_choch := eng1_m5_bull_choch_tmp
+        eng1_m5_bear_choch := eng1_m5_bear_choch_tmp
+        [eng1_m5_erl_high_tmp, eng1_m5_erl_low_tmp, eng1_m5_irl_high_tmp, eng1_m5_irl_low_tmp] = f_eng1_build_liquidity_layers(eng1_m5_last_swing_high, eng1_m5_prev_swing_high, eng1_m5_last_swing_low, eng1_m5_prev_swing_low, eng1_m5_eqh, eng1_m5_eql, eng1_m5_eqh_active, eng1_m5_eql_active)
+        eng1_m5_erl_high := eng1_m5_erl_high_tmp
+        eng1_m5_erl_low := eng1_m5_erl_low_tmp
+        eng1_m5_irl_high := eng1_m5_irl_high_tmp
+        eng1_m5_irl_low := eng1_m5_irl_low_tmp
+        [eng1_m5_range_high_tmp, eng1_m5_range_low_tmp, eng1_m5_equilibrium_tmp, eng1_m5_ote_long_top_tmp, eng1_m5_ote_long_bottom_tmp, eng1_m5_ote_short_top_tmp, eng1_m5_ote_short_bottom_tmp] = f_eng1_build_pd_arrays(eng1_buf_m5_high, eng1_buf_m5_low, ENG1_PD_LOOKBACK)
+        eng1_m5_range_high := eng1_m5_range_high_tmp
+        eng1_m5_range_low := eng1_m5_range_low_tmp
+        eng1_m5_equilibrium := eng1_m5_equilibrium_tmp
+        eng1_m5_ote_long_top := eng1_m5_ote_long_top_tmp
+        eng1_m5_ote_long_bottom := eng1_m5_ote_long_bottom_tmp
+        eng1_m5_ote_short_top := eng1_m5_ote_short_top_tmp
+        eng1_m5_ote_short_bottom := eng1_m5_ote_short_bottom_tmp
+
+    if recalc_m15
+        [eng1_m15_bull_bos_tmp, eng1_m15_bear_bos_tmp, eng1_m15_bull_choch_tmp, eng1_m15_bear_choch_tmp] = f_eng1_structure_break_signals(eng1_m15_last_swing_high, eng1_m15_last_swing_low, eng1_m15_prior_trend_bias, eng1_buf_m15_close)
+        eng1_m15_bull_bos := eng1_m15_bull_bos_tmp
+        eng1_m15_bear_bos := eng1_m15_bear_bos_tmp
+        eng1_m15_bull_choch := eng1_m15_bull_choch_tmp
+        eng1_m15_bear_choch := eng1_m15_bear_choch_tmp
+        [eng1_m15_erl_high_tmp, eng1_m15_erl_low_tmp, eng1_m15_irl_high_tmp, eng1_m15_irl_low_tmp] = f_eng1_build_liquidity_layers(eng1_m15_last_swing_high, eng1_m15_prev_swing_high, eng1_m15_last_swing_low, eng1_m15_prev_swing_low, eng1_m15_eqh, eng1_m15_eql, eng1_m15_eqh_active, eng1_m15_eql_active)
+        eng1_m15_erl_high := eng1_m15_erl_high_tmp
+        eng1_m15_erl_low := eng1_m15_erl_low_tmp
+        eng1_m15_irl_high := eng1_m15_irl_high_tmp
+        eng1_m15_irl_low := eng1_m15_irl_low_tmp
+        [eng1_m15_range_high_tmp, eng1_m15_range_low_tmp, eng1_m15_equilibrium_tmp, eng1_m15_ote_long_top_tmp, eng1_m15_ote_long_bottom_tmp, eng1_m15_ote_short_top_tmp, eng1_m15_ote_short_bottom_tmp] = f_eng1_build_pd_arrays(eng1_buf_m15_high, eng1_buf_m15_low, ENG1_PD_LOOKBACK)
+        eng1_m15_range_high := eng1_m15_range_high_tmp
+        eng1_m15_range_low := eng1_m15_range_low_tmp
+        eng1_m15_equilibrium := eng1_m15_equilibrium_tmp
+        eng1_m15_ote_long_top := eng1_m15_ote_long_top_tmp
+        eng1_m15_ote_long_bottom := eng1_m15_ote_long_bottom_tmp
+        eng1_m15_ote_short_top := eng1_m15_ote_short_top_tmp
+        eng1_m15_ote_short_bottom := eng1_m15_ote_short_bottom_tmp
+
+    if recalc_m30
+        [eng1_m30_bull_bos_tmp, eng1_m30_bear_bos_tmp, eng1_m30_bull_choch_tmp, eng1_m30_bear_choch_tmp] = f_eng1_structure_break_signals(eng1_m30_last_swing_high, eng1_m30_last_swing_low, eng1_m30_prior_trend_bias, eng1_buf_m30_close)
+        eng1_m30_bull_bos := eng1_m30_bull_bos_tmp
+        eng1_m30_bear_bos := eng1_m30_bear_bos_tmp
+        eng1_m30_bull_choch := eng1_m30_bull_choch_tmp
+        eng1_m30_bear_choch := eng1_m30_bear_choch_tmp
+        [eng1_m30_erl_high_tmp, eng1_m30_erl_low_tmp, eng1_m30_irl_high_tmp, eng1_m30_irl_low_tmp] = f_eng1_build_liquidity_layers(eng1_m30_last_swing_high, eng1_m30_prev_swing_high, eng1_m30_last_swing_low, eng1_m30_prev_swing_low, eng1_m30_eqh, eng1_m30_eql, eng1_m30_eqh_active, eng1_m30_eql_active)
+        eng1_m30_erl_high := eng1_m30_erl_high_tmp
+        eng1_m30_erl_low := eng1_m30_erl_low_tmp
+        eng1_m30_irl_high := eng1_m30_irl_high_tmp
+        eng1_m30_irl_low := eng1_m30_irl_low_tmp
+        [eng1_m30_range_high_tmp, eng1_m30_range_low_tmp, eng1_m30_equilibrium_tmp, eng1_m30_ote_long_top_tmp, eng1_m30_ote_long_bottom_tmp, eng1_m30_ote_short_top_tmp, eng1_m30_ote_short_bottom_tmp] = f_eng1_build_pd_arrays(eng1_buf_m30_high, eng1_buf_m30_low, ENG1_PD_LOOKBACK)
+        eng1_m30_range_high := eng1_m30_range_high_tmp
+        eng1_m30_range_low := eng1_m30_range_low_tmp
+        eng1_m30_equilibrium := eng1_m30_equilibrium_tmp
+        eng1_m30_ote_long_top := eng1_m30_ote_long_top_tmp
+        eng1_m30_ote_long_bottom := eng1_m30_ote_long_bottom_tmp
+        eng1_m30_ote_short_top := eng1_m30_ote_short_top_tmp
+        eng1_m30_ote_short_bottom := eng1_m30_ote_short_bottom_tmp
+
+    if recalc_h1
+        [eng1_h1_bull_bos_tmp, eng1_h1_bear_bos_tmp, eng1_h1_bull_choch_tmp, eng1_h1_bear_choch_tmp] = f_eng1_structure_break_signals(eng1_h1_last_swing_high, eng1_h1_last_swing_low, eng1_h1_prior_trend_bias, eng1_buf_h1_close)
+        eng1_h1_bull_bos := eng1_h1_bull_bos_tmp
+        eng1_h1_bear_bos := eng1_h1_bear_bos_tmp
+        eng1_h1_bull_choch := eng1_h1_bull_choch_tmp
+        eng1_h1_bear_choch := eng1_h1_bear_choch_tmp
+        [eng1_h1_erl_high_tmp, eng1_h1_erl_low_tmp, eng1_h1_irl_high_tmp, eng1_h1_irl_low_tmp] = f_eng1_build_liquidity_layers(eng1_h1_last_swing_high, eng1_h1_prev_swing_high, eng1_h1_last_swing_low, eng1_h1_prev_swing_low, eng1_h1_eqh, eng1_h1_eql, eng1_h1_eqh_active, eng1_h1_eql_active)
+        eng1_h1_erl_high := eng1_h1_erl_high_tmp
+        eng1_h1_erl_low := eng1_h1_erl_low_tmp
+        eng1_h1_irl_high := eng1_h1_irl_high_tmp
+        eng1_h1_irl_low := eng1_h1_irl_low_tmp
+        [eng1_h1_range_high_tmp, eng1_h1_range_low_tmp, eng1_h1_equilibrium_tmp, eng1_h1_ote_long_top_tmp, eng1_h1_ote_long_bottom_tmp, eng1_h1_ote_short_top_tmp, eng1_h1_ote_short_bottom_tmp] = f_eng1_build_pd_arrays(eng1_buf_h1_high, eng1_buf_h1_low, ENG1_PD_LOOKBACK)
+        eng1_h1_range_high := eng1_h1_range_high_tmp
+        eng1_h1_range_low := eng1_h1_range_low_tmp
+        eng1_h1_equilibrium := eng1_h1_equilibrium_tmp
+        eng1_h1_ote_long_top := eng1_h1_ote_long_top_tmp
+        eng1_h1_ote_long_bottom := eng1_h1_ote_long_bottom_tmp
+        eng1_h1_ote_short_top := eng1_h1_ote_short_top_tmp
+        eng1_h1_ote_short_bottom := eng1_h1_ote_short_bottom_tmp
+
+    if recalc_h4
+        [eng1_h4_bull_bos_tmp, eng1_h4_bear_bos_tmp, eng1_h4_bull_choch_tmp, eng1_h4_bear_choch_tmp] = f_eng1_structure_break_signals(eng1_h4_last_swing_high, eng1_h4_last_swing_low, eng1_h4_prior_trend_bias, eng1_buf_h4_close)
+        eng1_h4_bull_bos := eng1_h4_bull_bos_tmp
+        eng1_h4_bear_bos := eng1_h4_bear_bos_tmp
+        eng1_h4_bull_choch := eng1_h4_bull_choch_tmp
+        eng1_h4_bear_choch := eng1_h4_bear_choch_tmp
+        [eng1_h4_erl_high_tmp, eng1_h4_erl_low_tmp, eng1_h4_irl_high_tmp, eng1_h4_irl_low_tmp] = f_eng1_build_liquidity_layers(eng1_h4_last_swing_high, eng1_h4_prev_swing_high, eng1_h4_last_swing_low, eng1_h4_prev_swing_low, eng1_h4_eqh, eng1_h4_eql, eng1_h4_eqh_active, eng1_h4_eql_active)
+        eng1_h4_erl_high := eng1_h4_erl_high_tmp
+        eng1_h4_erl_low := eng1_h4_erl_low_tmp
+        eng1_h4_irl_high := eng1_h4_irl_high_tmp
+        eng1_h4_irl_low := eng1_h4_irl_low_tmp
+        [eng1_h4_range_high_tmp, eng1_h4_range_low_tmp, eng1_h4_equilibrium_tmp, eng1_h4_ote_long_top_tmp, eng1_h4_ote_long_bottom_tmp, eng1_h4_ote_short_top_tmp, eng1_h4_ote_short_bottom_tmp] = f_eng1_build_pd_arrays(eng1_buf_h4_high, eng1_buf_h4_low, ENG1_PD_LOOKBACK)
+        eng1_h4_range_high := eng1_h4_range_high_tmp
+        eng1_h4_range_low := eng1_h4_range_low_tmp
+        eng1_h4_equilibrium := eng1_h4_equilibrium_tmp
+        eng1_h4_ote_long_top := eng1_h4_ote_long_top_tmp
+        eng1_h4_ote_long_bottom := eng1_h4_ote_long_bottom_tmp
+        eng1_h4_ote_short_top := eng1_h4_ote_short_top_tmp
+        eng1_h4_ote_short_bottom := eng1_h4_ote_short_bottom_tmp
+
+    if recalc_d1
+        [eng1_d1_bull_bos_tmp, eng1_d1_bear_bos_tmp, eng1_d1_bull_choch_tmp, eng1_d1_bear_choch_tmp] = f_eng1_structure_break_signals(eng1_d1_last_swing_high, eng1_d1_last_swing_low, eng1_d1_prior_trend_bias, eng1_buf_d1_close)
+        eng1_d1_bull_bos := eng1_d1_bull_bos_tmp
+        eng1_d1_bear_bos := eng1_d1_bear_bos_tmp
+        eng1_d1_bull_choch := eng1_d1_bull_choch_tmp
+        eng1_d1_bear_choch := eng1_d1_bear_choch_tmp
+        [eng1_d1_erl_high_tmp, eng1_d1_erl_low_tmp, eng1_d1_irl_high_tmp, eng1_d1_irl_low_tmp] = f_eng1_build_liquidity_layers(eng1_d1_last_swing_high, eng1_d1_prev_swing_high, eng1_d1_last_swing_low, eng1_d1_prev_swing_low, eng1_d1_eqh, eng1_d1_eql, eng1_d1_eqh_active, eng1_d1_eql_active)
+        eng1_d1_erl_high := eng1_d1_erl_high_tmp
+        eng1_d1_erl_low := eng1_d1_erl_low_tmp
+        eng1_d1_irl_high := eng1_d1_irl_high_tmp
+        eng1_d1_irl_low := eng1_d1_irl_low_tmp
+        [eng1_d1_range_high_tmp, eng1_d1_range_low_tmp, eng1_d1_equilibrium_tmp, eng1_d1_ote_long_top_tmp, eng1_d1_ote_long_bottom_tmp, eng1_d1_ote_short_top_tmp, eng1_d1_ote_short_bottom_tmp] = f_eng1_build_pd_arrays(eng1_buf_d1_high, eng1_buf_d1_low, ENG1_PD_LOOKBACK)
+        eng1_d1_range_high := eng1_d1_range_high_tmp
+        eng1_d1_range_low := eng1_d1_range_low_tmp
+        eng1_d1_equilibrium := eng1_d1_equilibrium_tmp
+        eng1_d1_ote_long_top := eng1_d1_ote_long_top_tmp
+        eng1_d1_ote_long_bottom := eng1_d1_ote_long_bottom_tmp
+        eng1_d1_ote_short_top := eng1_d1_ote_short_top_tmp
+        eng1_d1_ote_short_bottom := eng1_d1_ote_short_bottom_tmp
     
-    [eng1_m15_bull_ob_top_tmp, eng1_m15_bull_ob_bottom_tmp, eng1_m15_bull_ob_entry_tmp, eng1_m15_bull_ob_bar_tmp, eng1_m15_bull_ob_breaker_tmp, eng1_m15_bear_ob_top_tmp, eng1_m15_bear_ob_bottom_tmp, eng1_m15_bear_ob_entry_tmp, eng1_m15_bear_ob_bar_tmp, eng1_m15_bear_ob_breaker_tmp] = f_eng1_build_ob(eng1_buf_m15_time, eng1_buf_m15_open, eng1_buf_m15_high, eng1_buf_m15_low, eng1_buf_m15_close)
-    [eng1_h1_bull_ob_top_tmp, eng1_h1_bull_ob_bottom_tmp, eng1_h1_bull_ob_entry_tmp, eng1_h1_bull_ob_bar_tmp, eng1_h1_bull_ob_breaker_tmp, eng1_h1_bear_ob_top_tmp, eng1_h1_bear_ob_bottom_tmp, eng1_h1_bear_ob_entry_tmp, eng1_h1_bear_ob_bar_tmp, eng1_h1_bear_ob_breaker_tmp] = f_eng1_build_ob(eng1_buf_h1_time, eng1_buf_h1_open, eng1_buf_h1_high, eng1_buf_h1_low, eng1_buf_h1_close)
-    [eng1_h4_bull_ob_top_tmp, eng1_h4_bull_ob_bottom_tmp, eng1_h4_bull_ob_entry_tmp, eng1_h4_bull_ob_bar_tmp, eng1_h4_bull_ob_breaker_tmp, eng1_h4_bear_ob_top_tmp, eng1_h4_bear_ob_bottom_tmp, eng1_h4_bear_ob_entry_tmp, eng1_h4_bear_ob_bar_tmp, eng1_h4_bear_ob_breaker_tmp] = f_eng1_build_ob(eng1_buf_h4_time, eng1_buf_h4_open, eng1_buf_h4_high, eng1_buf_h4_low, eng1_buf_h4_close)
-    [eng1_d1_bull_ob_top_tmp, eng1_d1_bull_ob_bottom_tmp, _, eng1_d1_bull_ob_bar_tmp, _, eng1_d1_bear_ob_top_tmp, eng1_d1_bear_ob_bottom_tmp, _, eng1_d1_bear_ob_bar_tmp, _] = f_eng1_build_ob(eng1_buf_d1_time, eng1_buf_d1_open, eng1_buf_d1_high, eng1_buf_d1_low, eng1_buf_d1_close)
-    eng1_m15_bull_ob_top := eng1_m15_bull_ob_top_tmp
-    eng1_m15_bull_ob_bottom := eng1_m15_bull_ob_bottom_tmp
-    eng1_m15_bull_ob_entry := eng1_m15_bull_ob_entry_tmp
-    eng1_m15_bull_ob_bar := eng1_m15_bull_ob_bar_tmp
-    eng1_m15_bull_ob_breaker := eng1_m15_bull_ob_breaker_tmp
-    eng1_m15_bear_ob_top := eng1_m15_bear_ob_top_tmp
-    eng1_m15_bear_ob_bottom := eng1_m15_bear_ob_bottom_tmp
-    eng1_m15_bear_ob_entry := eng1_m15_bear_ob_entry_tmp
-    eng1_m15_bear_ob_bar := eng1_m15_bear_ob_bar_tmp
-    eng1_m15_bear_ob_breaker := eng1_m15_bear_ob_breaker_tmp
-    eng1_h1_bull_ob_top := eng1_h1_bull_ob_top_tmp
-    eng1_h1_bull_ob_bottom := eng1_h1_bull_ob_bottom_tmp
-    eng1_h1_bull_ob_entry := eng1_h1_bull_ob_entry_tmp
-    eng1_h1_bull_ob_bar := eng1_h1_bull_ob_bar_tmp
-    eng1_h1_bull_ob_breaker := eng1_h1_bull_ob_breaker_tmp
-    eng1_h1_bear_ob_top := eng1_h1_bear_ob_top_tmp
-    eng1_h1_bear_ob_bottom := eng1_h1_bear_ob_bottom_tmp
-    eng1_h1_bear_ob_entry := eng1_h1_bear_ob_entry_tmp
-    eng1_h1_bear_ob_bar := eng1_h1_bear_ob_bar_tmp
-    eng1_h1_bear_ob_breaker := eng1_h1_bear_ob_breaker_tmp
-    eng1_h4_bull_ob_top := eng1_h4_bull_ob_top_tmp
-    eng1_h4_bull_ob_bottom := eng1_h4_bull_ob_bottom_tmp
-    eng1_h4_bull_ob_entry := eng1_h4_bull_ob_entry_tmp
-    eng1_h4_bull_ob_bar := eng1_h4_bull_ob_bar_tmp
-    eng1_h4_bull_ob_breaker := eng1_h4_bull_ob_breaker_tmp
-    eng1_h4_bear_ob_top := eng1_h4_bear_ob_top_tmp
-    eng1_h4_bear_ob_bottom := eng1_h4_bear_ob_bottom_tmp
-    eng1_h4_bear_ob_entry := eng1_h4_bear_ob_entry_tmp
-    eng1_h4_bear_ob_bar := eng1_h4_bear_ob_bar_tmp
-    eng1_h4_bear_ob_breaker := eng1_h4_bear_ob_breaker_tmp
-    eng1_d1_bull_ob_top := eng1_d1_bull_ob_top_tmp
-    eng1_d1_bull_ob_bottom := eng1_d1_bull_ob_bottom_tmp
-    eng1_d1_bull_ob_bar := eng1_d1_bull_ob_bar_tmp
-    eng1_d1_bear_ob_top := eng1_d1_bear_ob_top_tmp
-    eng1_d1_bear_ob_bottom := eng1_d1_bear_ob_bottom_tmp
-    eng1_d1_bear_ob_bar := eng1_d1_bear_ob_bar_tmp
-    
-    [eng1_m15_bull_fvg_top_tmp, eng1_m15_bull_fvg_bottom_tmp, eng1_m15_bull_fvg_bar_tmp, eng1_m15_bear_fvg_top_tmp, eng1_m15_bear_fvg_bottom_tmp, eng1_m15_bear_fvg_bar_tmp] = f_eng1_build_fvg(eng1_buf_m15_time, eng1_buf_m15_open, eng1_buf_m15_high, eng1_buf_m15_low, eng1_buf_m15_close)
-    [eng1_h1_bull_fvg_top_tmp, eng1_h1_bull_fvg_bottom_tmp, eng1_h1_bull_fvg_bar_tmp, eng1_h1_bear_fvg_top_tmp, eng1_h1_bear_fvg_bottom_tmp, eng1_h1_bear_fvg_bar_tmp] = f_eng1_build_fvg(eng1_buf_h1_time, eng1_buf_h1_open, eng1_buf_h1_high, eng1_buf_h1_low, eng1_buf_h1_close)
-    [eng1_h4_bull_fvg_top_tmp, eng1_h4_bull_fvg_bottom_tmp, eng1_h4_bull_fvg_bar_tmp, eng1_h4_bear_fvg_top_tmp, eng1_h4_bear_fvg_bottom_tmp, eng1_h4_bear_fvg_bar_tmp] = f_eng1_build_fvg(eng1_buf_h4_time, eng1_buf_h4_open, eng1_buf_h4_high, eng1_buf_h4_low, eng1_buf_h4_close)
-    eng1_m15_bull_fvg_top := eng1_m15_bull_fvg_top_tmp
-    eng1_m15_bull_fvg_bottom := eng1_m15_bull_fvg_bottom_tmp
-    eng1_m15_bull_fvg_bar := eng1_m15_bull_fvg_bar_tmp
-    eng1_m15_bear_fvg_top := eng1_m15_bear_fvg_top_tmp
-    eng1_m15_bear_fvg_bottom := eng1_m15_bear_fvg_bottom_tmp
-    eng1_m15_bear_fvg_bar := eng1_m15_bear_fvg_bar_tmp
-    eng1_h1_bull_fvg_top := eng1_h1_bull_fvg_top_tmp
-    eng1_h1_bull_fvg_bottom := eng1_h1_bull_fvg_bottom_tmp
-    eng1_h1_bull_fvg_bar := eng1_h1_bull_fvg_bar_tmp
-    eng1_h1_bear_fvg_top := eng1_h1_bear_fvg_top_tmp
-    eng1_h1_bear_fvg_bottom := eng1_h1_bear_fvg_bottom_tmp
-    eng1_h1_bear_fvg_bar := eng1_h1_bear_fvg_bar_tmp
-    eng1_h4_bull_fvg_top := eng1_h4_bull_fvg_top_tmp
-    eng1_h4_bull_fvg_bottom := eng1_h4_bull_fvg_bottom_tmp
-    eng1_h4_bull_fvg_bar := eng1_h4_bull_fvg_bar_tmp
-    eng1_h4_bear_fvg_top := eng1_h4_bear_fvg_top_tmp
-    eng1_h4_bear_fvg_bottom := eng1_h4_bear_fvg_bottom_tmp
-    eng1_h4_bear_fvg_bar := eng1_h4_bear_fvg_bar_tmp
-    
-    [eng1_m1_bull_sweep_tmp, eng1_m1_bear_sweep_tmp, eng1_m1_bull_displacement_tmp, eng1_m1_bear_displacement_tmp, eng1_m1_bull_mss_tmp, eng1_m1_bear_mss_tmp, eng1_m1_protected_high_tmp, eng1_m1_protected_low_tmp] = f_eng1_build_execution(eng1_m1_last_swing_high, eng1_m1_last_swing_low, eng1_m1_protected_high, eng1_m1_protected_low, eng1_buf_m1_open, eng1_buf_m1_high, eng1_buf_m1_low, eng1_buf_m1_close)
-    [eng1_m5_bull_sweep_tmp, eng1_m5_bear_sweep_tmp, eng1_m5_bull_displacement_tmp, eng1_m5_bear_displacement_tmp, eng1_m5_bull_mss_tmp, eng1_m5_bear_mss_tmp, eng1_m5_protected_high_tmp, eng1_m5_protected_low_tmp] = f_eng1_build_execution(eng1_m5_last_swing_high, eng1_m5_last_swing_low, eng1_m5_protected_high, eng1_m5_protected_low, eng1_buf_m5_open, eng1_buf_m5_high, eng1_buf_m5_low, eng1_buf_m5_close)
-    [eng1_m15_bull_sweep_tmp, eng1_m15_bear_sweep_tmp, eng1_m15_bull_displacement_tmp, eng1_m15_bear_displacement_tmp, eng1_m15_bull_mss_tmp, eng1_m15_bear_mss_tmp, eng1_m15_protected_high_tmp, eng1_m15_protected_low_tmp] = f_eng1_build_execution(eng1_m15_last_swing_high, eng1_m15_last_swing_low, eng1_m15_protected_high, eng1_m15_protected_low, eng1_buf_m15_open, eng1_buf_m15_high, eng1_buf_m15_low, eng1_buf_m15_close)
-    [eng1_m30_bull_sweep_tmp, eng1_m30_bear_sweep_tmp, eng1_m30_bull_displacement_tmp, eng1_m30_bear_displacement_tmp, eng1_m30_bull_mss_tmp, eng1_m30_bear_mss_tmp, eng1_m30_protected_high_tmp, eng1_m30_protected_low_tmp] = f_eng1_build_execution(eng1_m30_last_swing_high, eng1_m30_last_swing_low, eng1_m30_protected_high, eng1_m30_protected_low, eng1_buf_m30_open, eng1_buf_m30_high, eng1_buf_m30_low, eng1_buf_m30_close)
-    eng1_m1_bull_sweep := eng1_m1_bull_sweep_tmp
-    eng1_m1_bear_sweep := eng1_m1_bear_sweep_tmp
-    eng1_m1_bull_displacement := eng1_m1_bull_displacement_tmp
-    eng1_m1_bear_displacement := eng1_m1_bear_displacement_tmp
-    eng1_m1_bull_mss := eng1_m1_bull_mss_tmp
-    eng1_m1_bear_mss := eng1_m1_bear_mss_tmp
-    eng1_m1_protected_high := eng1_m1_protected_high_tmp
-    eng1_m1_protected_low := eng1_m1_protected_low_tmp
-    eng1_m5_bull_sweep := eng1_m5_bull_sweep_tmp
-    eng1_m5_bear_sweep := eng1_m5_bear_sweep_tmp
-    eng1_m5_bull_displacement := eng1_m5_bull_displacement_tmp
-    eng1_m5_bear_displacement := eng1_m5_bear_displacement_tmp
-    eng1_m5_bull_mss := eng1_m5_bull_mss_tmp
-    eng1_m5_bear_mss := eng1_m5_bear_mss_tmp
-    eng1_m5_protected_high := eng1_m5_protected_high_tmp
-    eng1_m5_protected_low := eng1_m5_protected_low_tmp
-    eng1_m15_bull_sweep := eng1_m15_bull_sweep_tmp
-    eng1_m15_bear_sweep := eng1_m15_bear_sweep_tmp
-    eng1_m15_bull_displacement := eng1_m15_bull_displacement_tmp
-    eng1_m15_bear_displacement := eng1_m15_bear_displacement_tmp
-    eng1_m15_bull_mss := eng1_m15_bull_mss_tmp
-    eng1_m15_bear_mss := eng1_m15_bear_mss_tmp
-    eng1_m15_protected_high := eng1_m15_protected_high_tmp
-    eng1_m15_protected_low := eng1_m15_protected_low_tmp
-    eng1_m30_bull_sweep := eng1_m30_bull_sweep_tmp
-    eng1_m30_bear_sweep := eng1_m30_bear_sweep_tmp
-    eng1_m30_bull_displacement := eng1_m30_bull_displacement_tmp
-    eng1_m30_bear_displacement := eng1_m30_bear_displacement_tmp
-    eng1_m30_bull_mss := eng1_m30_bull_mss_tmp
-    eng1_m30_bear_mss := eng1_m30_bear_mss_tmp
-    eng1_m30_protected_high := eng1_m30_protected_high_tmp
-    eng1_m30_protected_low := eng1_m30_protected_low_tmp
+    if recalc_m15
+        [eng1_m15_bull_ob_top_tmp, eng1_m15_bull_ob_bottom_tmp, eng1_m15_bull_ob_entry_tmp, eng1_m15_bull_ob_bar_tmp, eng1_m15_bull_ob_breaker_tmp, eng1_m15_bear_ob_top_tmp, eng1_m15_bear_ob_bottom_tmp, eng1_m15_bear_ob_entry_tmp, eng1_m15_bear_ob_bar_tmp, eng1_m15_bear_ob_breaker_tmp] = f_eng1_build_ob(eng1_buf_m15_time, eng1_buf_m15_open, eng1_buf_m15_high, eng1_buf_m15_low, eng1_buf_m15_close)
+        eng1_m15_bull_ob_top := eng1_m15_bull_ob_top_tmp
+        eng1_m15_bull_ob_bottom := eng1_m15_bull_ob_bottom_tmp
+        eng1_m15_bull_ob_entry := eng1_m15_bull_ob_entry_tmp
+        eng1_m15_bull_ob_bar := eng1_m15_bull_ob_bar_tmp
+        eng1_m15_bull_ob_breaker := eng1_m15_bull_ob_breaker_tmp
+        eng1_m15_bear_ob_top := eng1_m15_bear_ob_top_tmp
+        eng1_m15_bear_ob_bottom := eng1_m15_bear_ob_bottom_tmp
+        eng1_m15_bear_ob_entry := eng1_m15_bear_ob_entry_tmp
+        eng1_m15_bear_ob_bar := eng1_m15_bear_ob_bar_tmp
+        eng1_m15_bear_ob_breaker := eng1_m15_bear_ob_breaker_tmp
+    if recalc_h1
+        [eng1_h1_bull_ob_top_tmp, eng1_h1_bull_ob_bottom_tmp, eng1_h1_bull_ob_entry_tmp, eng1_h1_bull_ob_bar_tmp, eng1_h1_bull_ob_breaker_tmp, eng1_h1_bear_ob_top_tmp, eng1_h1_bear_ob_bottom_tmp, eng1_h1_bear_ob_entry_tmp, eng1_h1_bear_ob_bar_tmp, eng1_h1_bear_ob_breaker_tmp] = f_eng1_build_ob(eng1_buf_h1_time, eng1_buf_h1_open, eng1_buf_h1_high, eng1_buf_h1_low, eng1_buf_h1_close)
+        eng1_h1_bull_ob_top := eng1_h1_bull_ob_top_tmp
+        eng1_h1_bull_ob_bottom := eng1_h1_bull_ob_bottom_tmp
+        eng1_h1_bull_ob_entry := eng1_h1_bull_ob_entry_tmp
+        eng1_h1_bull_ob_bar := eng1_h1_bull_ob_bar_tmp
+        eng1_h1_bull_ob_breaker := eng1_h1_bull_ob_breaker_tmp
+        eng1_h1_bear_ob_top := eng1_h1_bear_ob_top_tmp
+        eng1_h1_bear_ob_bottom := eng1_h1_bear_ob_bottom_tmp
+        eng1_h1_bear_ob_entry := eng1_h1_bear_ob_entry_tmp
+        eng1_h1_bear_ob_bar := eng1_h1_bear_ob_bar_tmp
+        eng1_h1_bear_ob_breaker := eng1_h1_bear_ob_breaker_tmp
+    if recalc_h4
+        [eng1_h4_bull_ob_top_tmp, eng1_h4_bull_ob_bottom_tmp, eng1_h4_bull_ob_entry_tmp, eng1_h4_bull_ob_bar_tmp, eng1_h4_bull_ob_breaker_tmp, eng1_h4_bear_ob_top_tmp, eng1_h4_bear_ob_bottom_tmp, eng1_h4_bear_ob_entry_tmp, eng1_h4_bear_ob_bar_tmp, eng1_h4_bear_ob_breaker_tmp] = f_eng1_build_ob(eng1_buf_h4_time, eng1_buf_h4_open, eng1_buf_h4_high, eng1_buf_h4_low, eng1_buf_h4_close)
+        eng1_h4_bull_ob_top := eng1_h4_bull_ob_top_tmp
+        eng1_h4_bull_ob_bottom := eng1_h4_bull_ob_bottom_tmp
+        eng1_h4_bull_ob_entry := eng1_h4_bull_ob_entry_tmp
+        eng1_h4_bull_ob_bar := eng1_h4_bull_ob_bar_tmp
+        eng1_h4_bull_ob_breaker := eng1_h4_bull_ob_breaker_tmp
+        eng1_h4_bear_ob_top := eng1_h4_bear_ob_top_tmp
+        eng1_h4_bear_ob_bottom := eng1_h4_bear_ob_bottom_tmp
+        eng1_h4_bear_ob_entry := eng1_h4_bear_ob_entry_tmp
+        eng1_h4_bear_ob_bar := eng1_h4_bear_ob_bar_tmp
+        eng1_h4_bear_ob_breaker := eng1_h4_bear_ob_breaker_tmp
+    if recalc_d1
+        [eng1_d1_bull_ob_top_tmp, eng1_d1_bull_ob_bottom_tmp, _, eng1_d1_bull_ob_bar_tmp, _, eng1_d1_bear_ob_top_tmp, eng1_d1_bear_ob_bottom_tmp, _, eng1_d1_bear_ob_bar_tmp, _] = f_eng1_build_ob(eng1_buf_d1_time, eng1_buf_d1_open, eng1_buf_d1_high, eng1_buf_d1_low, eng1_buf_d1_close)
+        eng1_d1_bull_ob_top := eng1_d1_bull_ob_top_tmp
+        eng1_d1_bull_ob_bottom := eng1_d1_bull_ob_bottom_tmp
+        eng1_d1_bull_ob_bar := eng1_d1_bull_ob_bar_tmp
+        eng1_d1_bear_ob_top := eng1_d1_bear_ob_top_tmp
+        eng1_d1_bear_ob_bottom := eng1_d1_bear_ob_bottom_tmp
+        eng1_d1_bear_ob_bar := eng1_d1_bear_ob_bar_tmp
+
+    if recalc_m15
+        [eng1_m15_bull_fvg_top_tmp, eng1_m15_bull_fvg_bottom_tmp, eng1_m15_bull_fvg_bar_tmp, eng1_m15_bear_fvg_top_tmp, eng1_m15_bear_fvg_bottom_tmp, eng1_m15_bear_fvg_bar_tmp] = f_eng1_build_fvg(eng1_buf_m15_time, eng1_buf_m15_open, eng1_buf_m15_high, eng1_buf_m15_low, eng1_buf_m15_close)
+        eng1_m15_bull_fvg_top := eng1_m15_bull_fvg_top_tmp
+        eng1_m15_bull_fvg_bottom := eng1_m15_bull_fvg_bottom_tmp
+        eng1_m15_bull_fvg_bar := eng1_m15_bull_fvg_bar_tmp
+        eng1_m15_bear_fvg_top := eng1_m15_bear_fvg_top_tmp
+        eng1_m15_bear_fvg_bottom := eng1_m15_bear_fvg_bottom_tmp
+        eng1_m15_bear_fvg_bar := eng1_m15_bear_fvg_bar_tmp
+    if recalc_h1
+        [eng1_h1_bull_fvg_top_tmp, eng1_h1_bull_fvg_bottom_tmp, eng1_h1_bull_fvg_bar_tmp, eng1_h1_bear_fvg_top_tmp, eng1_h1_bear_fvg_bottom_tmp, eng1_h1_bear_fvg_bar_tmp] = f_eng1_build_fvg(eng1_buf_h1_time, eng1_buf_h1_open, eng1_buf_h1_high, eng1_buf_h1_low, eng1_buf_h1_close)
+        eng1_h1_bull_fvg_top := eng1_h1_bull_fvg_top_tmp
+        eng1_h1_bull_fvg_bottom := eng1_h1_bull_fvg_bottom_tmp
+        eng1_h1_bull_fvg_bar := eng1_h1_bull_fvg_bar_tmp
+        eng1_h1_bear_fvg_top := eng1_h1_bear_fvg_top_tmp
+        eng1_h1_bear_fvg_bottom := eng1_h1_bear_fvg_bottom_tmp
+        eng1_h1_bear_fvg_bar := eng1_h1_bear_fvg_bar_tmp
+    if recalc_h4
+        [eng1_h4_bull_fvg_top_tmp, eng1_h4_bull_fvg_bottom_tmp, eng1_h4_bull_fvg_bar_tmp, eng1_h4_bear_fvg_top_tmp, eng1_h4_bear_fvg_bottom_tmp, eng1_h4_bear_fvg_bar_tmp] = f_eng1_build_fvg(eng1_buf_h4_time, eng1_buf_h4_open, eng1_buf_h4_high, eng1_buf_h4_low, eng1_buf_h4_close)
+        eng1_h4_bull_fvg_top := eng1_h4_bull_fvg_top_tmp
+        eng1_h4_bull_fvg_bottom := eng1_h4_bull_fvg_bottom_tmp
+        eng1_h4_bull_fvg_bar := eng1_h4_bull_fvg_bar_tmp
+        eng1_h4_bear_fvg_top := eng1_h4_bear_fvg_top_tmp
+        eng1_h4_bear_fvg_bottom := eng1_h4_bear_fvg_bottom_tmp
+        eng1_h4_bear_fvg_bar := eng1_h4_bear_fvg_bar_tmp
+
+    if recalc_m1
+        [eng1_m1_bull_sweep_tmp, eng1_m1_bear_sweep_tmp, eng1_m1_bull_displacement_tmp, eng1_m1_bear_displacement_tmp, eng1_m1_bull_mss_tmp, eng1_m1_bear_mss_tmp, eng1_m1_protected_high_tmp, eng1_m1_protected_low_tmp] = f_eng1_build_execution(eng1_m1_last_swing_high, eng1_m1_last_swing_low, eng1_m1_protected_high, eng1_m1_protected_low, eng1_buf_m1_open, eng1_buf_m1_high, eng1_buf_m1_low, eng1_buf_m1_close)
+        eng1_m1_bull_sweep := eng1_m1_bull_sweep_tmp
+        eng1_m1_bear_sweep := eng1_m1_bear_sweep_tmp
+        eng1_m1_bull_displacement := eng1_m1_bull_displacement_tmp
+        eng1_m1_bear_displacement := eng1_m1_bear_displacement_tmp
+        eng1_m1_bull_mss := eng1_m1_bull_mss_tmp
+        eng1_m1_bear_mss := eng1_m1_bear_mss_tmp
+        eng1_m1_protected_high := eng1_m1_protected_high_tmp
+        eng1_m1_protected_low := eng1_m1_protected_low_tmp
+    if recalc_m5
+        [eng1_m5_bull_sweep_tmp, eng1_m5_bear_sweep_tmp, eng1_m5_bull_displacement_tmp, eng1_m5_bear_displacement_tmp, eng1_m5_bull_mss_tmp, eng1_m5_bear_mss_tmp, eng1_m5_protected_high_tmp, eng1_m5_protected_low_tmp] = f_eng1_build_execution(eng1_m5_last_swing_high, eng1_m5_last_swing_low, eng1_m5_protected_high, eng1_m5_protected_low, eng1_buf_m5_open, eng1_buf_m5_high, eng1_buf_m5_low, eng1_buf_m5_close)
+        eng1_m5_bull_sweep := eng1_m5_bull_sweep_tmp
+        eng1_m5_bear_sweep := eng1_m5_bear_sweep_tmp
+        eng1_m5_bull_displacement := eng1_m5_bull_displacement_tmp
+        eng1_m5_bear_displacement := eng1_m5_bear_displacement_tmp
+        eng1_m5_bull_mss := eng1_m5_bull_mss_tmp
+        eng1_m5_bear_mss := eng1_m5_bear_mss_tmp
+        eng1_m5_protected_high := eng1_m5_protected_high_tmp
+        eng1_m5_protected_low := eng1_m5_protected_low_tmp
+    if recalc_m15
+        [eng1_m15_bull_sweep_tmp, eng1_m15_bear_sweep_tmp, eng1_m15_bull_displacement_tmp, eng1_m15_bear_displacement_tmp, eng1_m15_bull_mss_tmp, eng1_m15_bear_mss_tmp, eng1_m15_protected_high_tmp, eng1_m15_protected_low_tmp] = f_eng1_build_execution(eng1_m15_last_swing_high, eng1_m15_last_swing_low, eng1_m15_protected_high, eng1_m15_protected_low, eng1_buf_m15_open, eng1_buf_m15_high, eng1_buf_m15_low, eng1_buf_m15_close)
+        eng1_m15_bull_sweep := eng1_m15_bull_sweep_tmp
+        eng1_m15_bear_sweep := eng1_m15_bear_sweep_tmp
+        eng1_m15_bull_displacement := eng1_m15_bull_displacement_tmp
+        eng1_m15_bear_displacement := eng1_m15_bear_displacement_tmp
+        eng1_m15_bull_mss := eng1_m15_bull_mss_tmp
+        eng1_m15_bear_mss := eng1_m15_bear_mss_tmp
+        eng1_m15_protected_high := eng1_m15_protected_high_tmp
+        eng1_m15_protected_low := eng1_m15_protected_low_tmp
+    if recalc_m30
+        [eng1_m30_bull_sweep_tmp, eng1_m30_bear_sweep_tmp, eng1_m30_bull_displacement_tmp, eng1_m30_bear_displacement_tmp, eng1_m30_bull_mss_tmp, eng1_m30_bear_mss_tmp, eng1_m30_protected_high_tmp, eng1_m30_protected_low_tmp] = f_eng1_build_execution(eng1_m30_last_swing_high, eng1_m30_last_swing_low, eng1_m30_protected_high, eng1_m30_protected_low, eng1_buf_m30_open, eng1_buf_m30_high, eng1_buf_m30_low, eng1_buf_m30_close)
+        eng1_m30_bull_sweep := eng1_m30_bull_sweep_tmp
+        eng1_m30_bear_sweep := eng1_m30_bear_sweep_tmp
+        eng1_m30_bull_displacement := eng1_m30_bull_displacement_tmp
+        eng1_m30_bear_displacement := eng1_m30_bear_displacement_tmp
+        eng1_m30_bull_mss := eng1_m30_bull_mss_tmp
+        eng1_m30_bear_mss := eng1_m30_bear_mss_tmp
+        eng1_m30_protected_high := eng1_m30_protected_high_tmp
+        eng1_m30_protected_low := eng1_m30_protected_low_tmp
+
+if recalc_d1
+    eng1_d1_lb20_high := f_eng1_window_high_safe(eng1_buf_d1_high, 20)
+    eng1_d1_lb20_low := f_eng1_window_low_safe(eng1_buf_d1_low, 20)
+    eng1_d1_lb40_high := f_eng1_window_high_safe(eng1_buf_d1_high, 40)
+    eng1_d1_lb40_low := f_eng1_window_low_safe(eng1_buf_d1_low, 40)
+    eng1_d1_lb60_high := f_eng1_window_high_safe(eng1_buf_d1_high, 60)
+    eng1_d1_lb60_low := f_eng1_window_low_safe(eng1_buf_d1_low, 60)
 
 [eng1_narr_bias_tmp, eng1_narr_liq_high_tmp, eng1_narr_liq_low_tmp, eng1_narr_bull_sd_top_tmp, eng1_narr_bull_sd_bottom_tmp, eng1_narr_bull_sd_bar_tmp, eng1_narr_bear_sd_top_tmp, eng1_narr_bear_sd_bottom_tmp, eng1_narr_bear_sd_bar_tmp, eng1_narr_strength_tmp] = f_eng1_select_narrative_snapshot(eng1_narr_tf)
 [eng1_ctx_trend_bias_tmp, eng1_ctx_bull_reversal_tmp, eng1_ctx_bear_reversal_tmp, eng1_ctx_bull_ob_top_tmp, eng1_ctx_bull_ob_bottom_tmp, eng1_ctx_bull_ob_entry_tmp, eng1_ctx_bull_ob_bar_tmp, eng1_ctx_bull_fvg_top_tmp, eng1_ctx_bull_fvg_bottom_tmp, eng1_ctx_bull_fvg_bar_tmp, eng1_ctx_bear_ob_top_tmp, eng1_ctx_bear_ob_bottom_tmp, eng1_ctx_bear_ob_entry_tmp, eng1_ctx_bear_ob_bar_tmp, eng1_ctx_bear_fvg_top_tmp, eng1_ctx_bear_fvg_bottom_tmp, eng1_ctx_bear_fvg_bar_tmp, eng1_ctx_liq_high_tmp, eng1_ctx_liq_low_tmp, eng1_ctx_liq_high_bar_tmp, eng1_ctx_liq_low_bar_tmp] = f_eng1_select_context_snapshot(eng1_ctx_tf)
@@ -2731,7 +2815,7 @@ f_eng2_syncSetupZoneVisual(box currentBox, line currentLine, label currentLabel,
     line nextLine = currentLine
     label nextLabel = currentLabel
     if enabled and not na(zoneTop) and not na(zoneBottom)
-        int leftBar = f_safeBarIndexX(not na(createdBar) ? createdBar : bar_index)
+        int leftBar = f_safeBarIndexX(f_createdBarFallback(createdBar))
         if na(nextBox)
             nextBox := box.new(left=leftBar, top=zoneTop, right=bar_index, bottom=zoneBottom, xloc=xloc.bar_index, extend=extend.none, bgcolor=fillColor, border_color=borderColor)
         else
@@ -2782,16 +2866,6 @@ f_eng2_syncSetupZoneVisual(box currentBox, line currentLine, label currentLabel,
             label.delete(nextLabel)
             nextLabel := na
     [nextBox, nextLine, nextLabel]
-
-f_draw_zone_box(box bx, label lb, float top, float bottom, string zoneType, bool isBull, bool selected, bool terminal) =>
-    bool enabled = not terminal and f_draw_zone_visible(draw_mode, selected, isBull, "Wait")
-    string labelText = zoneType
-    string labelStyle = isBull ? label.style_label_right : label.style_label_left
-    color borderColor = isBull ? color.new(bullColor, 20) : color.new(bearColor, 20)
-    color fillColor = isBull ? color.new(bullColor, 88) : color.new(bearColor, 88)
-    int borderWidth = selected ? 2 : 1
-    [nextBox, _, nextLabel] = f_eng2_syncSetupZoneVisual(bx, na, lb, enabled, bar_index, top, bottom, na, labelText, labelStyle, borderColor, fillColor, borderWidth, false, terminal ? "Completed" : "Waiting")
-    [nextBox, nextLabel]
 
 f_eng2_syncHistoryZoneBox(box currentBox, bool enabled, int leftBar, int rightBar, float zoneTop, float zoneBottom, color borderColor, color fillColor, int borderWidth) =>
     box nextBox = currentBox
@@ -3258,14 +3332,95 @@ int eng1BullObCreatedBarRaw = f_timeToChartBar(eng1_ctx_bull_ob_bar)
 int eng1BullFvgCreatedBarRaw = f_timeToChartBar(eng1_ctx_bull_fvg_bar)
 int eng1BearObCreatedBarRaw = f_timeToChartBar(eng1_ctx_bear_ob_bar)
 int eng1BearFvgCreatedBarRaw = f_timeToChartBar(eng1_ctx_bear_fvg_bar)
-int eng1BullObCreatedBar = not na(eng1_ctx_bull_ob_bar) ? nz(eng1BullObCreatedBarRaw, bar_index) : na
-int eng1BullFvgCreatedBar = not na(eng1_ctx_bull_fvg_bar) ? nz(eng1BullFvgCreatedBarRaw, bar_index) : na
-int eng1BearObCreatedBar = not na(eng1_ctx_bear_ob_bar) ? nz(eng1BearObCreatedBarRaw, bar_index) : na
-int eng1BearFvgCreatedBar = not na(eng1_ctx_bear_fvg_bar) ? nz(eng1BearFvgCreatedBarRaw, bar_index) : na
-bool eng1BullObTouched = f_zoneTouchedSinceBar(eng1_ctx_bull_ob_top, eng1_ctx_bull_ob_bottom, eng1BullObCreatedBar, eng1ContextTouchScan)
-bool eng1BullFvgTouched = f_zoneTouchedSinceBar(eng1_ctx_bull_fvg_top, eng1_ctx_bull_fvg_bottom, eng1BullFvgCreatedBar, eng1ContextTouchScan)
-bool eng1BearObTouched = f_zoneTouchedSinceBar(eng1_ctx_bear_ob_top, eng1_ctx_bear_ob_bottom, eng1BearObCreatedBar, eng1ContextTouchScan)
-bool eng1BearFvgTouched = f_zoneTouchedSinceBar(eng1_ctx_bear_fvg_top, eng1_ctx_bear_fvg_bottom, eng1BearFvgCreatedBar, eng1ContextTouchScan)
+int eng1BullObCreatedBar = not na(eng1_ctx_bull_ob_bar) ? eng1BullObCreatedBarRaw : na
+int eng1BullFvgCreatedBar = not na(eng1_ctx_bull_fvg_bar) ? eng1BullFvgCreatedBarRaw : na
+int eng1BearObCreatedBar = not na(eng1_ctx_bear_ob_bar) ? eng1BearObCreatedBarRaw : na
+int eng1BearFvgCreatedBar = not na(eng1_ctx_bear_fvg_bar) ? eng1BearFvgCreatedBarRaw : na
+
+// Touch latch: avoid historical scan on every bar.
+var int eng3BullObTouchBar = na
+var int eng3BullFvgTouchBar = na
+var int eng3BearObTouchBar = na
+var int eng3BearFvgTouchBar = na
+var float eng3BullObTouchTop = na
+var float eng3BullObTouchBottom = na
+var float eng3BullFvgTouchTop = na
+var float eng3BullFvgTouchBottom = na
+var float eng3BearObTouchTop = na
+var float eng3BearObTouchBottom = na
+var float eng3BearFvgTouchTop = na
+var float eng3BearFvgTouchBottom = na
+var bool eng3BullObTouchedState = false
+var bool eng3BullFvgTouchedState = false
+var bool eng3BearObTouchedState = false
+var bool eng3BearFvgTouchedState = false
+
+bool eng3BullObTrackValid = eng1HasBullObContext and not na(eng1_ctx_bull_ob_top) and not na(eng1_ctx_bull_ob_bottom) and not na(eng1BullObCreatedBar)
+bool eng3BullFvgTrackValid = eng1HasBullFvgContext and not na(eng1_ctx_bull_fvg_top) and not na(eng1_ctx_bull_fvg_bottom) and not na(eng1BullFvgCreatedBar)
+bool eng3BearObTrackValid = eng1HasBearObContext and not na(eng1_ctx_bear_ob_top) and not na(eng1_ctx_bear_ob_bottom) and not na(eng1BearObCreatedBar)
+bool eng3BearFvgTrackValid = eng1HasBearFvgContext and not na(eng1_ctx_bear_fvg_top) and not na(eng1_ctx_bear_fvg_bottom) and not na(eng1BearFvgCreatedBar)
+
+bool eng3BullObTrackChanged = eng3BullObTrackValid and (na(eng3BullObTouchBar) or eng3BullObTouchBar != eng1BullObCreatedBar or na(eng3BullObTouchTop) or eng3BullObTouchTop != eng1_ctx_bull_ob_top or na(eng3BullObTouchBottom) or eng3BullObTouchBottom != eng1_ctx_bull_ob_bottom)
+bool eng3BullFvgTrackChanged = eng3BullFvgTrackValid and (na(eng3BullFvgTouchBar) or eng3BullFvgTouchBar != eng1BullFvgCreatedBar or na(eng3BullFvgTouchTop) or eng3BullFvgTouchTop != eng1_ctx_bull_fvg_top or na(eng3BullFvgTouchBottom) or eng3BullFvgTouchBottom != eng1_ctx_bull_fvg_bottom)
+bool eng3BearObTrackChanged = eng3BearObTrackValid and (na(eng3BearObTouchBar) or eng3BearObTouchBar != eng1BearObCreatedBar or na(eng3BearObTouchTop) or eng3BearObTouchTop != eng1_ctx_bear_ob_top or na(eng3BearObTouchBottom) or eng3BearObTouchBottom != eng1_ctx_bear_ob_bottom)
+bool eng3BearFvgTrackChanged = eng3BearFvgTrackValid and (na(eng3BearFvgTouchBar) or eng3BearFvgTouchBar != eng1BearFvgCreatedBar or na(eng3BearFvgTouchTop) or eng3BearFvgTouchTop != eng1_ctx_bear_fvg_top or na(eng3BearFvgTouchBottom) or eng3BearFvgTouchBottom != eng1_ctx_bear_fvg_bottom)
+
+if not eng3BullObTrackValid
+    eng3BullObTouchedState := false
+    eng3BullObTouchBar := na
+    eng3BullObTouchTop := na
+    eng3BullObTouchBottom := na
+else if eng3BullObTrackChanged
+    eng3BullObTouchedState := f_zoneTouchedSinceBar(eng1_ctx_bull_ob_top, eng1_ctx_bull_ob_bottom, eng1BullObCreatedBar, eng1ContextTouchScan)
+    eng3BullObTouchBar := eng1BullObCreatedBar
+    eng3BullObTouchTop := eng1_ctx_bull_ob_top
+    eng3BullObTouchBottom := eng1_ctx_bull_ob_bottom
+else if not eng3BullObTouchedState and high >= eng1_ctx_bull_ob_bottom and low <= eng1_ctx_bull_ob_top
+    eng3BullObTouchedState := true
+
+if not eng3BullFvgTrackValid
+    eng3BullFvgTouchedState := false
+    eng3BullFvgTouchBar := na
+    eng3BullFvgTouchTop := na
+    eng3BullFvgTouchBottom := na
+else if eng3BullFvgTrackChanged
+    eng3BullFvgTouchedState := f_zoneTouchedSinceBar(eng1_ctx_bull_fvg_top, eng1_ctx_bull_fvg_bottom, eng1BullFvgCreatedBar, eng1ContextTouchScan)
+    eng3BullFvgTouchBar := eng1BullFvgCreatedBar
+    eng3BullFvgTouchTop := eng1_ctx_bull_fvg_top
+    eng3BullFvgTouchBottom := eng1_ctx_bull_fvg_bottom
+else if not eng3BullFvgTouchedState and high >= eng1_ctx_bull_fvg_bottom and low <= eng1_ctx_bull_fvg_top
+    eng3BullFvgTouchedState := true
+
+if not eng3BearObTrackValid
+    eng3BearObTouchedState := false
+    eng3BearObTouchBar := na
+    eng3BearObTouchTop := na
+    eng3BearObTouchBottom := na
+else if eng3BearObTrackChanged
+    eng3BearObTouchedState := f_zoneTouchedSinceBar(eng1_ctx_bear_ob_top, eng1_ctx_bear_ob_bottom, eng1BearObCreatedBar, eng1ContextTouchScan)
+    eng3BearObTouchBar := eng1BearObCreatedBar
+    eng3BearObTouchTop := eng1_ctx_bear_ob_top
+    eng3BearObTouchBottom := eng1_ctx_bear_ob_bottom
+else if not eng3BearObTouchedState and high >= eng1_ctx_bear_ob_bottom and low <= eng1_ctx_bear_ob_top
+    eng3BearObTouchedState := true
+
+if not eng3BearFvgTrackValid
+    eng3BearFvgTouchedState := false
+    eng3BearFvgTouchBar := na
+    eng3BearFvgTouchTop := na
+    eng3BearFvgTouchBottom := na
+else if eng3BearFvgTrackChanged
+    eng3BearFvgTouchedState := f_zoneTouchedSinceBar(eng1_ctx_bear_fvg_top, eng1_ctx_bear_fvg_bottom, eng1BearFvgCreatedBar, eng1ContextTouchScan)
+    eng3BearFvgTouchBar := eng1BearFvgCreatedBar
+    eng3BearFvgTouchTop := eng1_ctx_bear_fvg_top
+    eng3BearFvgTouchBottom := eng1_ctx_bear_fvg_bottom
+else if not eng3BearFvgTouchedState and high >= eng1_ctx_bear_fvg_bottom and low <= eng1_ctx_bear_fvg_top
+    eng3BearFvgTouchedState := true
+
+bool eng1BullObTouched = eng3BullObTouchedState
+bool eng1BullFvgTouched = eng3BullFvgTouchedState
+bool eng1BearObTouched = eng3BearObTouchedState
+bool eng1BearFvgTouched = eng3BearFvgTouchedState
 
 // Context POI sources (Engine 1 owned). Keep them explicit so Engine 3 never
 // accidentally pulls from execution-only state.
@@ -3327,12 +3482,12 @@ poi_short_valid := poi_short_contract_valid
 [tradeLongEntry, tradeLongStop, tradeLongTarget, longTargetIsLiquidity, tradeLongSetup, tradeLongValidTop, tradeLongValidBottom, tradeLongIsOb, tradeLongIsFvg, tradeLongCreatedBar, tradeLongTouched] = f_eng3_build_trade_plan(true, poi_long_contract_valid, poi_long_type, poi_long_top, poi_long_bottom, poi_long_entry, poi_long_bar, poi_long_touched, atr, stopAtrBuffer, effectiveExecLiqHigh, effectiveExecLiqLow, effectiveExecEqHigh, effectiveExecEqLow, effectiveContextHigh, effectiveContextLow)
 [tradeShortEntry, tradeShortStop, tradeShortTarget, shortTargetIsLiquidity, tradeShortSetup, tradeShortValidTop, tradeShortValidBottom, tradeShortIsOb, tradeShortIsFvg, tradeShortCreatedBar, tradeShortTouched] = f_eng3_build_trade_plan(false, poi_short_contract_valid, poi_short_type, poi_short_top, poi_short_bottom, poi_short_entry, poi_short_bar, poi_short_touched, atr, stopAtrBuffer, effectiveExecLiqHigh, effectiveExecLiqLow, effectiveExecEqHigh, effectiveExecEqLow, effectiveContextHigh, effectiveContextLow)
 
-float ipdaLookback20High = f_eng1_window_high_safe(eng1_buf_d1_high, 20)
-float ipdaLookback20Low = f_eng1_window_low_safe(eng1_buf_d1_low, 20)
-float ipdaLookback40High = f_eng1_window_high_safe(eng1_buf_d1_high, 40)
-float ipdaLookback40Low = f_eng1_window_low_safe(eng1_buf_d1_low, 40)
-float ipdaLookback60High = f_eng1_window_high_safe(eng1_buf_d1_high, 60)
-float ipdaLookback60Low = f_eng1_window_low_safe(eng1_buf_d1_low, 60)
+float ipdaLookback20High = eng1_d1_lb20_high
+float ipdaLookback20Low = eng1_d1_lb20_low
+float ipdaLookback40High = eng1_d1_lb40_high
+float ipdaLookback40Low = eng1_d1_lb40_low
+float ipdaLookback60High = eng1_d1_lb60_high
+float ipdaLookback60Low = eng1_d1_lb60_low
 bool ipdaLongDolAvailable = not na(eng1_narr_liq_high) or not na(ipdaLookback20High) or not na(ipdaLookback40High) or not na(ipdaLookback60High) or not na(eng1_narr_bear_sd_top) or not na(eng1_narr_bear_sd_bottom)
 bool ipdaShortDolAvailable = not na(eng1_narr_liq_low) or not na(ipdaLookback20Low) or not na(ipdaLookback40Low) or not na(ipdaLookback60Low) or not na(eng1_narr_bull_sd_top) or not na(eng1_narr_bull_sd_bottom)
 float longDolExternal = not na(tradeLongEntry) ? f_nearestAbove(tradeLongEntry, eng1_narr_liq_high, ipdaLookback20High, ipdaLookback40High, ipdaLookback60High, effectiveContextHigh, eng1_narr_bear_sd_bottom, eng1_narr_bear_sd_top) : na
@@ -3523,31 +3678,6 @@ float shortConfidence = f_setupScore(not na(tradeShortEntry), shortBiasAligned, 
 string longZoneQualityText = poi_long_contract_valid and not na(tradeLongEntry) ? longQualityTier : "-"
 string shortZoneQualityText = poi_short_contract_valid and not na(tradeShortEntry) ? shortQualityTier : "-"
 
-//------------------------------------------------------------------------------
-// ENGINE 3 CONTRACT ALIASES (MAIN_CONTRACT)
-// Keep canonical Engine 3 snapshot names explicit for cross-engine connectors.
-//------------------------------------------------------------------------------
-string stp_long_state = longExecutionState
-string stp_short_state = shortExecutionState
-float stp_long_entry = tradeLongEntry
-float stp_long_stop = tradeLongStop
-float stp_long_target = activeLongTarget
-float stp_short_entry = tradeShortEntry
-float stp_short_stop = tradeShortStop
-float stp_short_target = activeShortTarget
-float stp_long_rr = longRr
-float stp_short_rr = shortRr
-bool stp_long_touched = tradeLongTouched
-bool stp_short_touched = tradeShortTouched
-bool stp_long_completed = longCompleted
-bool stp_short_completed = shortCompleted
-bool stp_long_invalidated = longInvalidated
-bool stp_short_invalidated = shortInvalidated
-bool stp_long_ambiguous = longAmbiguous
-bool stp_short_ambiguous = shortAmbiguous
-int stp_long_age = longSetupAge
-int stp_short_age = shortSetupAge
-
 bool longSelectedVisualActive = not f_executionTerminal(longExecutionState)
 bool shortSelectedVisualActive = not f_executionTerminal(shortExecutionState)
 string preferredDirection = "Wait"
@@ -3591,12 +3721,6 @@ bool eng2LongZoneTypeVisible = (tradeLongIsOb and showOb) or (tradeLongIsFvg and
 bool eng2ShortZoneTypeVisible = (tradeShortIsOb and showOb) or (tradeShortIsFvg and showFvg)
 bool draw_long_selected = longSelectedVisualActive and eng2LongZoneTypeVisible
 bool draw_short_selected = shortSelectedVisualActive and eng2ShortZoneTypeVisible
-float draw_long_zone_top = draw_long_selected ? tradeLongValidTop : na
-float draw_long_zone_bottom = draw_long_selected ? tradeLongValidBottom : na
-float draw_short_zone_top = draw_short_selected ? tradeShortValidTop : na
-float draw_short_zone_bottom = draw_short_selected ? tradeShortValidBottom : na
-string draw_long_zone_type = draw_long_selected ? (tradeLongIsOb ? "OB" : tradeLongIsFvg ? "FVG" : "") : ""
-string draw_short_zone_type = draw_short_selected ? (tradeShortIsOb ? "OB" : tradeShortIsFvg ? "FVG" : "") : ""
 bool showEng2LongLiveZone = draw_long_selected and f_draw_zone_visible(draw_mode, true, true, preferredDirection)
 bool showEng2ShortLiveZone = draw_short_selected and f_draw_zone_visible(draw_mode, true, false, preferredDirection)
 
@@ -3606,7 +3730,7 @@ bool longTerminalSnapshot = longTerminalNow and currentLongSetupTag != "" and en
 bool shortTerminalSnapshot = shortTerminalNow and currentShortSetupTag != "" and eng2ShortHistoryTag != currentShortSetupTag
 if longTerminalSnapshot
     eng2LongHistoryTag := currentLongSetupTag
-    eng2LongHistoryLeftBar := nz(tradeLongCreatedBar, bar_index)
+    eng2LongHistoryLeftBar := f_createdBarFallback(tradeLongCreatedBar)
     eng2LongHistoryRightBar := bar_index
     eng2LongHistoryTop := tradeLongValidTop
     eng2LongHistoryBottom := tradeLongValidBottom
@@ -3614,7 +3738,7 @@ if longTerminalSnapshot
     eng2LongHistoryIsFvg := tradeLongIsFvg
 if shortTerminalSnapshot
     eng2ShortHistoryTag := currentShortSetupTag
-    eng2ShortHistoryLeftBar := nz(tradeShortCreatedBar, bar_index)
+    eng2ShortHistoryLeftBar := f_createdBarFallback(tradeShortCreatedBar)
     eng2ShortHistoryRightBar := bar_index
     eng2ShortHistoryTop := tradeShortValidTop
     eng2ShortHistoryBottom := tradeShortValidBottom
@@ -3697,8 +3821,8 @@ eng2ShortHistoryBox := f_eng2_syncHistoryZoneBox(eng2ShortHistoryBox, showEng2Sh
 bool eng2NarrativeZonesEnabled = eng1_exec_valid and draw_full and draw_show_htf and showOb and not compactMode
 int eng2NarrBullSdCreatedBarRaw = f_timeToChartBar(eng1_narr_bull_sd_bar)
 int eng2NarrBearSdCreatedBarRaw = f_timeToChartBar(eng1_narr_bear_sd_bar)
-int eng2NarrBullSdCreatedBar = not na(eng1_narr_bull_sd_bar) ? nz(eng2NarrBullSdCreatedBarRaw, bar_index) : na
-int eng2NarrBearSdCreatedBar = not na(eng1_narr_bear_sd_bar) ? nz(eng2NarrBearSdCreatedBarRaw, bar_index) : na
+int eng2NarrBullSdCreatedBar = not na(eng1_narr_bull_sd_bar) ? eng2NarrBullSdCreatedBarRaw : na
+int eng2NarrBearSdCreatedBar = not na(eng1_narr_bear_sd_bar) ? eng2NarrBearSdCreatedBarRaw : na
 string eng2NarrBullSdText = compactMode ? "SD+" : "Narr SD+"
 string eng2NarrBearSdText = compactMode ? "SD-" : "Narr SD-"
 color eng2NarrBullBorder = color.new(bullColor, 38)
@@ -3911,23 +4035,25 @@ string eng4_bias_market = f_biasSummary(displayExecBias, eng1CtxRangeReady, disp
 string eng4_bias_long = (eng1CtxRangeReady ? f_alignmentShortText(true, displayExecBias, displayCtxBias) : "G") + " / " + f_regimeSideShortText(true, displayNarrBias, eng1_exec_valid ? eng1_narr_strength : "Flat")
 string eng4_bias_short = (eng1CtxRangeReady ? f_alignmentShortText(false, displayExecBias, displayCtxBias) : "G") + " / " + f_regimeSideShortText(false, displayNarrBias, eng1_exec_valid ? eng1_narr_strength : "Flat")
 string eng4_pref_market = f_preferredExecutionText(preferredDirection, longExecutionState, shortExecutionState, false)
-string eng4_setup_long = f_eng4_setup_text(longSetupDisplay, eng4LongRetired)
-string eng4_setup_short = f_eng4_setup_text(shortSetupDisplay, eng4ShortRetired)
-string eng4_zone_long = f_eng4_zone_text(tradeLongValidTop, tradeLongValidBottom, tradeLongEntry, eng4LongRetired)
-string eng4_zone_short = f_eng4_zone_text(tradeShortValidTop, tradeShortValidBottom, tradeShortEntry, eng4ShortRetired)
+string eng4_poi_long = f_setupPathText(not na(tradeLongEntry), tradeLongIsFvg, tradeLongIsOb, longUsesExternalDolTarget, true)
+string eng4_poi_short = f_setupPathText(not na(tradeShortEntry), tradeShortIsFvg, tradeShortIsOb, shortUsesExternalDolTarget, true)
+string eng4_setup_long = f_dash_setup_text(longSetupDisplay, eng4_poi_long, eng4LongRetired)
+string eng4_setup_short = f_dash_setup_text(shortSetupDisplay, eng4_poi_short, eng4ShortRetired)
+string eng4_zone_long = f_dash_zone_text(tradeLongValidTop, tradeLongValidBottom, tradeLongEntry, eng4LongRetired)
+string eng4_zone_short = f_dash_zone_text(tradeShortValidTop, tradeShortValidBottom, tradeShortEntry, eng4ShortRetired)
 string eng4_target_market = f_eng4_market_summary(f_targetModeText(not na(activeLongTarget), longUsesExternalDolTarget, longTargetIsLiquidity), eng4LongRetired, f_targetModeText(not na(activeShortTarget), shortUsesExternalDolTarget, shortTargetIsLiquidity), eng4ShortRetired)
-string eng4_risk_long = f_eng4_risk_text(tradeLongStop, activeLongTarget, eng4LongRetired)
-string eng4_risk_short = f_eng4_risk_text(tradeShortStop, activeShortTarget, eng4ShortRetired)
-string eng4_rr_long = f_eng4_rr_text(longRr, longConfidence, eng4LongRetired)
-string eng4_rr_short = f_eng4_rr_text(shortRr, shortConfidence, eng4ShortRetired)
-string eng4_draw_long = f_eng4_level_text(eng4LongDrawLevel, eng4LongRetired)
-string eng4_draw_short = f_eng4_level_text(eng4ShortDrawLevel, eng4ShortRetired)
-string eng4_life_long = f_eng4_life_text(longSetupAge, tradeLongTouched, eng4LongRetired)
-string eng4_life_short = f_eng4_life_text(shortSetupAge, tradeShortTouched, eng4ShortRetired)
+string eng4_risk_long = f_dash_risk_text(tradeLongStop, activeLongTarget, eng4LongRetired)
+string eng4_risk_short = f_dash_risk_text(tradeShortStop, activeShortTarget, eng4ShortRetired)
+string eng4_rr_long = f_dash_rr_text(longRr, longConfidence, eng4LongRetired)
+string eng4_rr_short = f_dash_rr_text(shortRr, shortConfidence, eng4ShortRetired)
+string eng4_draw_long = f_dash_draw_text(eng4LongDrawLevel, eng4LongRetired)
+string eng4_draw_short = f_dash_draw_text(eng4ShortDrawLevel, eng4ShortRetired)
+string eng4_life_long = f_dash_life_text(longSetupAge, tradeLongTouched, eng4LongRetired)
+string eng4_life_short = f_dash_life_text(shortSetupAge, tradeShortTouched, eng4ShortRetired)
 string eng4_session_market = f_eng4_session_text(liquiditySessionSummary, timezoneSummary, strictModeEnabled, ipdaWindowSummary)
 string eng4_confirm_long = f_eng4_confirmation_text(not na(tradeLongEntry), strictModeEnabled, eng3LongTimePass, eng3LongBiasPass, eng3LongContextPass, eng3LongSweepPass, eng3LongMssPass, eng3LongDisplacementPass, eng3LongPdPass, eng3LongOtePass, eng3LongDolPass, tradeLongIsFvg, tradeLongIsOb, longUsesExternalDolTarget, longExecutionState, eng4LongRetired)
 string eng4_confirm_short = f_eng4_confirmation_text(not na(tradeShortEntry), strictModeEnabled, eng3ShortTimePass, eng3ShortBiasPass, eng3ShortContextPass, eng3ShortSweepPass, eng3ShortMssPass, eng3ShortDisplacementPass, eng3ShortPdPass, eng3ShortOtePass, eng3ShortDolPass, tradeShortIsFvg, tradeShortIsOb, shortUsesExternalDolTarget, shortExecutionState, eng4ShortRetired)
-string eng4_next_market = ipdaCycleMarketFullText + " | " + eng1StageSummary
+string eng4_next_market = f_dash_next_text(ipdaCycleMarketFullText, eng1StageSummary, "")
 string eng4_next_long = f_ipdaNextActionText(not na(tradeLongEntry), longExecutionState, effectiveLongDirectional, effectiveLongSweepSeen, effectiveLongMssSeen, effectiveLongDisplacementSeen, ipdaLongCyclePhase, true)
 string eng4_next_short = f_ipdaNextActionText(not na(tradeShortEntry), shortExecutionState, effectiveShortDirectional, effectiveShortSweepSeen, effectiveShortMssSeen, effectiveShortDisplacementSeen, ipdaShortCyclePhase, false)
 string eng4_deal_status = dealingRangeStatusText
@@ -3950,6 +4076,32 @@ string eng4_compact_draw = compactNeutral ? "-" : f_eng4_rr_draw_text(compactRr,
 string eng4_compact_life = compactBalanced ? "Mixed" : compactWaiting and compactContextOnly and compactCandidateHasSetup and not compactCandidateRetired ? f_eng4_detail_text(f_compactLifecycleText(compactUseLong, longSetupAge, tradeLongTouched, shortSetupAge, tradeShortTouched), eng4_compact_retired) : compactWaiting ? "Scan" : f_eng4_detail_text(f_compactLifecycleText(compactUseLong, longSetupAge, tradeLongTouched, shortSetupAge, tradeShortTouched), eng4_compact_retired)
 string eng4_compact_mode = usagePreset + " | " + ipdaCycleMarketText + " | " + eng1StageSummary
 string eng4_compact_sessions = eng4_session_market
+
+//------------------------------------------------------------------------------
+// ENGINE 4 CONTRACT ALIASES (MAIN_CONTRACT)
+// Keep canonical dashboard snapshot names so render rows read one stable layer.
+//------------------------------------------------------------------------------
+string dash_bias_market = eng1CtxRangeReady ? f_dash_bias_text(displayExecBias, displayCtxBias, displayNarrBias, eng1_exec_valid ? eng1_narr_strength : "Flat") : eng4_bias_market
+string dash_setup_long = eng4_setup_long
+string dash_setup_short = eng4_setup_short
+string dash_zone_long = eng4_zone_long
+string dash_zone_short = eng4_zone_short
+string dash_risk_long = eng4_risk_long
+string dash_risk_short = eng4_risk_short
+string dash_rr_long = eng4_rr_long
+string dash_rr_short = eng4_rr_short
+string dash_draw_long = eng4_draw_long
+string dash_draw_short = eng4_draw_short
+string dash_life_long = eng4_life_long
+string dash_life_short = eng4_life_short
+string dash_session_market = eng4_session_market
+string dash_next_market = eng4_next_market
+string dash_compact_setup = eng4_compact_setup
+string dash_compact_exec = eng4_compact_exec
+string dash_compact_zone = eng4_compact_zone
+string dash_compact_metric = eng4_compact_conf
+string dash_compact_life = eng4_compact_life
+string dash_compact_mode = eng4_compact_mode
 bool eng4_show_full_dashboard = barstate.islast and showDashboard and not compactDashboardMode
 bool eng4_show_compact_dashboard = barstate.islast and showDashboard and compactDashboardMode
 bool eng4_clear_dashboard = barstate.islast and not showDashboard
@@ -3996,47 +4148,47 @@ if eng4_show_full_dashboard
     f_setCell(dashboard, 3, 1, eng4_exec_short, color.white, panelBearBg)
 
     f_setCell(dashboard, 0, 2, "Bias", color.white, panelCellBg)
-    f_setCell(dashboard, 1, 2, eng4_bias_market, color.white, panelCellBg)
+    f_setCell(dashboard, 1, 2, dash_bias_market, color.white, panelCellBg)
     f_setCell(dashboard, 2, 2, eng4_bias_long, color.white, panelBullBg)
     f_setCell(dashboard, 3, 2, eng4_bias_short, color.white, panelBearBg)
 
     f_setCell(dashboard, 0, 3, "Pref", color.white, panelCellBg)
     f_setCell(dashboard, 1, 3, eng4_pref_market, color.white, color.new(preferredDirection == "Long" ? bullColor : preferredDirection == "Short" ? bearColor : neutralColor, 15))
-    f_setCell(dashboard, 2, 3, eng4_setup_long, color.white, panelBullBg)
-    f_setCell(dashboard, 3, 3, eng4_setup_short, color.white, panelBearBg)
+    f_setCell(dashboard, 2, 3, dash_setup_long, color.white, panelBullBg)
+    f_setCell(dashboard, 3, 3, dash_setup_short, color.white, panelBearBg)
 
     f_setCell(dashboard, 0, 4, "Z / E", color.white, panelCellBg)
     f_setCell(dashboard, 1, 4, "POI | trig", color.white, panelCellBg)
-    f_setCell(dashboard, 2, 4, eng4_zone_long, color.white, panelBullBg)
-    f_setCell(dashboard, 3, 4, eng4_zone_short, color.white, panelBearBg)
+    f_setCell(dashboard, 2, 4, dash_zone_long, color.white, panelBullBg)
+    f_setCell(dashboard, 3, 4, dash_zone_short, color.white, panelBearBg)
 
     f_setCell(dashboard, 0, 5, "SL / TP", color.white, panelCellBg)
     f_setCell(dashboard, 1, 5, eng4_target_market, color.white, panelCellBg)
-    f_setCell(dashboard, 2, 5, eng4_risk_long, color.white, panelBullBg)
-    f_setCell(dashboard, 3, 5, eng4_risk_short, color.white, panelBearBg)
+    f_setCell(dashboard, 2, 5, dash_risk_long, color.white, panelBullBg)
+    f_setCell(dashboard, 3, 5, dash_risk_short, color.white, panelBearBg)
 
     f_setCell(dashboard, 0, 6, "RR / Cf", color.white, panelCellBg)
     f_setCell(dashboard, 1, 6, "RR | conf", color.white, panelCellBg)
-    f_setCell(dashboard, 2, 6, eng4_rr_long, color.white, panelBullBg)
-    f_setCell(dashboard, 3, 6, eng4_rr_short, color.white, panelBearBg)
+    f_setCell(dashboard, 2, 6, dash_rr_long, color.white, panelBullBg)
+    f_setCell(dashboard, 3, 6, dash_rr_short, color.white, panelBearBg)
 
     f_setCell(dashboard, 0, 7, "Draw", color.white, panelCellBg)
     f_setCell(dashboard, 1, 7, "DOL", color.white, panelCellBg)
-    f_setCell(dashboard, 2, 7, eng4_draw_long, color.white, panelBullBg)
-    f_setCell(dashboard, 3, 7, eng4_draw_short, color.white, panelBearBg)
+    f_setCell(dashboard, 2, 7, dash_draw_long, color.white, panelBullBg)
+    f_setCell(dashboard, 3, 7, dash_draw_short, color.white, panelBearBg)
 
     f_setCell(dashboard, 0, 8, "Life", color.white, panelCellBg)
     f_setCell(dashboard, 1, 8, "Age / touch", color.white, panelCellBg)
-    f_setCell(dashboard, 2, 8, eng4_life_long, color.white, panelBullBg)
-    f_setCell(dashboard, 3, 8, eng4_life_short, color.white, panelBearBg)
+    f_setCell(dashboard, 2, 8, dash_life_long, color.white, panelBullBg)
+    f_setCell(dashboard, 3, 8, dash_life_short, color.white, panelBearBg)
 
     f_setCell(dashboard, 0, 9, "Sess/Cfm", color.white, panelCellBg)
-    f_setCell(dashboard, 1, 9, eng4_session_market, color.white, color.new(strictModeEnabled ? color.teal : neutralColor, 15))
+    f_setCell(dashboard, 1, 9, dash_session_market, color.white, color.new(strictModeEnabled ? color.teal : neutralColor, 15))
     f_setCell(dashboard, 2, 9, eng4_confirm_long, color.white, panelBullBg)
     f_setCell(dashboard, 3, 9, eng4_confirm_short, color.white, panelBearBg)
 
     f_setCell(dashboard, 0, 10, "Next", color.white, panelCellBg)
-    f_setCell(dashboard, 1, 10, eng4_next_market, color.white, panelCellBg)
+    f_setCell(dashboard, 1, 10, dash_next_market, color.white, panelCellBg)
     f_setCell(dashboard, 2, 10, eng4_next_long, color.white, panelBullBg)
     f_setCell(dashboard, 3, 10, eng4_next_short, color.white, panelBearBg)
 
@@ -4062,21 +4214,21 @@ else if eng4_show_compact_dashboard
     // Order is Narrative / Context / Execution to match the top-down workflow.
     f_setCell(dashboardCompact, 1, 1, eng4_compact_biases, color.white, panelCellBg)
     f_setCell(dashboardCompact, 0, 2, "Setup", color.white, panelCellBg)
-    f_setCell(dashboardCompact, 1, 2, eng4_compact_setup, color.white, compactAccent)
+    f_setCell(dashboardCompact, 1, 2, dash_compact_setup, color.white, compactAccent)
     f_setCell(dashboardCompact, 0, 3, "Zone", color.white, panelCellBg)
-    f_setCell(dashboardCompact, 1, 3, eng4_compact_zone, color.white, compactAccent)
+    f_setCell(dashboardCompact, 1, 3, dash_compact_zone, color.white, compactAccent)
     f_setCell(dashboardCompact, 0, 4, "E / SL / TP", color.white, panelCellBg)
     f_setCell(dashboardCompact, 1, 4, eng4_compact_plan, color.white, compactAccent)
     f_setCell(dashboardCompact, 0, 5, "Exec", color.white, panelCellBg)
-    f_setCell(dashboardCompact, 1, 5, eng4_compact_exec, color.white, compactAccent)
+    f_setCell(dashboardCompact, 1, 5, dash_compact_exec, color.white, compactAccent)
     f_setCell(dashboardCompact, 0, 6, eng4_compact_conf_label, color.white, panelCellBg)
-    f_setCell(dashboardCompact, 1, 6, eng4_compact_conf, color.white, compactAccent)
+    f_setCell(dashboardCompact, 1, 6, dash_compact_metric, color.white, compactAccent)
     f_setCell(dashboardCompact, 0, 7, "R / DOL", color.white, panelCellBg)
     f_setCell(dashboardCompact, 1, 7, eng4_compact_draw, color.white, compactAccent)
     f_setCell(dashboardCompact, 0, 8, "Life", color.white, panelCellBg)
-    f_setCell(dashboardCompact, 1, 8, eng4_compact_life, color.white, panelCellBg)
+    f_setCell(dashboardCompact, 1, 8, dash_compact_life, color.white, panelCellBg)
     f_setCell(dashboardCompact, 0, 9, "Mode", color.white, panelCellBg)
-    f_setCell(dashboardCompact, 1, 9, eng4_compact_mode, color.white, panelCellBg)
+    f_setCell(dashboardCompact, 1, 9, dash_compact_mode, color.white, panelCellBg)
     f_setCell(dashboardCompact, 0, 10, "Sessions", color.white, panelCellBg)
     f_setCell(dashboardCompact, 1, 10, eng4_compact_sessions, color.white, panelCellBg)
 else if eng4_clear_dashboard
