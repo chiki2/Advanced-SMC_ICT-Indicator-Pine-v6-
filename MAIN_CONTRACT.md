@@ -21,10 +21,22 @@ string eng_narr_tf = f_ictNarrativeHtf(timeframe.in_seconds())
 
 bool eng_exec_valid = eng_ctx_tf != "" and eng_narr_tf != ""
 
+string tradingSessionTimezone = "Etc/UTC"
+string asiaSessionWindow = "0000-0900"
+string londonSessionWindow = "0700-1600"
+string newYorkSessionWindow = "1300-2200"
+
+string ipdaTimeTimezone = "Etc/UTC"
+string ipdaAsiaKillzoneSession = "0000-0300"
+string ipdaLondonKillzoneSession = "0700-1000"
+string ipdaNewYorkKillzoneSession = "1200-1500"
+
 ```
 
 ## Engine 1: Data Buffer
-Gunakan template namespace ini untuk tiap TF: m1, m5, m15, m30, h1, h4, d1.
+Gunakan template namespace raw buffer, structure, dan execution untuk tiap TF: m1, m5, m15, m30, h1, h4, d1. Liquidity/PD array yang tidak dipakai langsung downstream tidak disimpan sebagai state per-TF; nilainya dihitung pada active layer dari snapshot narrative/context/execution yang sedang dipakai.
+
+Catatan pruning implementasi: snapshot zona OB/FVG tidak wajib untuk M1/M5 karena kedua TF ini dipakai sebagai execution layer, bukan context POI. Context/narrative POI tetap berasal dari M15, M30, H1, H4, dan D1 agar state tidak melebar tanpa downstream ownership.
 
 ```markdown
 //------------------------------------------------------------------------------
@@ -65,12 +77,9 @@ var int   X_trend_bias = 0
 
 ```markdown
 //------------------------------------------------------------------------------
-// ENGINE 1C: LIQUIDITY / PD ARRAY SNAPSHOT TEMPLATE
+// ENGINE 1C: ACTIVE LIQUIDITY / PD ARRAY SNAPSHOT TEMPLATE
 //------------------------------------------------------------------------------
-var float X_erl_high = na
-var float X_erl_low = na
-var float X_irl_high = na
-var float X_irl_low = na
+// Computed only for the selected active layer unless a downstream engine owns it.
 var float X_eqh = na
 var float X_eql = na
 var bool  X_eqh_active = false
@@ -89,6 +98,8 @@ var float X_ote_short_bottom = na
 ```markdown
 //------------------------------------------------------------------------------
 // ENGINE 1D: ZONE SNAPSHOT TEMPLATE
+// Apply to context/narrative POI TFs only: m15, m30, h1, h4, d1.
+// M1/M5 are intentionally execution-only and do not carry OB/FVG snapshot state.
 //------------------------------------------------------------------------------
 var float X_bull_ob_top = na
 var float X_bull_ob_bottom = na
@@ -214,13 +225,12 @@ bool draw_full = draw_mode == "Full"
 bool draw_focused = draw_mode == "Focused"
 bool draw_minimal = draw_mode == "Minimal"
 
-bool draw_show_sessions = showSessionVisuals and draw_full and timeframe.isintraday
-bool draw_show_structure = showStructureLabels and draw_full and not compactMode
-bool draw_show_sweeps = showSweeps and draw_full and not compactMode
+bool sessionVisualsEnabled = showSessionVisuals and draw_full and timeframe.isintraday
+bool draw_show_structure = showMarketStructure and draw_full and not compactMode
+bool displaySweepMarkers = showLiquidity and showSweeps and draw_full and not compactMode
 bool draw_show_htf = showHtf
-bool draw_show_protected = showProtectedLevels
-bool draw_show_ote = strictShowOte and not draw_minimal
-bool draw_show_right_labels = displayLiquidityRightLabels
+bool showOteVisual = strictShowOte and (draw_full or draw_focused) and not draw_minimal
+bool draw_show_right_labels = showLiquidityRightLabels
 
 ```
 
@@ -404,7 +414,7 @@ f_dash_bias_text(int execBias, int ctxBias, int narrBias, string narrStrength) =
 f_dash_setup_text(string state, string poiType, bool retired) =>
 f_dash_zone_text(float top, float bottom, float entry, bool retired) =>
 f_dash_risk_text(float stop, float target, bool retired) =>
-f_dash_rr_text(float rr, float confidence, bool retired) =>
+f_dash_rr_text(float rr, string signalGrade, bool retired) =>
 f_dash_draw_text(float drawLevel, bool retired) =>
 f_dash_life_text(int age, bool touched, bool retired) =>
 f_dash_next_text(string modeSummary, string mtfSummary, string oteSummary) =>
