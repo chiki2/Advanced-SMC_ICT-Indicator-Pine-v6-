@@ -292,6 +292,10 @@ var bool longPoiInvalidatedLatched = false
 var bool shortPoiTappedLatched = false
 var bool shortPoiMitigatedLatched = false
 var bool shortPoiInvalidatedLatched = false
+var string eng3LongActivePoiIdentity = ""
+var string eng3ShortActivePoiIdentity = ""
+var string eng3LongConsumedPoiIdentity = ""
+var string eng3ShortConsumedPoiIdentity = ""
 var string eng2LongTappedEventTag = ""
 var string eng2LongMitigatedEventTag = ""
 var string eng2ShortTappedEventTag = ""
@@ -1275,6 +1279,9 @@ f_eng3_poi_lifecycle(bool poiValid, string poiType, bool poiTouched, bool mitiga
 f_eng3_poi_actionable(string poiLifecycle) =>
     poiLifecycle == "Fresh" or poiLifecycle == "Tapped" or poiLifecycle == "Inverted/Breaker"
 
+f_eng3_poi_identity(string sideText, string poiType, int poiBar, float poiTop, float poiBottom) =>
+    poiType != "" and not na(poiBar) and not na(poiTop) and not na(poiBottom) ? sideText + "|" + poiType + "|" + str.tostring(poiBar) + "|" + str.tostring(poiTop) + "|" + str.tostring(poiBottom) : ""
+
 f_eng3_select_context_poi(bool preferOb, bool preferFvg, bool obIsBreaker, float obTop, float obBottom, float obEntry, int obCreatedBar, bool obTouched, float fvgTop, float fvgBottom, int fvgCreatedBar, bool fvgTouched) =>
     bool selectedOb = preferOb and not na(obTop) and not na(obBottom) and not na(obEntry)
     bool selectedFvg = not selectedOb and preferFvg and not na(fvgTop) and not na(fvgBottom)
@@ -1855,15 +1862,16 @@ f_eng1_build_ob(array<int> arrT, array<float> arrO, array<float> arrH, array<flo
                 break
     [bullTop, bullBottom, bullEntry, bullBar, bullBreaker, bullBreakerTime, bearTop, bearBottom, bearEntry, bearBar, bearBreaker, bearBreakerTime]
 
-f_eng1_build_execution(float lastHigh, float lastLow, float protectedHigh, float protectedLow, array<float> arrO, array<float> arrH, array<float> arrL, array<float> arrC) =>
+f_eng1_build_execution(float lastHigh, float lastLow, array<float> arrO, array<float> arrH, array<float> arrL, array<float> arrC) =>
     bool bullSweep = false
     bool bearSweep = false
     bool bullDisplacement = false
     bool bearDisplacement = false
     bool bullMss = false
     bool bearMss = false
-    float nextProtectedHigh = protectedHigh
-    float nextProtectedLow = protectedLow
+    // Kept as downstream MSS-reference outputs, but no longer recursive state.
+    float mssHighRef = lastHigh
+    float mssLowRef = lastLow
     int size = math.min(math.min(array.size(arrO), array.size(arrH)), math.min(array.size(arrL), array.size(arrC)))
     if size > 0
         float latestOpen = array.get(arrO, 0)
@@ -1878,20 +1886,12 @@ f_eng1_build_execution(float lastHigh, float lastLow, float protectedHigh, float
         bearSweep := not na(lastHigh) and latestHigh > lastHigh and latestClose < lastHigh
         bullDisplacement := latestClose > latestOpen and latestRange >= displacementThreshold and bodyShare >= 0.55
         bearDisplacement := latestClose < latestOpen and latestRange >= displacementThreshold and bodyShare >= 0.55
-        float bullMssLevel = not na(protectedHigh) ? protectedHigh : lastHigh
-        float bearMssLevel = not na(protectedLow) ? protectedLow : lastLow
+        float bullMssLevel = mssHighRef
+        float bearMssLevel = mssLowRef
         float prevClose = size > 1 ? array.get(arrC, 1) : na
         bullMss := bullDisplacement and not na(bullMssLevel) and not na(prevClose) and prevClose <= bullMssLevel and f_eng1_break_up(bullMssLevel, latestClose)
         bearMss := bearDisplacement and not na(bearMssLevel) and not na(prevClose) and prevClose >= bearMssLevel and f_eng1_break_down(bearMssLevel, latestClose)
-        if bullSweep
-            nextProtectedLow := f_eng1_window_low_safe(arrL, math.min(size, 4))
-        if bearSweep
-            nextProtectedHigh := f_eng1_window_high_safe(arrH, math.min(size, 4))
-        if bullMss
-            nextProtectedLow := f_eng1_window_low_safe(arrL, math.min(size, 6))
-        if bearMss
-            nextProtectedHigh := f_eng1_window_high_safe(arrH, math.min(size, 6))
-    [bullSweep, bearSweep, bullDisplacement, bearDisplacement, bullMss, bearMss, nextProtectedHigh, nextProtectedLow]
+    [bullSweep, bearSweep, bullDisplacement, bearDisplacement, bullMss, bearMss, mssHighRef, mssLowRef]
 
 // Engine 1 raw buffers
 var array<int> eng1_buf_m1_time = array.new_int()
@@ -1992,8 +1992,8 @@ var float eng1_m1_last_swing_low = na
 var int eng1_m1_last_swing_low_bar = na
 var float eng1_m1_eqh = na
 var float eng1_m1_eql = na
-var float eng1_m1_protected_high = na
-var float eng1_m1_protected_low = na
+var float eng1_m1_mss_ref_high = na
+var float eng1_m1_mss_ref_low = na
 var int eng1_m1_trend_bias = 0
 var bool eng1_m1_eqh_active = false
 var bool eng1_m1_eql_active = false
@@ -2010,8 +2010,8 @@ var float eng1_m5_last_swing_low = na
 var int eng1_m5_last_swing_low_bar = na
 var float eng1_m5_eqh = na
 var float eng1_m5_eql = na
-var float eng1_m5_protected_high = na
-var float eng1_m5_protected_low = na
+var float eng1_m5_mss_ref_high = na
+var float eng1_m5_mss_ref_low = na
 var int eng1_m5_trend_bias = 0
 var bool eng1_m5_eqh_active = false
 var bool eng1_m5_eql_active = false
@@ -2046,8 +2046,8 @@ var int eng1_m15_bull_fvg_bar = na
 var float eng1_m15_bear_fvg_top = na
 var float eng1_m15_bear_fvg_bottom = na
 var int eng1_m15_bear_fvg_bar = na
-var float eng1_m15_protected_high = na
-var float eng1_m15_protected_low = na
+var float eng1_m15_mss_ref_high = na
+var float eng1_m15_mss_ref_low = na
 var int eng1_m15_trend_bias = 0
 var bool eng1_m15_eqh_active = false
 var bool eng1_m15_eql_active = false
@@ -2082,8 +2082,8 @@ var int eng1_m30_bull_fvg_bar = na
 var float eng1_m30_bear_fvg_top = na
 var float eng1_m30_bear_fvg_bottom = na
 var int eng1_m30_bear_fvg_bar = na
-var float eng1_m30_protected_high = na
-var float eng1_m30_protected_low = na
+var float eng1_m30_mss_ref_high = na
+var float eng1_m30_mss_ref_low = na
 var int eng1_m30_trend_bias = 0
 var bool eng1_m30_eqh_active = false
 var bool eng1_m30_eql_active = false
@@ -2260,8 +2260,8 @@ var bool eng1_exe_bull_mss = false
 var bool eng1_exe_bear_mss = false
 var bool eng1_exe_bull_displacement = false
 var bool eng1_exe_bear_displacement = false
-var float eng1_exe_protected_high = na
-var float eng1_exe_protected_low = na
+var float eng1_exe_mss_ref_high = na
+var float eng1_exe_mss_ref_low = na
 var float eng1_exe_liq_high = na
 var float eng1_exe_liq_low = na
 var float eng1_exe_eqh = na
@@ -2344,8 +2344,8 @@ f_eng1_select_execution_snapshot(string tf) =>
     bool exeBearMss = false
     bool exeBullDisplacement = false
     bool exeBearDisplacement = false
-    float exeProtectedHigh = na
-    float exeProtectedLow = na
+    float exeMssRefHigh = na
+    float exeMssRefLow = na
     if tf == ENG1_TF_M1
         exeBullSweep := eng1_m1_bull_sweep
         exeBearSweep := eng1_m1_bear_sweep
@@ -2353,8 +2353,8 @@ f_eng1_select_execution_snapshot(string tf) =>
         exeBearMss := eng1_m1_bear_mss
         exeBullDisplacement := eng1_m1_bull_displacement
         exeBearDisplacement := eng1_m1_bear_displacement
-        exeProtectedHigh := eng1_m1_protected_high
-        exeProtectedLow := eng1_m1_protected_low
+        exeMssRefHigh := eng1_m1_mss_ref_high
+        exeMssRefLow := eng1_m1_mss_ref_low
     else if tf == ENG1_TF_M5
         exeBullSweep := eng1_m5_bull_sweep
         exeBearSweep := eng1_m5_bear_sweep
@@ -2362,8 +2362,8 @@ f_eng1_select_execution_snapshot(string tf) =>
         exeBearMss := eng1_m5_bear_mss
         exeBullDisplacement := eng1_m5_bull_displacement
         exeBearDisplacement := eng1_m5_bear_displacement
-        exeProtectedHigh := eng1_m5_protected_high
-        exeProtectedLow := eng1_m5_protected_low
+        exeMssRefHigh := eng1_m5_mss_ref_high
+        exeMssRefLow := eng1_m5_mss_ref_low
     else if tf == ENG1_TF_M15
         exeBullSweep := eng1_m15_bull_sweep
         exeBearSweep := eng1_m15_bear_sweep
@@ -2371,8 +2371,8 @@ f_eng1_select_execution_snapshot(string tf) =>
         exeBearMss := eng1_m15_bear_mss
         exeBullDisplacement := eng1_m15_bull_displacement
         exeBearDisplacement := eng1_m15_bear_displacement
-        exeProtectedHigh := eng1_m15_protected_high
-        exeProtectedLow := eng1_m15_protected_low
+        exeMssRefHigh := eng1_m15_mss_ref_high
+        exeMssRefLow := eng1_m15_mss_ref_low
     else if tf == ENG1_TF_M30
         exeBullSweep := eng1_m30_bull_sweep
         exeBearSweep := eng1_m30_bear_sweep
@@ -2380,9 +2380,9 @@ f_eng1_select_execution_snapshot(string tf) =>
         exeBearMss := eng1_m30_bear_mss
         exeBullDisplacement := eng1_m30_bull_displacement
         exeBearDisplacement := eng1_m30_bear_displacement
-        exeProtectedHigh := eng1_m30_protected_high
-        exeProtectedLow := eng1_m30_protected_low
-    [exeBullSweep, exeBearSweep, exeBullMss, exeBearMss, exeBullDisplacement, exeBearDisplacement, exeProtectedHigh, exeProtectedLow]
+        exeMssRefHigh := eng1_m30_mss_ref_high
+        exeMssRefLow := eng1_m30_mss_ref_low
+    [exeBullSweep, exeBearSweep, exeBullMss, exeBearMss, exeBullDisplacement, exeBearDisplacement, exeMssRefHigh, exeMssRefLow]
 
 f_eng1_select_execution_snapshot_levels(string tf) =>
     float exeEqh = na
@@ -2717,45 +2717,45 @@ if eng1_any_new_closed_bar or barstate.isfirst
         eng1_d1_bear_fvg_bar := eng1_d1_bear_fvg_bar_tmp
 
     if recalc_m1
-        [eng1_m1_bull_sweep_tmp, eng1_m1_bear_sweep_tmp, eng1_m1_bull_displacement_tmp, eng1_m1_bear_displacement_tmp, eng1_m1_bull_mss_tmp, eng1_m1_bear_mss_tmp, eng1_m1_protected_high_tmp, eng1_m1_protected_low_tmp] = f_eng1_build_execution(eng1_m1_last_swing_high, eng1_m1_last_swing_low, eng1_m1_protected_high, eng1_m1_protected_low, eng1_buf_m1_open, eng1_buf_m1_high, eng1_buf_m1_low, eng1_buf_m1_close)
+        [eng1_m1_bull_sweep_tmp, eng1_m1_bear_sweep_tmp, eng1_m1_bull_displacement_tmp, eng1_m1_bear_displacement_tmp, eng1_m1_bull_mss_tmp, eng1_m1_bear_mss_tmp, eng1_m1_mss_ref_high_tmp, eng1_m1_mss_ref_low_tmp] = f_eng1_build_execution(eng1_m1_last_swing_high, eng1_m1_last_swing_low, eng1_buf_m1_open, eng1_buf_m1_high, eng1_buf_m1_low, eng1_buf_m1_close)
         eng1_m1_bull_sweep := eng1_m1_bull_sweep_tmp
         eng1_m1_bear_sweep := eng1_m1_bear_sweep_tmp
         eng1_m1_bull_displacement := eng1_m1_bull_displacement_tmp
         eng1_m1_bear_displacement := eng1_m1_bear_displacement_tmp
         eng1_m1_bull_mss := eng1_m1_bull_mss_tmp
         eng1_m1_bear_mss := eng1_m1_bear_mss_tmp
-        eng1_m1_protected_high := eng1_m1_protected_high_tmp
-        eng1_m1_protected_low := eng1_m1_protected_low_tmp
+        eng1_m1_mss_ref_high := eng1_m1_mss_ref_high_tmp
+        eng1_m1_mss_ref_low := eng1_m1_mss_ref_low_tmp
     if recalc_m5
-        [eng1_m5_bull_sweep_tmp, eng1_m5_bear_sweep_tmp, eng1_m5_bull_displacement_tmp, eng1_m5_bear_displacement_tmp, eng1_m5_bull_mss_tmp, eng1_m5_bear_mss_tmp, eng1_m5_protected_high_tmp, eng1_m5_protected_low_tmp] = f_eng1_build_execution(eng1_m5_last_swing_high, eng1_m5_last_swing_low, eng1_m5_protected_high, eng1_m5_protected_low, eng1_buf_m5_open, eng1_buf_m5_high, eng1_buf_m5_low, eng1_buf_m5_close)
+        [eng1_m5_bull_sweep_tmp, eng1_m5_bear_sweep_tmp, eng1_m5_bull_displacement_tmp, eng1_m5_bear_displacement_tmp, eng1_m5_bull_mss_tmp, eng1_m5_bear_mss_tmp, eng1_m5_mss_ref_high_tmp, eng1_m5_mss_ref_low_tmp] = f_eng1_build_execution(eng1_m5_last_swing_high, eng1_m5_last_swing_low, eng1_buf_m5_open, eng1_buf_m5_high, eng1_buf_m5_low, eng1_buf_m5_close)
         eng1_m5_bull_sweep := eng1_m5_bull_sweep_tmp
         eng1_m5_bear_sweep := eng1_m5_bear_sweep_tmp
         eng1_m5_bull_displacement := eng1_m5_bull_displacement_tmp
         eng1_m5_bear_displacement := eng1_m5_bear_displacement_tmp
         eng1_m5_bull_mss := eng1_m5_bull_mss_tmp
         eng1_m5_bear_mss := eng1_m5_bear_mss_tmp
-        eng1_m5_protected_high := eng1_m5_protected_high_tmp
-        eng1_m5_protected_low := eng1_m5_protected_low_tmp
+        eng1_m5_mss_ref_high := eng1_m5_mss_ref_high_tmp
+        eng1_m5_mss_ref_low := eng1_m5_mss_ref_low_tmp
     if recalc_m15
-        [eng1_m15_bull_sweep_tmp, eng1_m15_bear_sweep_tmp, eng1_m15_bull_displacement_tmp, eng1_m15_bear_displacement_tmp, eng1_m15_bull_mss_tmp, eng1_m15_bear_mss_tmp, eng1_m15_protected_high_tmp, eng1_m15_protected_low_tmp] = f_eng1_build_execution(eng1_m15_last_swing_high, eng1_m15_last_swing_low, eng1_m15_protected_high, eng1_m15_protected_low, eng1_buf_m15_open, eng1_buf_m15_high, eng1_buf_m15_low, eng1_buf_m15_close)
+        [eng1_m15_bull_sweep_tmp, eng1_m15_bear_sweep_tmp, eng1_m15_bull_displacement_tmp, eng1_m15_bear_displacement_tmp, eng1_m15_bull_mss_tmp, eng1_m15_bear_mss_tmp, eng1_m15_mss_ref_high_tmp, eng1_m15_mss_ref_low_tmp] = f_eng1_build_execution(eng1_m15_last_swing_high, eng1_m15_last_swing_low, eng1_buf_m15_open, eng1_buf_m15_high, eng1_buf_m15_low, eng1_buf_m15_close)
         eng1_m15_bull_sweep := eng1_m15_bull_sweep_tmp
         eng1_m15_bear_sweep := eng1_m15_bear_sweep_tmp
         eng1_m15_bull_displacement := eng1_m15_bull_displacement_tmp
         eng1_m15_bear_displacement := eng1_m15_bear_displacement_tmp
         eng1_m15_bull_mss := eng1_m15_bull_mss_tmp
         eng1_m15_bear_mss := eng1_m15_bear_mss_tmp
-        eng1_m15_protected_high := eng1_m15_protected_high_tmp
-        eng1_m15_protected_low := eng1_m15_protected_low_tmp
+        eng1_m15_mss_ref_high := eng1_m15_mss_ref_high_tmp
+        eng1_m15_mss_ref_low := eng1_m15_mss_ref_low_tmp
     if recalc_m30
-        [eng1_m30_bull_sweep_tmp, eng1_m30_bear_sweep_tmp, eng1_m30_bull_displacement_tmp, eng1_m30_bear_displacement_tmp, eng1_m30_bull_mss_tmp, eng1_m30_bear_mss_tmp, eng1_m30_protected_high_tmp, eng1_m30_protected_low_tmp] = f_eng1_build_execution(eng1_m30_last_swing_high, eng1_m30_last_swing_low, eng1_m30_protected_high, eng1_m30_protected_low, eng1_buf_m30_open, eng1_buf_m30_high, eng1_buf_m30_low, eng1_buf_m30_close)
+        [eng1_m30_bull_sweep_tmp, eng1_m30_bear_sweep_tmp, eng1_m30_bull_displacement_tmp, eng1_m30_bear_displacement_tmp, eng1_m30_bull_mss_tmp, eng1_m30_bear_mss_tmp, eng1_m30_mss_ref_high_tmp, eng1_m30_mss_ref_low_tmp] = f_eng1_build_execution(eng1_m30_last_swing_high, eng1_m30_last_swing_low, eng1_buf_m30_open, eng1_buf_m30_high, eng1_buf_m30_low, eng1_buf_m30_close)
         eng1_m30_bull_sweep := eng1_m30_bull_sweep_tmp
         eng1_m30_bear_sweep := eng1_m30_bear_sweep_tmp
         eng1_m30_bull_displacement := eng1_m30_bull_displacement_tmp
         eng1_m30_bear_displacement := eng1_m30_bear_displacement_tmp
         eng1_m30_bull_mss := eng1_m30_bull_mss_tmp
         eng1_m30_bear_mss := eng1_m30_bear_mss_tmp
-        eng1_m30_protected_high := eng1_m30_protected_high_tmp
-        eng1_m30_protected_low := eng1_m30_protected_low_tmp
+        eng1_m30_mss_ref_high := eng1_m30_mss_ref_high_tmp
+        eng1_m30_mss_ref_low := eng1_m30_mss_ref_low_tmp
 
 if recalc_d1
     eng1_d1_lb20_high := f_eng1_window_high_safe(eng1_buf_d1_high, 20)
@@ -2993,7 +2993,7 @@ else if eng1_ctx_tf == ENG1_TF_D1
     eng1_ctx_bear_breakout := eng1_d1_bear_bos
     eng1_ctx_bull_choch := eng1_d1_bull_choch
     eng1_ctx_bear_choch := eng1_d1_bear_choch
-[eng1_exe_bull_sweep_tmp, eng1_exe_bear_sweep_tmp, eng1_exe_bull_mss_tmp, eng1_exe_bear_mss_tmp, eng1_exe_bull_displacement_tmp, eng1_exe_bear_displacement_tmp, eng1_exe_protected_high_tmp, eng1_exe_protected_low_tmp] = f_eng1_select_execution_snapshot(eng1_exec_tf)
+[eng1_exe_bull_sweep_tmp, eng1_exe_bear_sweep_tmp, eng1_exe_bull_mss_tmp, eng1_exe_bear_mss_tmp, eng1_exe_bull_displacement_tmp, eng1_exe_bear_displacement_tmp, eng1_exe_mss_ref_high_tmp, eng1_exe_mss_ref_low_tmp] = f_eng1_select_execution_snapshot(eng1_exec_tf)
 [eng1_exe_eqh_tmp, eng1_exe_eql_tmp, eng1_exe_eqh_active_tmp, eng1_exe_eql_active_tmp, eng1_exe_swing_high_tmp, eng1_exe_swing_low_tmp] = f_eng1_select_execution_snapshot_levels(eng1_exec_tf)
 
 eng1_exe_bull_bos := false
@@ -3028,8 +3028,8 @@ if eng1_exec_valid
     eng1_exe_bear_mss := eng1_exe_bear_mss_tmp
     eng1_exe_bull_displacement := eng1_exe_bull_displacement_tmp
     eng1_exe_bear_displacement := eng1_exe_bear_displacement_tmp
-    eng1_exe_protected_high := eng1_exe_protected_high_tmp
-    eng1_exe_protected_low := eng1_exe_protected_low_tmp
+    eng1_exe_mss_ref_high := eng1_exe_mss_ref_high_tmp
+    eng1_exe_mss_ref_low := eng1_exe_mss_ref_low_tmp
     eng1_exe_liq_high := eng1_exe_eqh_active_tmp ? eng1_exe_eqh_tmp : eng1_exe_swing_high_tmp
     eng1_exe_liq_low := eng1_exe_eql_active_tmp ? eng1_exe_eql_tmp : eng1_exe_swing_low_tmp
     eng1_exe_eqh := eng1_exe_eqh_tmp
@@ -3088,8 +3088,8 @@ else
     eng1_exe_bear_mss := false
     eng1_exe_bull_displacement := false
     eng1_exe_bear_displacement := false
-    eng1_exe_protected_high := na
-    eng1_exe_protected_low := na
+    eng1_exe_mss_ref_high := na
+    eng1_exe_mss_ref_low := na
     eng1_exe_liq_high := na
     eng1_exe_liq_low := na
     eng1_exe_eqh := na
@@ -3437,8 +3437,10 @@ bool bearObInZone = hasBearOb and not na(eng3SignalClose) and eng3SignalClose >=
 
 [poi_long_valid, poi_long_type, poi_long_top, poi_long_bottom, poi_long_entry, poi_long_bar, poi_long_touched] = f_eng3_select_context_poi(preferBullOb, preferBullFvg, ctxBullObBreaker, ctxBullObTop, ctxBullObBottom, ctxBullObEntry, ctxBullObCreatedBar, ctxBullObTouched, ctxBullFvgTop, ctxBullFvgBottom, ctxBullFvgCreatedBar, ctxBullFvgTouched)
 [poi_short_valid, poi_short_type, poi_short_top, poi_short_bottom, poi_short_entry, poi_short_bar, poi_short_touched] = f_eng3_select_context_poi(preferBearOb, preferBearFvg, ctxBearObBreaker, ctxBearObTop, ctxBearObBottom, ctxBearObEntry, ctxBearObCreatedBar, ctxBearObTouched, ctxBearFvgTop, ctxBearFvgBottom, ctxBearFvgCreatedBar, ctxBearFvgTouched)
-bool poi_long_contract_valid = eng1BullContextAllowed and poi_long_valid
-bool poi_short_contract_valid = eng1BearContextAllowed and poi_short_valid
+eng3LongActivePoiIdentity := f_eng3_poi_identity("L", poi_long_type, poi_long_bar, poi_long_top, poi_long_bottom)
+eng3ShortActivePoiIdentity := f_eng3_poi_identity("S", poi_short_type, poi_short_bar, poi_short_top, poi_short_bottom)
+bool poi_long_contract_valid = eng1BullContextAllowed and poi_long_valid and eng3LongActivePoiIdentity != eng3LongConsumedPoiIdentity
+bool poi_short_contract_valid = eng1BearContextAllowed and poi_short_valid and eng3ShortActivePoiIdentity != eng3ShortConsumedPoiIdentity
 poi_long_valid := poi_long_contract_valid
 poi_short_valid := poi_short_contract_valid
 
@@ -3503,7 +3505,7 @@ bool ipdaLongAsiaPoolRaid = eng3ClosedFallbackAllowed and ipdaMainKillzoneActive
 bool ipdaLongLondonRaid = eng3ClosedFallbackAllowed and ipdaNewYorkKillzoneActive and not na(londonSessionLow) and eng3ExecLow < londonSessionLow and eng3ExecClose > londonSessionLow
 bool ipdaLongLookbackRaid = eng3ClosedFallbackAllowed and ((not na(ipdaLookback20Low) and eng3ExecLow < ipdaLookback20Low and eng3ExecClose > ipdaLookback20Low) or (not na(ipdaLookback40Low) and eng3ExecLow < ipdaLookback40Low and eng3ExecClose > ipdaLookback40Low) or (not na(ipdaLookback60Low) and eng3ExecLow < ipdaLookback60Low and eng3ExecClose > ipdaLookback60Low))
 bool effectiveLongSweepSeen = eng1_exe_bull_sweep or (strictModeEnabled and (ipdaLongAsiaPoolRaid or ipdaLongLondonRaid or ipdaLongLookbackRaid))
-bool longMssFallbackBreak = eng3ClosedFallbackAllowed and not na(eng1_exe_protected_high) and not na(eng3ExecPrevClose) and eng3ExecClose > eng1_exe_protected_high and eng3ExecPrevClose <= eng1_exe_protected_high
+bool longMssFallbackBreak = eng3ClosedFallbackAllowed and not na(eng1_exe_mss_ref_high) and not na(eng3ExecPrevClose) and eng3ExecClose > eng1_exe_mss_ref_high and eng3ExecPrevClose <= eng1_exe_mss_ref_high
 int longMssFallbackAge = ta.barssince(longMssFallbackBreak)
 bool longMssFallbackRecent = not na(longMssFallbackAge) and longMssFallbackAge <= strictMssLookbackEffective
 bool longDispFallbackBreak = eng3ClosedFallbackAllowed and eng3ExecClose > eng3ExecOpen and execBarRange >= atr * 0.80 and execBarBodyShare >= 0.50
@@ -3593,7 +3595,7 @@ bool ipdaShortAsiaPoolRaid = eng3ClosedFallbackAllowed and ipdaMainKillzoneActiv
 bool ipdaShortLondonRaid = eng3ClosedFallbackAllowed and ipdaNewYorkKillzoneActive and not na(londonSessionHigh) and eng3ExecHigh > londonSessionHigh and eng3ExecClose < londonSessionHigh
 bool ipdaShortLookbackRaid = eng3ClosedFallbackAllowed and ((not na(ipdaLookback20High) and eng3ExecHigh > ipdaLookback20High and eng3ExecClose < ipdaLookback20High) or (not na(ipdaLookback40High) and eng3ExecHigh > ipdaLookback40High and eng3ExecClose < ipdaLookback40High) or (not na(ipdaLookback60High) and eng3ExecHigh > ipdaLookback60High and eng3ExecClose < ipdaLookback60High))
 bool effectiveShortSweepSeen = eng1_exe_bear_sweep or (strictModeEnabled and (ipdaShortAsiaPoolRaid or ipdaShortLondonRaid or ipdaShortLookbackRaid))
-bool shortMssFallbackBreak = eng3ClosedFallbackAllowed and not na(eng1_exe_protected_low) and not na(eng3ExecPrevClose) and eng3ExecClose < eng1_exe_protected_low and eng3ExecPrevClose >= eng1_exe_protected_low
+bool shortMssFallbackBreak = eng3ClosedFallbackAllowed and not na(eng1_exe_mss_ref_low) and not na(eng3ExecPrevClose) and eng3ExecClose < eng1_exe_mss_ref_low and eng3ExecPrevClose >= eng1_exe_mss_ref_low
 int shortMssFallbackAge = ta.barssince(shortMssFallbackBreak)
 bool shortMssFallbackRecent = not na(shortMssFallbackAge) and shortMssFallbackAge <= strictMssLookbackEffective
 bool shortDispFallbackBreak = eng3ClosedFallbackAllowed and eng3ExecClose < eng3ExecOpen and execBarRange >= atr * 0.80 and execBarBodyShare >= 0.50
@@ -3666,6 +3668,10 @@ string longQualityTier = f_zoneQualityTier(not na(tradeLongEntry), f_zoneRespons
 string shortQualityTier = f_zoneQualityTier(not na(tradeShortEntry), f_zoneResponseScore(not na(tradeShortEntry), shortZoneConfirmPass) + ((tradeShortIsOb or tradeShortIsFvg) and hasBearOb and hasBearFvg and f_zoneIntersects(ctxBearObTop, ctxBearObBottom, ctxBearFvgTop, ctxBearFvgBottom) ? 1 : 0), f_zoneDisplacementScore(shortDisplacementSeen), f_zoneAtrExpansionScore(contextDepartureRange, atr))
 string longExecutionState = f_setupExecutionState(not na(tradeLongEntry), longAmbiguous, longInvalidated, longExpired, longChased, longCompleted, longManaged, exe_long_base_confirm or longArmedLatched, longConfirmationPass or longArmedLatched, longExecutionFreshPass or longArmedLatched, longDisplacementSeen or longArmedLatched, longPriceInZone or longPoiMitigatedLatched, longPriceNearZone)
 string shortExecutionState = f_setupExecutionState(not na(tradeShortEntry), shortAmbiguous, shortInvalidated, shortExpired, shortChased, shortCompleted, shortManaged, exe_short_base_confirm or shortArmedLatched, shortConfirmationPass or shortArmedLatched, shortExecutionFreshPass or shortArmedLatched, shortDisplacementSeen or shortArmedLatched, shortPriceInZone or shortPoiMitigatedLatched, shortPriceNearZone)
+if eng3LongActivePoiIdentity != "" and (longPoiInvalidatedLatched or f_eng4_retired_state(longExecutionState, longSetupAge, longPoiMitigatedLatched, expiryBarsEffective))
+    eng3LongConsumedPoiIdentity := eng3LongActivePoiIdentity
+if eng3ShortActivePoiIdentity != "" and (shortPoiInvalidatedLatched or f_eng4_retired_state(shortExecutionState, shortSetupAge, shortPoiMitigatedLatched, expiryBarsEffective))
+    eng3ShortConsumedPoiIdentity := eng3ShortActivePoiIdentity
 string longPoiLifecycle = f_eng3_poi_lifecycle(poi_long_contract_valid, poi_long_type, longPoiTappedLatched, longPoiMitigatedLatched, longPoiInvalidatedLatched)
 string shortPoiLifecycle = f_eng3_poi_lifecycle(poi_short_contract_valid, poi_short_type, shortPoiTappedLatched, shortPoiMitigatedLatched, shortPoiInvalidatedLatched)
 
@@ -4147,7 +4153,7 @@ f_eng4_render_dashboard() =>
         string signalGrade = poiUseLong ? longSignalGrade : shortSignalGrade
         string gradeSuffix = signalGrade == "Invalid" ? "" : " | " + signalGrade
         string biasText = (eng2InternalTrend != 0 and eng2SwingTrend != 0 and eng2InternalTrend == eng2SwingTrend ? "Aligned " + (eng2InternalTrend == 1 ? "Bullish" : "Bearish") : eng2InternalTrend != 0 and eng2SwingTrend != 0 ? "Mixed" : "Building") + " | MTF " + f_biasShort(displayNarrBias) + "/" + f_biasShort(displayCtxBias) + "/" + f_biasShort(displayExecBias)
-        string sessionText = liquiditySessionSummary + " | " + timezoneSummary + " | " + (strictModeEnabled ? "Strict " + ipdaWindowSummary : "Normal")
+        string sessionText = liquiditySessionSummary + " | " + timezoneSummary + " | " + (strictModeEnabled ? (ipdaWindowSummary == "Off" ? "Strict KZ Off" : "Strict " + ipdaWindowSummary) : "Normal")
         string nextLongText = strictModeEnabled ? f_ipdaNextActionText(not na(tradeLongEntry), longExecutionState, effectiveLongDirectional, effectiveLongSweepSeen, effectiveLongMssSeen, effectiveLongDisplacementSeen, ipdaLongCyclePhase, true) : (not na(tradeLongEntry) ? f_entryActionText(longExecutionState) : "Wait OB/FVG long")
         string nextShortText = strictModeEnabled ? f_ipdaNextActionText(not na(tradeShortEntry), shortExecutionState, effectiveShortDirectional, effectiveShortSweepSeen, effectiveShortMssSeen, effectiveShortDisplacementSeen, ipdaShortCyclePhase, false) : (not na(tradeShortEntry) ? f_entryActionText(shortExecutionState) : "Wait OB/FVG short")
         string nextText = compactWaiting ? "Wait " + waitName + " " + f_formatLevel(waitLevel) : useLongSide ? nextLongText : nextShortText

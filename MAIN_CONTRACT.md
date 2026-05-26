@@ -133,8 +133,8 @@ var bool X_bull_displacement = false
 var bool X_bear_displacement = false
 var bool X_bull_mss = false
 var bool X_bear_mss = false
-var float X_protected_high = na
-var float X_protected_low = na
+var float X_mss_ref_high = na
+var float X_mss_ref_low = na
 
 ```
 
@@ -167,7 +167,7 @@ f_tf_build_ob(...) =>
     // returns: [bullObTop, bullObBottom, bullObEntry, bullObBar, bullBreaker, bearObTop, bearObBottom, bearObEntry, bearObBar, bearBreaker]
 
 f_tf_build_execution(...) =>
-    // returns: [bullSweep, bearSweep, bullDisp, bearDisp, bullMss, bearMss, protectedHigh, protectedLow]
+    // returns: [bullSweep, bearSweep, bullDisp, bearDisp, bullMss, bearMss, mssRefHigh, mssRefLow]
 
 ```
 	
@@ -210,8 +210,8 @@ bool  exe_bull_mss = false
 bool  exe_bear_mss = false
 bool  exe_bull_displacement = false
 bool  exe_bear_displacement = false
-float exe_protected_high = na
-float exe_protected_low = na
+float exe_mss_ref_high = na
+float exe_mss_ref_low = na
 
 ```	
 	

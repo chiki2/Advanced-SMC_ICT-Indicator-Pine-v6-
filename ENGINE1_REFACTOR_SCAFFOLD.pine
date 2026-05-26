@@ -146,16 +146,16 @@ f_tf_build_ob(array<float> arrO, array<float> arrH, array<float> arrL, array<flo
     bool bearBreaker = false
     [bullTop, bullBottom, bullEntry, bullBar, bullBreaker, bearTop, bearBottom, bearEntry, bearBar, bearBreaker]
 
-f_tf_build_execution(float lastHigh, float lastLow, float protectedHigh, float protectedLow, array<float> arrH, array<float> arrL, array<float> arrC) =>
+f_tf_build_execution(float lastHigh, float lastLow, array<float> arrH, array<float> arrL, array<float> arrC) =>
     bool bullSweep = false
     bool bearSweep = false
     bool bullDisplacement = false
     bool bearDisplacement = false
     bool bullMss = false
     bool bearMss = false
-    float nextProtectedHigh = protectedHigh
-    float nextProtectedLow = protectedLow
-    [bullSweep, bearSweep, bullDisplacement, bearDisplacement, bullMss, bearMss, nextProtectedHigh, nextProtectedLow]
+    float mssRefHigh = lastHigh
+    float mssRefLow = lastLow
+    [bullSweep, bearSweep, bullDisplacement, bearDisplacement, bullMss, bearMss, mssRefHigh, mssRefLow]
 
 f_regime_bias(float closeValue, float refValue) =>
     na(closeValue) or na(refValue) ? 0 : closeValue > refValue ? 1 : closeValue < refValue ? -1 : 0
@@ -237,8 +237,8 @@ var float m1_eqh = na
 var float m1_eql = na
 var bool m1_eqh_active = false
 var bool m1_eql_active = false
-var float m1_protected_high = na
-var float m1_protected_low = na
+var float m1_mss_ref_high = na
+var float m1_mss_ref_low = na
 var bool m1_bull_sweep = false
 var bool m1_bear_sweep = false
 var bool m1_bull_mss = false
@@ -259,8 +259,8 @@ var float m5_eqh = na
 var float m5_eql = na
 var bool m5_eqh_active = false
 var bool m5_eql_active = false
-var float m5_protected_high = na
-var float m5_protected_low = na
+var float m5_mss_ref_high = na
+var float m5_mss_ref_low = na
 var bool m5_bull_sweep = false
 var bool m5_bear_sweep = false
 var bool m5_bull_mss = false
@@ -281,8 +281,8 @@ var float m15_eqh = na
 var float m15_eql = na
 var bool m15_eqh_active = false
 var bool m15_eql_active = false
-var float m15_protected_high = na
-var float m15_protected_low = na
+var float m15_mss_ref_high = na
+var float m15_mss_ref_low = na
 var bool m15_bull_sweep = false
 var bool m15_bear_sweep = false
 var bool m15_bull_mss = false
@@ -303,8 +303,8 @@ var float m30_eqh = na
 var float m30_eql = na
 var bool m30_eqh_active = false
 var bool m30_eql_active = false
-var float m30_protected_high = na
-var float m30_protected_low = na
+var float m30_mss_ref_high = na
+var float m30_mss_ref_low = na
 var bool m30_bull_sweep = false
 var bool m30_bear_sweep = false
 var bool m30_bull_mss = false
@@ -325,8 +325,8 @@ var float h1_eqh = na
 var float h1_eql = na
 var bool h1_eqh_active = false
 var bool h1_eql_active = false
-var float h1_protected_high = na
-var float h1_protected_low = na
+var float h1_mss_ref_high = na
+var float h1_mss_ref_low = na
 var bool h1_bull_sweep = false
 var bool h1_bear_sweep = false
 var bool h1_bull_mss = false
@@ -347,8 +347,8 @@ var float h4_eqh = na
 var float h4_eql = na
 var bool h4_eqh_active = false
 var bool h4_eql_active = false
-var float h4_protected_high = na
-var float h4_protected_low = na
+var float h4_mss_ref_high = na
+var float h4_mss_ref_low = na
 var bool h4_bull_sweep = false
 var bool h4_bear_sweep = false
 var bool h4_bull_mss = false
@@ -369,8 +369,8 @@ var float d1_eqh = na
 var float d1_eql = na
 var bool d1_eqh_active = false
 var bool d1_eql_active = false
-var float d1_protected_high = na
-var float d1_protected_low = na
+var float d1_mss_ref_high = na
+var float d1_mss_ref_low = na
 var bool d1_bull_sweep = false
 var bool d1_bear_sweep = false
 var bool d1_bull_mss = false
@@ -412,8 +412,8 @@ var bool exe_bull_mss = false
 var bool exe_bear_mss = false
 var bool exe_bull_displacement = false
 var bool exe_bear_displacement = false
-var float exe_protected_high = na
-var float exe_protected_low = na
+var float exe_mss_ref_high = na
+var float exe_mss_ref_low = na
 
 f_select_narrative_snapshot(string tf) =>
     if tf == TF_H1
@@ -490,29 +490,29 @@ f_select_execution_snapshot(string tf) =>
         exe_bear_sweep := m1_bear_sweep
         exe_bull_mss := m1_bull_mss
         exe_bear_mss := m1_bear_mss
-        exe_protected_high := m1_protected_high
-        exe_protected_low := m1_protected_low
+        exe_mss_ref_high := m1_mss_ref_high
+        exe_mss_ref_low := m1_mss_ref_low
     else if tf == TF_M5
         exe_bull_sweep := m5_bull_sweep
         exe_bear_sweep := m5_bear_sweep
         exe_bull_mss := m5_bull_mss
         exe_bear_mss := m5_bear_mss
-        exe_protected_high := m5_protected_high
-        exe_protected_low := m5_protected_low
+        exe_mss_ref_high := m5_mss_ref_high
+        exe_mss_ref_low := m5_mss_ref_low
     else if tf == TF_M15
         exe_bull_sweep := m15_bull_sweep
         exe_bear_sweep := m15_bear_sweep
         exe_bull_mss := m15_bull_mss
         exe_bear_mss := m15_bear_mss
-        exe_protected_high := m15_protected_high
-        exe_protected_low := m15_protected_low
+        exe_mss_ref_high := m15_mss_ref_high
+        exe_mss_ref_low := m15_mss_ref_low
     else if tf == TF_M30
         exe_bull_sweep := m30_bull_sweep
         exe_bear_sweep := m30_bear_sweep
         exe_bull_mss := m30_bull_mss
         exe_bear_mss := m30_bear_mss
-        exe_protected_high := m30_protected_high
-        exe_protected_low := m30_protected_low
+        exe_mss_ref_high := m30_mss_ref_high
+        exe_mss_ref_low := m30_mss_ref_low
     exe_bull_displacement := false
     exe_bear_displacement := false
 
@@ -562,13 +562,13 @@ f_select_execution_snapshot(string tf) =>
 [h4_bull_fvg_top, h4_bull_fvg_bottom, _, h4_bear_fvg_top, h4_bear_fvg_bottom, _] = f_tf_build_fvg(buf_h4_high, buf_h4_low, buf_h4_close)
 [d1_bull_fvg_top, d1_bull_fvg_bottom, _, d1_bear_fvg_top, d1_bear_fvg_bottom, _] = f_tf_build_fvg(buf_d1_high, buf_d1_low, buf_d1_close)
 
-[m1_bull_sweep, m1_bear_sweep, _, _, m1_bull_mss, m1_bear_mss, m1_protected_high, m1_protected_low] = f_tf_build_execution(m1_last_swing_high, m1_last_swing_low, m1_protected_high, m1_protected_low, buf_m1_high, buf_m1_low, buf_m1_close)
-[m5_bull_sweep, m5_bear_sweep, _, _, m5_bull_mss, m5_bear_mss, m5_protected_high, m5_protected_low] = f_tf_build_execution(m5_last_swing_high, m5_last_swing_low, m5_protected_high, m5_protected_low, buf_m5_high, buf_m5_low, buf_m5_close)
-[m15_bull_sweep, m15_bear_sweep, _, _, m15_bull_mss, m15_bear_mss, m15_protected_high, m15_protected_low] = f_tf_build_execution(m15_last_swing_high, m15_last_swing_low, m15_protected_high, m15_protected_low, buf_m15_high, buf_m15_low, buf_m15_close)
-[m30_bull_sweep, m30_bear_sweep, _, _, m30_bull_mss, m30_bear_mss, m30_protected_high, m30_protected_low] = f_tf_build_execution(m30_last_swing_high, m30_last_swing_low, m30_protected_high, m30_protected_low, buf_m30_high, buf_m30_low, buf_m30_close)
-[h1_bull_sweep, h1_bear_sweep, _, _, h1_bull_mss, h1_bear_mss, h1_protected_high, h1_protected_low] = f_tf_build_execution(h1_last_swing_high, h1_last_swing_low, h1_protected_high, h1_protected_low, buf_h1_high, buf_h1_low, buf_h1_close)
-[h4_bull_sweep, h4_bear_sweep, _, _, h4_bull_mss, h4_bear_mss, h4_protected_high, h4_protected_low] = f_tf_build_execution(h4_last_swing_high, h4_last_swing_low, h4_protected_high, h4_protected_low, buf_h4_high, buf_h4_low, buf_h4_close)
-[d1_bull_sweep, d1_bear_sweep, _, _, d1_bull_mss, d1_bear_mss, d1_protected_high, d1_protected_low] = f_tf_build_execution(d1_last_swing_high, d1_last_swing_low, d1_protected_high, d1_protected_low, buf_d1_high, buf_d1_low, buf_d1_close)
+[m1_bull_sweep, m1_bear_sweep, _, _, m1_bull_mss, m1_bear_mss, m1_mss_ref_high, m1_mss_ref_low] = f_tf_build_execution(m1_last_swing_high, m1_last_swing_low, buf_m1_high, buf_m1_low, buf_m1_close)
+[m5_bull_sweep, m5_bear_sweep, _, _, m5_bull_mss, m5_bear_mss, m5_mss_ref_high, m5_mss_ref_low] = f_tf_build_execution(m5_last_swing_high, m5_last_swing_low, buf_m5_high, buf_m5_low, buf_m5_close)
+[m15_bull_sweep, m15_bear_sweep, _, _, m15_bull_mss, m15_bear_mss, m15_mss_ref_high, m15_mss_ref_low] = f_tf_build_execution(m15_last_swing_high, m15_last_swing_low, buf_m15_high, buf_m15_low, buf_m15_close)
+[m30_bull_sweep, m30_bear_sweep, _, _, m30_bull_mss, m30_bear_mss, m30_mss_ref_high, m30_mss_ref_low] = f_tf_build_execution(m30_last_swing_high, m30_last_swing_low, buf_m30_high, buf_m30_low, buf_m30_close)
+[h1_bull_sweep, h1_bear_sweep, _, _, h1_bull_mss, h1_bear_mss, h1_mss_ref_high, h1_mss_ref_low] = f_tf_build_execution(h1_last_swing_high, h1_last_swing_low, buf_h1_high, buf_h1_low, buf_h1_close)
+[h4_bull_sweep, h4_bear_sweep, _, _, h4_bull_mss, h4_bear_mss, h4_mss_ref_high, h4_mss_ref_low] = f_tf_build_execution(h4_last_swing_high, h4_last_swing_low, buf_h4_high, buf_h4_low, buf_h4_close)
+[d1_bull_sweep, d1_bear_sweep, _, _, d1_bull_mss, d1_bear_mss, d1_mss_ref_high, d1_mss_ref_low] = f_tf_build_execution(d1_last_swing_high, d1_last_swing_low, buf_d1_high, buf_d1_low, buf_d1_close)
 
 //------------------------------------------------------------------------------
 // Resolve active layer aliases
