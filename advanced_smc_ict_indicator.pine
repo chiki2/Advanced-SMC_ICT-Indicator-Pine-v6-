@@ -730,6 +730,8 @@ f_eng2_syncLineFill(linefill currentFill, line lineA, line lineB, color fillColo
     if enabled and not na(lineA) and not na(lineB)
         if na(updatedFill)
             updatedFill := linefill.new(lineA, lineB, fillColor)
+        else
+            linefill.set_color(updatedFill, fillColor)
     else if not na(updatedFill)
         linefill.delete(updatedFill)
         updatedFill := na
@@ -1025,6 +1027,8 @@ f_eng2_syncPassiveZoneVisual(box currentBox, label currentLabel, bool enabled, i
             box.set_right(nextBox, rightBar)
             box.set_top(nextBox, safeTop)
             box.set_bottom(nextBox, safeBottom)
+            box.set_bgcolor(nextBox, fillColor)
+            box.set_border_color(nextBox, borderColor)
         if not na(nextLabel)
             label.delete(nextLabel)
             nextLabel := na
@@ -1059,12 +1063,16 @@ f_eng2_syncHtfSdVisual(box currentBox, label currentLabel, bool enabled, int sou
             box.set_right(nextBox, rightTime)
             box.set_top(nextBox, safeTop)
             box.set_bottom(nextBox, safeBottom)
+            box.set_bgcolor(nextBox, fillColor)
+            box.set_border_color(nextBox, borderColor)
         if labelText != ""
             if na(nextLabel)
                 nextLabel := label.new(x=labelTime, y=f_zoneMid(safeTop, safeBottom), xloc=xloc.bar_time, yloc=yloc.price, text=labelText, style=label.style_label_right, color=color.new(borderColor, 0), textcolor=color.white, size=size.tiny)
             else
                 label.set_x(nextLabel, labelTime)
                 label.set_y(nextLabel, f_zoneMid(safeTop, safeBottom))
+                label.set_text(nextLabel, labelText)
+                label.set_color(nextLabel, color.new(borderColor, 0))
         else if not na(nextLabel)
             label.delete(nextLabel)
             nextLabel := na
@@ -1093,6 +1101,9 @@ f_eng2_syncHistoryZoneBox(box currentBox, bool enabled, int leftBar, int rightBa
             box.set_right(nextBox, safeRightBar)
             box.set_top(nextBox, safeTop)
             box.set_bottom(nextBox, safeBottom)
+            box.set_bgcolor(nextBox, fillColor)
+            box.set_border_color(nextBox, borderColor)
+            box.set_border_width(nextBox, borderWidth)
     else if not na(nextBox)
         box.delete(nextBox)
         nextBox := na
@@ -4132,19 +4143,12 @@ f_eng4_render_dashboard() =>
         bool compactBalanced = preferredDirection == "Balanced"
         bool compactWaiting = preferredDirection == "Wait"
         bool compactNeutral = compactBalanced or compactWaiting
-        bool useLongSide = compactUseLong
-        string executionState = useLongSide ? longExecutionState : shortExecutionState
-        float entryLevel = useLongSide ? tradeLongEntry : tradeShortEntry
-        float stopLevel = useLongSide ? tradeLongStop : tradeShortStop
-        float targetLevel = useLongSide ? activeLongTarget : activeShortTarget
         bool longRetired = longCompleted or longInvalidated or (not longAmbiguous and longLifecycleRetired)
         bool shortRetired = shortCompleted or shortInvalidated or (not shortAmbiguous and shortLifecycleRetired)
-        bool retiredState = useLongSide ? longRetired : shortRetired
-        color accentColor = compactNeutral ? color.new(neutralColor, 12) : useLongSide ? color.new(bullColor, 12) : color.new(bearColor, 12)
         bool waitBuySide = displayCtxBias == -1 or (displayCtxBias == 0 and displayNarrBias == -1)
         string waitName = waitBuySide ? (eng1_exe_eqh_active ? "EQH" : "BSL") : (eng1_exe_eql_active ? "EQL" : "SSL")
         float waitLevel = waitBuySide ? eng1_exe_liq_high : eng1_exe_liq_low
-        bool poiUseLong = useLongSide
+        bool poiUseLong = compactUseLong
         if compactWaiting
             if poi_long_contract_valid and not poi_short_contract_valid
                 poiUseLong := true
@@ -4152,11 +4156,25 @@ f_eng4_render_dashboard() =>
                 poiUseLong := false
             else
                 poiUseLong := not waitBuySide
+        bool dashboardUseLong = compactWaiting ? poiUseLong : compactUseLong
+        string executionState = dashboardUseLong ? longExecutionState : shortExecutionState
+        float entryLevel = dashboardUseLong ? tradeLongEntry : tradeShortEntry
+        float stopLevel = dashboardUseLong ? tradeLongStop : tradeShortStop
+        float targetLevel = dashboardUseLong ? activeLongTarget : activeShortTarget
+        bool retiredState = dashboardUseLong ? longRetired : shortRetired
+        color accentColor = compactNeutral ? color.new(neutralColor, 12) : dashboardUseLong ? color.new(bullColor, 12) : color.new(bearColor, 12)
         bool poiValid = poiUseLong ? poi_long_contract_valid : poi_short_contract_valid
         string poiType = poiUseLong ? poi_long_type : poi_short_type
         float poiEntry = poiUseLong ? poi_long_entry : poi_short_entry
         string poiLifecycle = poiUseLong ? longPoiLifecycle : shortPoiLifecycle
-        string poiWaitReason = "No POI"
+        bool poiContextAllowed = poiUseLong ? eng1BullContextAllowed : eng1BearContextAllowed
+        bool poiHasZone = poiUseLong ? (hasBullOb or hasBullFvg) : (hasBearOb or hasBearFvg)
+        bool poiCandidateValid = poiUseLong ? poi_long_candidate_valid : poi_short_candidate_valid
+        bool poiIdentityReady = poiUseLong ? eng3LongActivePoiReady : eng3ShortActivePoiReady
+        bool poiStrictOwned = poiUseLong ? strictLongPdArrayOwned : strictShortPdArrayOwned
+        bool poiConsumed = poiUseLong ? eng3LongActivePoiIdentity == eng3LongConsumedPoiIdentity : eng3ShortActivePoiIdentity == eng3ShortConsumedPoiIdentity
+        string poiSideText = poiUseLong ? "L " : "S "
+        string poiWaitReason = not poiContextAllowed ? "No POI: Gate" : not poiHasZone ? "No POI: Zone" : not poiCandidateValid ? "No POI: Select" : not poiIdentityReady ? "No POI: Map" : not poiStrictOwned ? "No POI: Own" : poiConsumed ? "No POI: Used" : "No POI"
         string poiRetireReason = poiUseLong ? longPoiRetireReason : shortPoiRetireReason
         bool poiRetired = poiUseLong ? longRetired : shortRetired
         bool poiActive = poiValid and not poiRetired
@@ -4168,22 +4186,26 @@ f_eng4_render_dashboard() =>
         string biasText = (dashboardBiasAligned ? "Aligned " + (displayExecBias == 1 ? "Bullish" : "Bearish") : dashboardBiasMixed ? "Mixed" : "Building") + " | MTF " + f_biasShort(displayNarrBias) + "/" + f_biasShort(displayCtxBias) + "/" + f_biasShort(displayExecBias)
         string compactBiasText = (dashboardBiasAligned ? "Al " + f_eng4_compact_bias_token(displayExecBias) : dashboardBiasMixed ? "Mix" : "Bld") + " | " + f_eng4_compact_bias_token(displayNarrBias) + "/" + f_eng4_compact_bias_token(displayCtxBias) + "/" + f_eng4_compact_bias_token(displayExecBias)
         string sessionText = liquiditySessionSummary + " | " + timezoneSummary + " | " + (strictModeEnabled ? (ipdaWindowSummary == "Off" ? "Strict KZ Off" : "Strict " + ipdaWindowSummary) : "Normal")
-        string nextText = compactWaiting ? "Wait " + waitName + " " + f_formatLevel(waitLevel) : executionState
+        string nextText = compactWaiting ? "Wait " + waitName + " " + f_formatLevel(waitLevel) : executionState == "Active" ? "Entry active" : executionState == "Armed" ? "Monitor retest" : executionState == "Confirming" ? "Wait confirm" : executionState == "Managed" ? "Manage" : executionState == "Ambiguous" ? "Review" : executionState == "Completed" ? "Next setup" : executionState == "Expired" or executionState == "Invalidated" ? "Stand down" : "Wait trigger"
         string pxText = syminfo.ticker + " " + timeframe.period + " | Px " + f_formatLevel(not na(eng3SignalClose) ? eng3SignalClose : close)
-        string setupText = compactWaiting ? "Wait " + waitName + " " + f_formatLevel(waitLevel) : compactBalanced ? "Both POI L " + f_formatLevel(tradeLongEntry) + " / S " + f_formatLevel(tradeShortEntry) : (useLongSide ? "Long " : "Short ") + executionState + " " + f_formatLevel(entryLevel)
-        string compactSetupText = compactWaiting ? waitName + " " + f_formatLevel(waitLevel) : compactBalanced ? "Both L " + f_formatLevel(tradeLongEntry) + " / S " + f_formatLevel(tradeShortEntry) : (useLongSide ? "L " : "S ") + executionState + " " + f_formatLevel(entryLevel)
-        string orderText = retiredState or na(entryLevel) ? "No pending order" : "E " + f_formatLevel(entryLevel) + " | SL " + f_formatLevel(stopLevel) + " | TP " + f_formatLevel(targetLevel)
-        orderText := compactBalanced ? "Focus " + (useLongSide ? "Long" : "Short") + " | " + orderText : orderText
-        string compactOrderText = retiredState or na(entryLevel) ? "No order" : (compactBalanced ? (useLongSide ? "Foc L " : "Foc S ") : "") + "E " + f_formatLevel(entryLevel) + " SL " + f_formatLevel(stopLevel) + " TP " + f_formatLevel(targetLevel)
-        string triggerProgressText = (sweepOk ? "Sweep OK" : "Need Sweep") + " | " + (mssOk ? "MSS OK" : "Need MSS") + " | " + (dispOk ? "Disp OK" : "Need Disp")
-        string triggerText = not poiValid ? poiWaitReason : poiRetired ? (poiRetireReason == "" ? "POI Retired" : "POI " + poiRetireReason) : triggerProgressText
-        string poiText = not poiValid ? poiWaitReason : poiRetired ? (poiRetireReason == "" ? "Retired" : "Retired: " + poiRetireReason) : (poiUseLong ? "L " : "S ") + (poiType == "Breaker" ? "BRK" : poiType) + " " + f_formatLevel(poiEntry) + " | " + f_poiLifecycleDisplayText(poiLifecycle, poiType)
+        string setupText = compactWaiting ? "Wait " + waitName + " " + f_formatLevel(waitLevel) : compactBalanced ? "Both POI L " + f_formatLevel(tradeLongEntry) + " / S " + f_formatLevel(tradeShortEntry) : (dashboardUseLong ? "Long " : "Short ") + executionState + " " + f_formatLevel(entryLevel)
+        string compactSetupText = compactWaiting ? waitName + " " + f_formatLevel(waitLevel) : compactBalanced ? "Both L " + f_formatLevel(tradeLongEntry) + " / S " + f_formatLevel(tradeShortEntry) : (dashboardUseLong ? "L " : "S ") + executionState + " " + f_formatLevel(entryLevel)
+        bool orderPlanAvailable = not retiredState and not na(entryLevel)
+        bool orderRiskReady = orderPlanAvailable and f_executionRiskVisible(executionState)
+        string orderPrefix = orderRiskReady ? "E " : "Plan E "
+        string compactOrderPrefix = orderRiskReady ? "E " : "Plan E "
+        string orderText = not orderPlanAvailable ? "No pending order" : orderPrefix + f_formatLevel(entryLevel) + " | SL " + f_formatLevel(stopLevel) + " | TP " + f_formatLevel(targetLevel)
+        orderText := compactBalanced ? "Focus " + (dashboardUseLong ? "Long" : "Short") + " | " + orderText : orderText
+        string compactOrderText = not orderPlanAvailable ? "No order" : (compactBalanced ? (dashboardUseLong ? "Foc L " : "Foc S ") : "") + compactOrderPrefix + f_formatLevel(entryLevel) + " SL " + f_formatLevel(stopLevel) + " TP " + f_formatLevel(targetLevel)
+        string triggerProgressText = poiSideText + (not sweepOk ? "Need Sweep" : not mssOk ? "Need MSS" : not dispOk ? "Need Disp" : "Trigger OK")
+        string triggerText = not poiValid ? poiSideText + poiWaitReason : poiRetired ? poiSideText + (poiRetireReason == "" ? "POI Retired" : "POI " + poiRetireReason) : triggerProgressText
+        string poiText = not poiValid ? poiSideText + poiWaitReason : poiRetired ? poiSideText + (poiRetireReason == "" ? "Retired" : "Retired: " + poiRetireReason) : poiSideText + (poiType == "Breaker" ? "BRK" : poiType) + " " + f_formatLevel(poiEntry) + " | " + f_poiLifecycleDisplayText(poiLifecycle, poiType)
         bool triggerReady = poiActive and sweepOk and mssOk and dispOk
         color dashboardNeutralBg = color.new(neutralColor, 18)
         color dashboardSetupBg = compactWaiting ? dashboardNeutralBg : accentColor
         color dashboardBiasBg = dashboardBiasAligned ? accentColor : dashboardNeutralBg
         color dashboardPoiBg = poiActive ? accentColor : panelCellBg
-        color dashboardOrderBg = not na(entryLevel) and not retiredState ? accentColor : panelCellBg
+        color dashboardOrderBg = orderRiskReady ? accentColor : panelCellBg
         color dashboardTriggerBg = triggerReady ? accentColor : panelCellBg
         color dashboardTimingBg = color.new(strictModeEnabled ? color.teal : neutralColor, 15)
         color dashboardNextBg = compactWaiting ? dashboardNeutralBg : accentColor
