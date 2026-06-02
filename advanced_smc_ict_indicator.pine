@@ -322,11 +322,8 @@ f_sessionCode(string sessionLabel) =>
 f_zoneMid(float zoneTop, float zoneBottom) =>
     (zoneTop + zoneBottom) * 0.5
 
-f_fvgLabelText(bool isBull) =>
-    compactMode ? (isBull ? "FVG+ CE" : "FVG- CE") : (isBull ? "Bullish FVG + CE" : "Bearish FVG + CE")
-
 f_obLabelText(bool isBull, bool isBreaker) =>
-    compactMode ? (isBreaker ? (isBull ? "BRK+" : "BRK-") : (isBull ? "OB+" : "OB-")) : (isBreaker ? (isBull ? "Bullish Breaker" : "Bearish Breaker") : (isBull ? "Bullish OB" : "Bearish OB"))
+    isBreaker ? (isBull ? "BRK+" : "BRK-") : isBull ? "OB+" : "OB-"
 
 f_formatLevel(float price) =>
     na(price) ? "-" : str.tostring(price, format.mintick)
@@ -815,9 +812,6 @@ f_executionVisualByMode(string mode, bool riskVisible, string preferredDirection
     else
         false
 
-f_contextVisualByMode(string mode) =>
-    mode != "Minimal"
-
 f_setupExecutionState(bool hasSetup, bool ambiguous, bool invalidated, bool expired, bool chased, bool completed, bool managed, bool baseContextPass, bool confirmationPass, bool mssFresh, bool displacementSeen, bool priceInZone, bool priceNearZone) =>
     not hasSetup ? "Waiting" : ambiguous ? "Ambiguous" : completed ? "Completed" : invalidated ? "Invalidated" : managed ? "Managed" : expired or chased ? "Expired" : not baseContextPass ? "Waiting" : not confirmationPass ? "Confirming" : mssFresh and displacementSeen ? (priceInZone or priceNearZone ? "Active" : "Armed") : "Waiting"
 
@@ -826,9 +820,6 @@ f_executionTerminal(string stateText) =>
 
 f_executionRiskVisible(string stateText) =>
     stateText == "Armed" or stateText == "Active" or stateText == "Managed" or stateText == "Ambiguous"
-
-f_eng4_compact_bias_token(int bias) =>
-    bias == 1 ? "Bu" : bias == -1 ? "Be" : "Rg"
 
 f_eng4_retired_state(string executionState, int setupAge, bool touched, int expiryBarsWindow) =>
     executionState == "Invalidated" or executionState == "Completed" or executionState == "Expired" or (touched and not na(setupAge) and setupAge > expiryBarsWindow and not f_executionRiskVisible(executionState) and executionState != "Confirming" and executionState != "Ambiguous")
@@ -1232,6 +1223,10 @@ f_eng3_strict_pd_array_owned(bool poiIsFvg, int poiBar, int sweepAge, int mssAge
         int safeWindow = ownershipWindow > 1 ? ownershipWindow : 1
         owned := poiAge >= 0 and sweepAge >= mssAge and sweepAge >= displacementAge and lateExpansionAge <= safeWindow and poiAge <= sweepAge + safeWindow and (poiIsFvg ? poiAge <= earlyExpansionAge + safeWindow : poiAge >= lateExpansionAge - safeWindow)
     owned
+
+f_eng3_strict_cycle_stage_pass(int sweepAge, int stageAge, int cycleWindow) =>
+    int safeWindow = cycleWindow > 1 ? cycleWindow : 1
+    not na(sweepAge) and not na(stageAge) and sweepAge <= safeWindow and stageAge <= safeWindow and sweepAge >= stageAge
 
 f_eng3_select_poi_preference(bool strictEnabled, bool hasOb, bool hasFvg, bool obConfirmPass, bool fvgConfirmPass, bool obInZone, bool fvgInZone, bool obStrictOwned, bool fvgStrictOwned) =>
     bool preferOb = false
@@ -3040,7 +3035,7 @@ if sessionRangeTrackingNeeded
 //------------------------------------------------------------------------------
 // Calendar liquidity references (ICT naming)
 //------------------------------------------------------------------------------
-bool calendarLiquidityVisualsEnabled = eng1_exec_valid and showLiquidity and draw_show_htf and not compactMode and f_contextVisualByMode(draw_mode)
+bool calendarLiquidityVisualsEnabled = eng1_exec_valid and showLiquidity and draw_show_htf and not compactMode and draw_mode != "Minimal"
 bool calendarLiquidityRequestEnabled = barstate.islast and calendarLiquidityVisualsEnabled
 bool calendarDayFromEng1Ready = calendarLiquidityRequestEnabled and eng1_d1_active_tf and array.size(eng1_buf_d1_high) > 0 and array.size(eng1_buf_d1_low) > 0
 [prevDayHighRequested, prevDayLowRequested] = f_prev_period_high_low(calendarLiquidityRequestEnabled and not calendarDayFromEng1Ready, "D")
@@ -3262,6 +3257,13 @@ int strictLongMssAge = ta.barssince(strictModeEnabled and eng1_exe_bull_mss)
 int strictShortMssAge = ta.barssince(strictModeEnabled and eng1_exe_bear_mss)
 int strictLongDisplacementAge = ta.barssince(strictModeEnabled and eng1_exe_bull_displacement)
 int strictShortDisplacementAge = ta.barssince(strictModeEnabled and eng1_exe_bear_displacement)
+int strictCycleMemoryWindow = math.max(strictMssLookbackEffective, strictPdOwnershipWindow)
+bool strictLongSweepMemoryPass = not na(strictLongSweepAge) and strictLongSweepAge <= strictCycleMemoryWindow
+bool strictShortSweepMemoryPass = not na(strictShortSweepAge) and strictShortSweepAge <= strictCycleMemoryWindow
+bool strictLongMssMemoryPass = f_eng3_strict_cycle_stage_pass(strictLongSweepAge, strictLongMssAge, strictCycleMemoryWindow)
+bool strictShortMssMemoryPass = f_eng3_strict_cycle_stage_pass(strictShortSweepAge, strictShortMssAge, strictCycleMemoryWindow)
+bool strictLongDisplacementMemoryPass = f_eng3_strict_cycle_stage_pass(strictLongSweepAge, strictLongDisplacementAge, strictCycleMemoryWindow)
+bool strictShortDisplacementMemoryPass = f_eng3_strict_cycle_stage_pass(strictShortSweepAge, strictShortDisplacementAge, strictCycleMemoryWindow)
 bool bullObStrictPdOwned = eng1HasBullObContext and f_eng3_strict_pd_array_owned(false, eng1BullObCreatedBar, strictLongSweepAge, strictLongMssAge, strictLongDisplacementAge, strictPdOwnershipWindow)
 bool bullFvgStrictPdOwned = eng1HasBullFvgContext and f_eng3_strict_pd_array_owned(true, eng1BullFvgCreatedBar, strictLongSweepAge, strictLongMssAge, strictLongDisplacementAge, strictPdOwnershipWindow)
 bool bearObStrictPdOwned = eng1HasBearObContext and f_eng3_strict_pd_array_owned(false, eng1BearObCreatedBar, strictShortSweepAge, strictShortMssAge, strictShortDisplacementAge, strictPdOwnershipWindow)
@@ -3431,7 +3433,7 @@ float execBarBodyShare = eng3ClosedFallbackAllowed ? f_eng1_body_share(eng3ExecO
 bool longDirectionalFallback = displayExecBias == 0 and ((eng1_exe_bull_mss and not eng1_exe_bear_mss) or (eng1_exe_bull_displacement and not eng1_exe_bear_displacement))
 bool shortDirectionalFallback = displayExecBias == 0 and ((eng1_exe_bear_mss and not eng1_exe_bull_mss) or (eng1_exe_bear_displacement and not eng1_exe_bull_displacement))
 bool effectiveLongDirectional = displayExecBias == 1 or longDirectionalFallback
-bool effectiveLongSweepSeen = strictModeEnabled ? strictLongRawSweepSignal : eng1_exe_bull_sweep
+bool effectiveLongSweepSeen = strictModeEnabled ? strictLongSweepMemoryPass : eng1_exe_bull_sweep
 bool longMssFallbackBreak = eng3ClosedFallbackAllowed and not na(eng1_exe_mss_ref_high) and not na(eng3ExecPrevClose) and eng3ExecClose > eng1_exe_mss_ref_high and eng3ExecPrevClose <= eng1_exe_mss_ref_high
 int longMssFallbackAge = ta.barssince(longMssFallbackBreak)
 bool longMssFallbackRecent = not na(longMssFallbackAge) and longMssFallbackAge <= strictMssLookbackEffective
@@ -3440,8 +3442,8 @@ int longDispFallbackAge = ta.barssince(longDispFallbackBreak)
 bool longDispFallbackRecent = not na(longDispFallbackAge) and longDispFallbackAge <= strictMssLookbackEffective
 bool longDispFallbackContext = eng1_exe_bull_sweep or longMssFallbackRecent or eng1_exe_bull_mss
 bool longDispFallback = not strictModeEnabled and longDispFallbackRecent and longDispFallbackContext
-bool effectiveLongMssSeen = eng1_exe_bull_mss or longMssFallbackRecent
-bool effectiveLongDisplacementSeen = eng1_exe_bull_displacement or longDispFallback
+bool effectiveLongMssSeen = strictModeEnabled ? strictLongMssMemoryPass : (eng1_exe_bull_mss or longMssFallbackRecent)
+bool effectiveLongDisplacementSeen = strictModeEnabled ? strictLongDisplacementMemoryPass : (eng1_exe_bull_displacement or longDispFallback)
 bool effectiveLongStructureInvalidated = longPoiInvalidatedLatched or (displayExecBias == -1 and (displayCtxBias == -1 or eng1_ctx_bear_reversal or eng1_exe_bear_mss))
 bool normalLongDirectionalContext = displayCtxBias != -1 and (displayExecBias == 1 or effectiveLongDirectional or eng1_ctx_bull_reversal or eng1_ctx_bull_breakout)
 bool normalLongBiasPass = eng1_exec_valid and displayNarrBias != -1 and normalLongDirectionalContext
@@ -3453,12 +3455,13 @@ bool normalLongTargetPass = not na(activeLongTarget)
 // Non-strict deliberately stays normal: OB/FVG zone + direction + MSS /
 // displacement + retest. No IPDA time, DOL lookback, Judas, or OTE mandate.
 bool strictLongBiasPass = not strictModeEnabled or (displayNarrBias == 1 and ipdaLongDolAvailable)
-bool strictLongContextTfPass = not strictModeEnabled or ((displayCtxBias == 1 or eng1_ctx_bull_reversal or eng1_ctx_bull_breakout or (displayCtxBias == 0 and effectiveLongDirectional)) and (tradeLongIsOb or tradeLongIsFvg))
-bool exe_long_sweep_signal = strictModeEnabled ? strictLongRawSweepSignal : (eng1_exe_bull_sweep or longPriceInZone or longPriceNearZone or tradeLongTouched)
-bool exe_long_mss_signal = strictModeEnabled ? eng1_exe_bull_mss : effectiveLongMssSeen
-bool exe_long_displacement_signal = strictModeEnabled ? eng1_exe_bull_displacement : effectiveLongDisplacementSeen
-bool strictLongSweepPass = not strictModeEnabled or exe_long_sweep_signal
-bool strictLongMssPass = not strictModeEnabled or (exe_long_mss_signal and effectiveLongDirectional)
+bool strictLongDirectionalPass = not strictModeEnabled or displayExecBias == 1 or (displayExecBias == 0 and (strictLongMssMemoryPass or strictLongDisplacementMemoryPass))
+bool strictLongContextTfPass = not strictModeEnabled or ((displayCtxBias == 1 or eng1_ctx_bull_reversal or eng1_ctx_bull_breakout or (displayCtxBias == 0 and strictLongDirectionalPass)) and (tradeLongIsOb or tradeLongIsFvg))
+bool exe_long_sweep_signal = strictModeEnabled ? strictLongSweepMemoryPass : (eng1_exe_bull_sweep or longPriceInZone or longPriceNearZone or tradeLongTouched)
+bool exe_long_mss_signal = strictModeEnabled ? strictLongMssMemoryPass : effectiveLongMssSeen
+bool exe_long_displacement_signal = strictModeEnabled ? strictLongDisplacementMemoryPass : effectiveLongDisplacementSeen
+bool strictLongSweepPass = not strictModeEnabled or strictLongSweepMemoryPass
+bool strictLongMssPass = not strictModeEnabled or (strictLongMssMemoryPass and strictLongDirectionalPass)
 bool strictLongDisplacementPass = not strictModeEnabled or exe_long_displacement_signal
 bool strictLongPdPass = not strictModeEnabled or exe_long_pd_pass
 bool strictLongOtePass = not strictModeEnabled or exe_long_ote_pass
@@ -3508,7 +3511,7 @@ if not shortSetupMissing
     shortPoiInvalidatedLatched := shortPoiInvalidatedLatched or f_eng3_poi_invalidated(false, tradeShortValidTop, tradeShortValidBottom, eng3SignalClose)
 bool shortChased = not shortPoiMitigatedLatched and not na(tradeShortValidBottom) and not na(eng3SignalClose) and eng3SignalClose < tradeShortValidBottom - atr * setupChaseAtr
 bool effectiveShortDirectional = displayExecBias == -1 or shortDirectionalFallback
-bool effectiveShortSweepSeen = strictModeEnabled ? strictShortRawSweepSignal : eng1_exe_bear_sweep
+bool effectiveShortSweepSeen = strictModeEnabled ? strictShortSweepMemoryPass : eng1_exe_bear_sweep
 bool shortMssFallbackBreak = eng3ClosedFallbackAllowed and not na(eng1_exe_mss_ref_low) and not na(eng3ExecPrevClose) and eng3ExecClose < eng1_exe_mss_ref_low and eng3ExecPrevClose >= eng1_exe_mss_ref_low
 int shortMssFallbackAge = ta.barssince(shortMssFallbackBreak)
 bool shortMssFallbackRecent = not na(shortMssFallbackAge) and shortMssFallbackAge <= strictMssLookbackEffective
@@ -3517,20 +3520,21 @@ int shortDispFallbackAge = ta.barssince(shortDispFallbackBreak)
 bool shortDispFallbackRecent = not na(shortDispFallbackAge) and shortDispFallbackAge <= strictMssLookbackEffective
 bool shortDispFallbackContext = eng1_exe_bear_sweep or shortMssFallbackRecent or eng1_exe_bear_mss
 bool shortDispFallback = not strictModeEnabled and shortDispFallbackRecent and shortDispFallbackContext
-bool effectiveShortMssSeen = eng1_exe_bear_mss or shortMssFallbackRecent
-bool effectiveShortDisplacementSeen = eng1_exe_bear_displacement or shortDispFallback
+bool effectiveShortMssSeen = strictModeEnabled ? strictShortMssMemoryPass : (eng1_exe_bear_mss or shortMssFallbackRecent)
+bool effectiveShortDisplacementSeen = strictModeEnabled ? strictShortDisplacementMemoryPass : (eng1_exe_bear_displacement or shortDispFallback)
 bool effectiveShortStructureInvalidated = shortPoiInvalidatedLatched or (displayExecBias == 1 and (displayCtxBias == 1 or eng1_ctx_bull_reversal or eng1_exe_bull_mss))
 bool normalShortDirectionalContext = displayCtxBias != 1 and (displayExecBias == -1 or effectiveShortDirectional or eng1_ctx_bear_reversal or eng1_ctx_bear_breakout)
 bool normalShortBiasPass = eng1_exec_valid and displayNarrBias != 1 and normalShortDirectionalContext
 bool normalShortContextPass = (tradeShortIsOb or tradeShortIsFvg) and normalShortDirectionalContext
 bool normalShortTargetPass = not na(activeShortTarget)
 bool strictShortBiasPass = not strictModeEnabled or (displayNarrBias == -1 and ipdaShortDolAvailable)
-bool strictShortContextTfPass = not strictModeEnabled or ((displayCtxBias == -1 or eng1_ctx_bear_reversal or eng1_ctx_bear_breakout or (displayCtxBias == 0 and effectiveShortDirectional)) and (tradeShortIsOb or tradeShortIsFvg))
-bool exe_short_sweep_signal = strictModeEnabled ? strictShortRawSweepSignal : (eng1_exe_bear_sweep or shortPriceInZone or shortPriceNearZone or tradeShortTouched)
-bool exe_short_mss_signal = strictModeEnabled ? eng1_exe_bear_mss : effectiveShortMssSeen
-bool exe_short_displacement_signal = strictModeEnabled ? eng1_exe_bear_displacement : effectiveShortDisplacementSeen
-bool strictShortSweepPass = not strictModeEnabled or exe_short_sweep_signal
-bool strictShortMssPass = not strictModeEnabled or (exe_short_mss_signal and effectiveShortDirectional)
+bool strictShortDirectionalPass = not strictModeEnabled or displayExecBias == -1 or (displayExecBias == 0 and (strictShortMssMemoryPass or strictShortDisplacementMemoryPass))
+bool strictShortContextTfPass = not strictModeEnabled or ((displayCtxBias == -1 or eng1_ctx_bear_reversal or eng1_ctx_bear_breakout or (displayCtxBias == 0 and strictShortDirectionalPass)) and (tradeShortIsOb or tradeShortIsFvg))
+bool exe_short_sweep_signal = strictModeEnabled ? strictShortSweepMemoryPass : (eng1_exe_bear_sweep or shortPriceInZone or shortPriceNearZone or tradeShortTouched)
+bool exe_short_mss_signal = strictModeEnabled ? strictShortMssMemoryPass : effectiveShortMssSeen
+bool exe_short_displacement_signal = strictModeEnabled ? strictShortDisplacementMemoryPass : effectiveShortDisplacementSeen
+bool strictShortSweepPass = not strictModeEnabled or strictShortSweepMemoryPass
+bool strictShortMssPass = not strictModeEnabled or (strictShortMssMemoryPass and strictShortDirectionalPass)
 bool strictShortDisplacementPass = not strictModeEnabled or exe_short_displacement_signal
 bool strictShortPdPass = not strictModeEnabled or exe_short_pd_pass
 bool strictShortOtePass = not strictModeEnabled or exe_short_ote_pass
@@ -3570,8 +3574,10 @@ bool dashShortTriggerDisplacementOk = strictModeEnabled ? strictShortDisplacemen
 // simple and non-overfit.
 bool longZoneQualityResponsePass = strictModeEnabled ? (exe_long_pd_pass and exe_long_ote_pass) : (longPriceInZone or longPriceNearZone or tradeLongTouched or exe_long_pd_pass)
 bool shortZoneQualityResponsePass = strictModeEnabled ? (exe_short_pd_pass and exe_short_ote_pass) : (shortPriceInZone or shortPriceNearZone or tradeShortTouched or exe_short_pd_pass)
-bool longLifecycleBasePass = longArmedLatched or (not na(tradeLongEntry) and effectiveLongDirectional and effectiveLongMssSeen and (effectiveLongSweepSeen or longPriceInZone or longPriceNearZone))
-bool shortLifecycleBasePass = shortArmedLatched or (not na(tradeShortEntry) and effectiveShortDirectional and effectiveShortMssSeen and (effectiveShortSweepSeen or shortPriceInZone or shortPriceNearZone))
+bool longLifecycleDirectionalPass = strictModeEnabled ? strictLongDirectionalPass : effectiveLongDirectional
+bool shortLifecycleDirectionalPass = strictModeEnabled ? strictShortDirectionalPass : effectiveShortDirectional
+bool longLifecycleBasePass = longArmedLatched or (not na(tradeLongEntry) and longLifecycleDirectionalPass and effectiveLongMssSeen and (effectiveLongSweepSeen or longPriceInZone or longPriceNearZone))
+bool shortLifecycleBasePass = shortArmedLatched or (not na(tradeShortEntry) and shortLifecycleDirectionalPass and effectiveShortMssSeen and (effectiveShortSweepSeen or shortPriceInZone or shortPriceNearZone))
 float contextDepartureRange = eng1CtxRangeReady ? eng1CtxRangeHigh - eng1CtxRangeLow : na
 bool longZoneOverlapBonus = (tradeLongIsOb or tradeLongIsFvg) and hasBullOb and hasBullFvg and f_zoneIntersects(ctxBullObTop, ctxBullObBottom, ctxBullFvgTop, ctxBullFvgBottom)
 bool shortZoneOverlapBonus = (tradeShortIsOb or tradeShortIsFvg) and hasBearOb and hasBearFvg and f_zoneIntersects(ctxBearObTop, ctxBearObBottom, ctxBearFvgTop, ctxBearFvgBottom)
@@ -3699,26 +3705,23 @@ bool shortCtxBearFvgReplacementCandidate = shortCtxReplacementBase and showFvg a
 // to the current bar instead of looking visually cut off.
 bool longHistoryDrawableType = (eng2LongHistoryIsOb and showOb) or (eng2LongHistoryIsFvg and showFvg)
 bool shortHistoryDrawableType = (eng2ShortHistoryIsOb and showOb) or (eng2ShortHistoryIsFvg and showFvg)
-bool longHistoryZoneCandidate = historyZonesEnabled and eng2LongHistoryTag != "" and not na(eng2LongHistoryTop) and not na(eng2LongHistoryBottom) and longHistoryDrawableType
+bool longHistoryZoneCandidate = historyZonesEnabled and eng2LongHistoryTag != "" and not na(eng2LongHistoryTop) and not na(eng2LongHistoryBottom) and longHistoryDrawableType and not f_eng3_poi_invalidated(true, eng2LongHistoryTop, eng2LongHistoryBottom, eng3SignalClose)
 bool longHistoryMatchesLiveZone = f_eng2_matches_history_zone(showEng2LongLiveZone, (eng2LongHistoryIsOb and tradeLongIsOb) or (eng2LongHistoryIsFvg and tradeLongIsFvg), draw_long_zone_top, draw_long_zone_bottom, tradeLongCreatedBar, eng2LongHistoryTop, eng2LongHistoryBottom, eng2LongHistoryLeftBar)
 bool longHistoryMatchesCtxBullOb = f_eng2_matches_history_zone(longCtxBullObReplacementCandidate and eng2LongHistoryIsOb, true, eng1_ctx_bull_ob_top, eng1_ctx_bull_ob_bottom, eng1BullObCreatedBar, eng2LongHistoryTop, eng2LongHistoryBottom, eng2LongHistoryLeftBar)
 bool longHistoryMatchesCtxBullFvg = f_eng2_matches_history_zone(longCtxBullFvgReplacementCandidate and eng2LongHistoryIsFvg, true, eng1_ctx_bull_fvg_top, eng1_ctx_bull_fvg_bottom, eng1BullFvgCreatedBar, eng2LongHistoryTop, eng2LongHistoryBottom, eng2LongHistoryLeftBar)
 bool longHistoryHiddenByActiveZone = longHistoryMatchesLiveZone or longHistoryMatchesCtxBullOb or longHistoryMatchesCtxBullFvg
 bool showEng2LongHistoryZone = longHistoryZoneCandidate and not longHistoryHiddenByActiveZone
-bool shortHistoryZoneCandidate = historyZonesEnabled and eng2ShortHistoryTag != "" and not na(eng2ShortHistoryTop) and not na(eng2ShortHistoryBottom) and shortHistoryDrawableType
+bool shortHistoryZoneCandidate = historyZonesEnabled and eng2ShortHistoryTag != "" and not na(eng2ShortHistoryTop) and not na(eng2ShortHistoryBottom) and shortHistoryDrawableType and not f_eng3_poi_invalidated(false, eng2ShortHistoryTop, eng2ShortHistoryBottom, eng3SignalClose)
 bool shortHistoryMatchesLiveZone = f_eng2_matches_history_zone(showEng2ShortLiveZone, (eng2ShortHistoryIsOb and tradeShortIsOb) or (eng2ShortHistoryIsFvg and tradeShortIsFvg), draw_short_zone_top, draw_short_zone_bottom, tradeShortCreatedBar, eng2ShortHistoryTop, eng2ShortHistoryBottom, eng2ShortHistoryLeftBar)
 bool shortHistoryMatchesCtxBearOb = f_eng2_matches_history_zone(shortCtxBearObReplacementCandidate and eng2ShortHistoryIsOb, true, eng1_ctx_bear_ob_top, eng1_ctx_bear_ob_bottom, eng1BearObCreatedBar, eng2ShortHistoryTop, eng2ShortHistoryBottom, eng2ShortHistoryLeftBar)
 bool shortHistoryMatchesCtxBearFvg = f_eng2_matches_history_zone(shortCtxBearFvgReplacementCandidate and eng2ShortHistoryIsFvg, true, eng1_ctx_bear_fvg_top, eng1_ctx_bear_fvg_bottom, eng1BearFvgCreatedBar, eng2ShortHistoryTop, eng2ShortHistoryBottom, eng2ShortHistoryLeftBar)
 bool shortHistoryHiddenByActiveZone = shortHistoryMatchesLiveZone or shortHistoryMatchesCtxBearOb or shortHistoryMatchesCtxBearFvg
 bool showEng2ShortHistoryZone = shortHistoryZoneCandidate and not shortHistoryHiddenByActiveZone
-// Keep terminal history snapshots frozen; only the draw call receives a moving
-// right edge so history remains visual-only and cannot become live state.
-int eng2LongHistoryVisualRightBar = showEng2LongHistoryZone ? bar_index : eng2LongHistoryRightBar
-int eng2ShortHistoryVisualRightBar = showEng2ShortHistoryZone ? bar_index : eng2ShortHistoryRightBar
+// Keep terminal history snapshots frozen so old zones do not read as live POI.
 string eng2LongZoneBadge = f_executionStateBadge(longExecutionState, compactMode)
 string eng2ShortZoneBadge = f_executionStateBadge(shortExecutionState, compactMode)
-string eng2LongZoneBaseLabel = draw_long_zone_type == "OB" ? f_obLabelText(true, eng1_ctx_bull_ob_breaker) : draw_long_zone_type == "FVG" ? f_fvgLabelText(true) : ""
-string eng2ShortZoneBaseLabel = draw_short_zone_type == "OB" ? f_obLabelText(false, eng1_ctx_bear_ob_breaker) : draw_short_zone_type == "FVG" ? f_fvgLabelText(false) : ""
+string eng2LongZoneBaseLabel = draw_long_zone_type == "OB" ? f_obLabelText(true, eng1_ctx_bull_ob_breaker) : draw_long_zone_type == "FVG" ? "FVG" : ""
+string eng2ShortZoneBaseLabel = draw_short_zone_type == "OB" ? f_obLabelText(false, eng1_ctx_bear_ob_breaker) : draw_short_zone_type == "FVG" ? "FVG" : ""
 string longPoiLifecycleText = f_poiLifecycleDisplayText(longPoiLifecycle, poi_long_type)
 string shortPoiLifecycleText = f_poiLifecycleDisplayText(shortPoiLifecycle, poi_short_type)
 string eng2LongZoneLabelCore = eng2LongZoneBadge != "" ? eng2LongZoneBaseLabel + " | " + longPoiLifecycleText + " | " + eng2LongZoneBadge : eng2LongZoneBaseLabel + " | " + longPoiLifecycleText
@@ -3736,10 +3739,10 @@ bool longHistoryBlocksBullOb = f_eng2_matches_history_zone(showEng2LongHistoryZo
 bool longHistoryBlocksBullFvg = f_eng2_matches_history_zone(showEng2LongHistoryZone, eng2LongHistoryIsFvg, eng1_ctx_bull_fvg_top, eng1_ctx_bull_fvg_bottom, eng1BullFvgCreatedBar, eng2LongHistoryTop, eng2LongHistoryBottom, eng2LongHistoryLeftBar)
 bool shortHistoryBlocksBearOb = f_eng2_matches_history_zone(showEng2ShortHistoryZone, eng2ShortHistoryIsOb, eng1_ctx_bear_ob_top, eng1_ctx_bear_ob_bottom, eng1BearObCreatedBar, eng2ShortHistoryTop, eng2ShortHistoryBottom, eng2ShortHistoryLeftBar)
 bool shortHistoryBlocksBearFvg = f_eng2_matches_history_zone(showEng2ShortHistoryZone, eng2ShortHistoryIsFvg, eng1_ctx_bear_fvg_top, eng1_ctx_bear_fvg_bottom, eng1BearFvgCreatedBar, eng2ShortHistoryTop, eng2ShortHistoryBottom, eng2ShortHistoryLeftBar)
-bool showEng2CtxBullOb = longCtxBullObReplacementCandidate and not longHistoryBlocksBullOb
-bool showEng2CtxBullFvg = longCtxBullFvgReplacementCandidate and not longHistoryBlocksBullFvg
-bool showEng2CtxBearOb = shortCtxBearObReplacementCandidate and not shortHistoryBlocksBearOb
-bool showEng2CtxBearFvg = shortCtxBearFvgReplacementCandidate and not shortHistoryBlocksBearFvg
+bool showEng2CtxBullOb = longCtxBullObReplacementCandidate and not longHistoryBlocksBullOb and not f_eng3_poi_invalidated(true, eng1_ctx_bull_ob_top, eng1_ctx_bull_ob_bottom, eng3SignalClose)
+bool showEng2CtxBullFvg = longCtxBullFvgReplacementCandidate and not longHistoryBlocksBullFvg and not f_eng3_poi_invalidated(true, eng1_ctx_bull_fvg_top, eng1_ctx_bull_fvg_bottom, eng3SignalClose)
+bool showEng2CtxBearOb = shortCtxBearObReplacementCandidate and not shortHistoryBlocksBearOb and not f_eng3_poi_invalidated(false, eng1_ctx_bear_ob_top, eng1_ctx_bear_ob_bottom, eng3SignalClose)
+bool showEng2CtxBearFvg = shortCtxBearFvgReplacementCandidate and not shortHistoryBlocksBearFvg and not f_eng3_poi_invalidated(false, eng1_ctx_bear_fvg_top, eng1_ctx_bear_fvg_bottom, eng3SignalClose)
 // Empty passive context paths skip sync work; existing handles still clear here.
 bool eng2AnyPassiveCtxZoneVisible = showEng2CtxBullOb or showEng2CtxBullFvg or showEng2CtxBearOb or showEng2CtxBearFvg
 bool eng2PassiveCtxVisualsHaveHandles = not na(eng2CtxBullObBox) or not na(eng2CtxBullObLabel) or not na(eng2CtxBullFvgBox) or not na(eng2CtxBullFvgLabel) or not na(eng2CtxBearObBox) or not na(eng2CtxBearObLabel) or not na(eng2CtxBearFvgBox) or not na(eng2CtxBearFvgLabel)
@@ -3777,9 +3780,9 @@ if eng2ShortLiveZoneNeedsSync
 bool eng2LongHistoryZoneNeedsSync = showEng2LongHistoryZone or not na(eng2LongHistoryBox)
 bool eng2ShortHistoryZoneNeedsSync = showEng2ShortHistoryZone or not na(eng2ShortHistoryBox)
 if eng2LongHistoryZoneNeedsSync
-    eng2LongHistoryBox := f_eng2_syncHistoryZoneBox(eng2LongHistoryBox, showEng2LongHistoryZone, eng2LongHistoryLeftBar, eng2LongHistoryVisualRightBar, eng2LongHistoryTop, eng2LongHistoryBottom, color.new(bullColor, 80), color.new(bullColor, 98), 1)
+    eng2LongHistoryBox := f_eng2_syncHistoryZoneBox(eng2LongHistoryBox, showEng2LongHistoryZone, eng2LongHistoryLeftBar, eng2LongHistoryRightBar, eng2LongHistoryTop, eng2LongHistoryBottom, color.new(bullColor, 80), color.new(bullColor, 98), 1)
 if eng2ShortHistoryZoneNeedsSync
-    eng2ShortHistoryBox := f_eng2_syncHistoryZoneBox(eng2ShortHistoryBox, showEng2ShortHistoryZone, eng2ShortHistoryLeftBar, eng2ShortHistoryVisualRightBar, eng2ShortHistoryTop, eng2ShortHistoryBottom, color.new(bearColor, 80), color.new(bearColor, 98), 1)
+    eng2ShortHistoryBox := f_eng2_syncHistoryZoneBox(eng2ShortHistoryBox, showEng2ShortHistoryZone, eng2ShortHistoryLeftBar, eng2ShortHistoryRightBar, eng2ShortHistoryTop, eng2ShortHistoryBottom, color.new(bearColor, 80), color.new(bearColor, 98), 1)
 
 bool eng2AnySetupZoneVisible = showEng2LongLiveZone or showEng2ShortLiveZone
 bool eng2LongSetupEventAllowed = draw_show_setup_events and eng2SignalEventsStateReady and showEng2LongLiveZone
@@ -3987,7 +3990,7 @@ bool draw_eq_high_primary = f_preferredLevelMatch(eng1_exe_liq_high, preferredDi
 bool draw_eq_low_primary = f_preferredLevelMatch(eng1_exe_liq_low, preferredDirection == "Balanced", compactUseLong, activeLongTarget, activeShortTarget)
 showEqHighVisual = showLiquidity and not compactMode and f_draw_level_visible(draw_mode, draw_eq_high_primary, true, preferredDirection)
 showEqLowVisual = showLiquidity and not compactMode and f_draw_level_visible(draw_mode, draw_eq_low_primary, false, preferredDirection)
-showRangeVisual = showLiquidity and displayInternalRange and f_contextVisualByMode(draw_mode)
+showRangeVisual = showLiquidity and displayInternalRange and draw_mode != "Minimal"
 showOteVisual = strictShowOte and (draw_full or draw_focused) and draw_mode != "Minimal"
 showCalendarLiquidityVisual = calendarLiquidityRequestEnabled
 showLongRiskVisual = showRisk and not compactMode and f_executionVisualByMode(draw_mode, longRiskVisible, preferredDirection, true, compactUseLong)
@@ -4174,41 +4177,49 @@ f_eng4_render_dashboard() =>
         bool poiStrictOwned = poiUseLong ? strictLongPdArrayOwned : strictShortPdArrayOwned
         bool poiConsumed = poiUseLong ? eng3LongActivePoiIdentity == eng3LongConsumedPoiIdentity : eng3ShortActivePoiIdentity == eng3ShortConsumedPoiIdentity
         string poiSideText = poiUseLong ? "L " : "S "
-        string poiWaitReason = not poiContextAllowed ? "No POI: Gate" : not poiHasZone ? "No POI: Zone" : not poiCandidateValid ? "No POI: Select" : not poiIdentityReady ? "No POI: Map" : not poiStrictOwned ? "No POI: Own" : poiConsumed ? "No POI: Used" : "No POI"
+        string poiWaitReason = not poiContextAllowed ? "No POI: Gate" : not poiHasZone ? "No POI: Zone" : not poiCandidateValid ? "No POI: Select" : not poiIdentityReady ? "No POI: Map" : not poiStrictOwned ? "No POI: Own" : poiConsumed ? "Used POI" : "No POI"
         string poiRetireReason = poiUseLong ? longPoiRetireReason : shortPoiRetireReason
         bool poiRetired = poiUseLong ? longRetired : shortRetired
         bool poiActive = poiValid and not poiRetired
         bool sweepOk = poiUseLong ? dashLongTriggerSweepOk : dashShortTriggerSweepOk
         bool mssOk = poiUseLong ? dashLongTriggerMssOk : dashShortTriggerMssOk
         bool dispOk = poiUseLong ? dashLongTriggerDisplacementOk : dashShortTriggerDisplacementOk
-        bool dashboardBiasAligned = displayExecBias != 0 and displayCtxBias != 0 and displayExecBias == displayCtxBias
-        bool dashboardBiasMixed = displayExecBias != 0 and displayCtxBias != 0 and displayExecBias != displayCtxBias
-        string biasText = (dashboardBiasAligned ? "Aligned " + (displayExecBias == 1 ? "Bullish" : "Bearish") : dashboardBiasMixed ? "Mixed" : "Building") + " | MTF " + f_biasShort(displayNarrBias) + "/" + f_biasShort(displayCtxBias) + "/" + f_biasShort(displayExecBias)
-        string compactBiasText = (dashboardBiasAligned ? "Al " + f_eng4_compact_bias_token(displayExecBias) : dashboardBiasMixed ? "Mix" : "Bld") + " | " + f_eng4_compact_bias_token(displayNarrBias) + "/" + f_eng4_compact_bias_token(displayCtxBias) + "/" + f_eng4_compact_bias_token(displayExecBias)
-        string sessionText = liquiditySessionSummary + " | " + timezoneSummary + " | " + (strictModeEnabled ? (ipdaWindowSummary == "Off" ? "Strict KZ Off" : "Strict " + ipdaWindowSummary) : "Normal")
-        string nextText = compactWaiting ? "Wait " + waitName + " " + f_formatLevel(waitLevel) : executionState == "Active" ? "Entry active" : executionState == "Armed" ? "Monitor retest" : executionState == "Confirming" ? "Wait confirm" : executionState == "Managed" ? "Manage" : executionState == "Ambiguous" ? "Review" : executionState == "Completed" ? "Next setup" : executionState == "Expired" or executionState == "Invalidated" ? "Stand down" : "Wait trigger"
-        string pxText = syminfo.ticker + " " + timeframe.period + " | Px " + f_formatLevel(not na(eng3SignalClose) ? eng3SignalClose : close)
-        string setupText = compactWaiting ? "Wait " + waitName + " " + f_formatLevel(waitLevel) : compactBalanced ? "Both POI L " + f_formatLevel(tradeLongEntry) + " / S " + f_formatLevel(tradeShortEntry) : (dashboardUseLong ? "Long " : "Short ") + executionState + " " + f_formatLevel(entryLevel)
-        string compactSetupText = compactWaiting ? waitName + " " + f_formatLevel(waitLevel) : compactBalanced ? "Both L " + f_formatLevel(tradeLongEntry) + " / S " + f_formatLevel(tradeShortEntry) : (dashboardUseLong ? "L " : "S ") + executionState + " " + f_formatLevel(entryLevel)
+        bool strictBiasOk = poiUseLong ? strictLongBiasPass : strictShortBiasPass
+        bool strictCtxOk = poiUseLong ? strictLongContextTfPass : strictShortContextTfPass
+        bool strictPdOk = poiUseLong ? strictLongPdPass : strictShortPdPass
+        bool strictOteOk = poiUseLong ? strictLongOtePass : strictShortOtePass
+        bool strictDolOk = poiUseLong ? strictLongDolPass : strictShortDolPass
+        bool strictKzOk = poiUseLong ? strictLongKillzonePass : strictShortKillzonePass
+        bool strictConfirmOk = strictBiasOk and strictCtxOk and strictPdOk and strictOteOk and strictDolOk and strictKzOk
+        float dashboardPx = not na(eng3SignalClose) ? eng3SignalClose : close
+        string waitTargetText = not na(waitLevel) and (waitBuySide ? waitLevel > dashboardPx : waitLevel < dashboardPx) ? waitName + " " + f_formatLevel(waitLevel) : "New " + waitName
+        bool dashboardBiasAligned = displayNarrBias != 0 and displayNarrBias == displayCtxBias and displayCtxBias == displayExecBias
+        bool dashboardNarrativeConflict = displayNarrBias != 0 and displayCtxBias != 0 and displayExecBias != 0 and displayCtxBias == displayExecBias and displayNarrBias != displayExecBias
+        bool dashboardBiasMixed = (displayNarrBias != 0 and displayCtxBias != 0 and displayNarrBias != displayCtxBias) or (displayNarrBias != 0 and displayExecBias != 0 and displayNarrBias != displayExecBias) or (displayCtxBias != 0 and displayExecBias != 0 and displayCtxBias != displayExecBias)
+        string strictGateText = not strictBiasOk ? "Need Bias" : not strictCtxOk ? "Need Ctx" : not strictPdOk ? "Need PD" : not strictOteOk ? "Need OTE" : not strictDolOk ? "Need DOL" : not strictKzOk ? "Need KZ" : "Strict OK"
+        string strictTriggerStepText = not sweepOk ? "Need Sweep" : not mssOk ? "Need MSS" : not dispOk ? "Need Disp" : strictGateText
+        string nextText = compactWaiting ? "Wait " + waitTargetText : executionState == "Active" ? "Active" : executionState == "Armed" ? "Retest" : executionState == "Confirming" ? (strictModeEnabled ? strictTriggerStepText : "Confirm") : executionState == "Managed" ? "Manage" : executionState == "Ambiguous" ? "Review" : executionState == "Completed" ? "Next" : executionState == "Expired" or executionState == "Invalidated" ? "Stand" : strictModeEnabled and poiValid and not poiRetired ? strictTriggerStepText : "Wait"
+        string pxText = syminfo.ticker + " " + timeframe.period + " | Px " + f_formatLevel(dashboardPx)
+        string setupText = compactWaiting ? "Wait " + waitTargetText : compactBalanced ? "Both POI L " + f_formatLevel(tradeLongEntry) + " / S " + f_formatLevel(tradeShortEntry) : (dashboardUseLong ? "Long " : "Short ") + executionState + " " + f_formatLevel(entryLevel)
+        string compactSetupText = compactWaiting ? waitTargetText : compactBalanced ? "Both POI" : (dashboardUseLong ? "L " : "S ") + executionState
         bool orderPlanAvailable = not retiredState and not na(entryLevel)
-        bool orderRiskReady = orderPlanAvailable and f_executionRiskVisible(executionState)
-        string orderPrefix = orderRiskReady ? "E " : "Plan E "
-        string compactOrderPrefix = orderRiskReady ? "E " : "Plan E "
-        string orderText = not orderPlanAvailable ? "No pending order" : orderPrefix + f_formatLevel(entryLevel) + " | SL " + f_formatLevel(stopLevel) + " | TP " + f_formatLevel(targetLevel)
+        bool orderStrictReady = not strictModeEnabled or (sweepOk and mssOk and dispOk and strictConfirmOk)
+        bool orderStrictBlocked = strictModeEnabled and orderPlanAvailable and not orderStrictReady
+        setupText := orderStrictBlocked ? (compactBalanced ? "Focus " + (dashboardUseLong ? "Long " : "Short ") : dashboardUseLong ? "Long " : "Short ") + "Gate " + strictTriggerStepText + " " + f_formatLevel(entryLevel) : setupText
+        compactSetupText := orderStrictBlocked ? (dashboardUseLong ? "L Gate " : "S Gate ") + strictTriggerStepText : compactSetupText
+        bool orderRiskReady = orderPlanAvailable and f_executionRiskVisible(executionState) and orderStrictReady
+        string orderText = not orderPlanAvailable ? "No pending order" : (orderStrictBlocked ? "Gate " + strictTriggerStepText + " | Plan E " : orderRiskReady ? "E " : "Plan E ") + f_formatLevel(entryLevel) + " | SL " + f_formatLevel(stopLevel) + " | TP " + f_formatLevel(targetLevel)
         orderText := compactBalanced ? "Focus " + (dashboardUseLong ? "Long" : "Short") + " | " + orderText : orderText
-        string compactOrderText = not orderPlanAvailable ? "No order" : (compactBalanced ? (dashboardUseLong ? "Foc L " : "Foc S ") : "") + compactOrderPrefix + f_formatLevel(entryLevel) + " SL " + f_formatLevel(stopLevel) + " TP " + f_formatLevel(targetLevel)
-        string triggerProgressText = poiSideText + (not sweepOk ? "Need Sweep" : not mssOk ? "Need MSS" : not dispOk ? "Need Disp" : "Trigger OK")
-        string triggerText = not poiValid ? poiSideText + poiWaitReason : poiRetired ? poiSideText + (poiRetireReason == "" ? "POI Retired" : "POI " + poiRetireReason) : triggerProgressText
+        string triggerText = not poiValid ? poiSideText + poiWaitReason : poiRetired ? poiSideText + (poiRetireReason == "" ? "POI Retired" : "POI " + poiRetireReason) : poiSideText + (strictModeEnabled ? strictTriggerStepText : not sweepOk ? "Need Sweep" : not mssOk ? "Need MSS" : not dispOk ? "Need Disp" : "Trigger OK")
+        bool strictPoiGateBlocked = strictModeEnabled and poiActive and not (sweepOk and mssOk and dispOk and strictConfirmOk)
         string poiText = not poiValid ? poiSideText + poiWaitReason : poiRetired ? poiSideText + (poiRetireReason == "" ? "Retired" : "Retired: " + poiRetireReason) : poiSideText + (poiType == "Breaker" ? "BRK" : poiType) + " " + f_formatLevel(poiEntry) + " | " + f_poiLifecycleDisplayText(poiLifecycle, poiType)
-        bool triggerReady = poiActive and sweepOk and mssOk and dispOk
+        poiText := strictPoiGateBlocked ? poiText + " | " + strictTriggerStepText : poiText
+        bool triggerReady = poiActive and sweepOk and mssOk and dispOk and (not strictModeEnabled or strictConfirmOk)
         color dashboardNeutralBg = color.new(neutralColor, 18)
-        color dashboardSetupBg = compactWaiting ? dashboardNeutralBg : accentColor
-        color dashboardBiasBg = dashboardBiasAligned ? accentColor : dashboardNeutralBg
-        color dashboardPoiBg = poiActive ? accentColor : panelCellBg
+        color dashboardSetupBg = compactWaiting ? dashboardNeutralBg : orderStrictBlocked ? panelCellBg : accentColor
+        color dashboardPoiBg = poiActive and not strictPoiGateBlocked ? accentColor : panelCellBg
         color dashboardOrderBg = orderRiskReady ? accentColor : panelCellBg
-        color dashboardTriggerBg = triggerReady ? accentColor : panelCellBg
-        color dashboardTimingBg = color.new(strictModeEnabled ? color.teal : neutralColor, 15)
-        color dashboardNextBg = compactWaiting ? dashboardNeutralBg : accentColor
+        color dashboardNextBg = compactWaiting ? dashboardNeutralBg : strictModeEnabled ? (triggerReady ? accentColor : panelCellBg) : accentColor
         if showCompact
             f_prepareDashboardTable(dashboardCompact, 6, dashboard, 10)
             f_setCell(dashboardCompact, 0, 1, "TRADE", color.white, panelHeaderBg)
@@ -4216,11 +4227,11 @@ f_eng4_render_dashboard() =>
             f_setCell(dashboardCompact, 0, 2, "Setup", color.white, panelCellBg)
             f_setCell(dashboardCompact, 1, 2, compactSetupText, color.white, dashboardSetupBg)
             f_setCell(dashboardCompact, 0, 3, "Bias", color.white, panelCellBg)
-            f_setCell(dashboardCompact, 1, 3, compactBiasText, color.white, panelCellBg)
+            f_setCell(dashboardCompact, 1, 3, dashboardBiasAligned ? "Al " + (displayExecBias == 1 ? "Bu" : "Be") : dashboardNarrativeConflict ? "Nar!" : dashboardBiasMixed ? "Mix" : "Bld", color.white, panelCellBg)
             f_setCell(dashboardCompact, 0, 4, "POI", color.white, panelCellBg)
             f_setCell(dashboardCompact, 1, 4, poiText, color.white, dashboardPoiBg)
             f_setCell(dashboardCompact, 0, 5, "Order", color.white, panelCellBg)
-            f_setCell(dashboardCompact, 1, 5, compactOrderText, color.white, dashboardOrderBg)
+            f_setCell(dashboardCompact, 1, 5, not orderPlanAvailable ? "No order" : orderStrictBlocked ? "Gate " + strictTriggerStepText : orderRiskReady ? "Order OK" : "Plan", color.white, dashboardOrderBg)
             f_setCell(dashboardCompact, 0, 6, "Next", color.white, panelCellBg)
             f_setCell(dashboardCompact, 1, 6, nextText, color.white, dashboardNextBg)
         else
@@ -4230,7 +4241,7 @@ f_eng4_render_dashboard() =>
             f_setCell(dashboard, 0, 2, "Setup", color.white, panelCellBg)
             f_setCell(dashboard, 1, 2, setupText, color.white, dashboardSetupBg)
             f_setCell(dashboard, 0, 3, "Bias", color.white, panelCellBg)
-            f_setCell(dashboard, 1, 3, biasText, color.white, dashboardBiasBg)
+            f_setCell(dashboard, 1, 3, (dashboardBiasAligned ? "Aligned " + (displayExecBias == 1 ? "Bullish" : "Bearish") : dashboardNarrativeConflict ? "Narr Conflict" : dashboardBiasMixed ? "Mixed" : "Building") + " | MTF " + f_biasShort(displayNarrBias) + "/" + f_biasShort(displayCtxBias) + "/" + f_biasShort(displayExecBias), color.white, dashboardBiasAligned ? accentColor : dashboardNeutralBg)
             f_setCell(dashboard, 0, 4, "Liquidity", color.white, panelCellBg)
             f_setCell(dashboard, 1, 4, (eng1_exe_eqh_active ? "EQH " : "BSL ") + f_formatLevel(eng1_exe_liq_high) + " | " + (eng1_exe_eql_active ? "EQL " : "SSL ") + f_formatLevel(eng1_exe_liq_low), color.white, panelCellBg)
             f_setCell(dashboard, 0, 5, "POI", color.white, panelCellBg)
@@ -4238,9 +4249,9 @@ f_eng4_render_dashboard() =>
             f_setCell(dashboard, 0, 6, "Order", color.white, panelCellBg)
             f_setCell(dashboard, 1, 6, orderText, color.white, dashboardOrderBg)
             f_setCell(dashboard, 0, 7, "Trigger", color.white, panelCellBg)
-            f_setCell(dashboard, 1, 7, triggerText, color.white, dashboardTriggerBg)
+            f_setCell(dashboard, 1, 7, triggerText, color.white, triggerReady ? accentColor : panelCellBg)
             f_setCell(dashboard, 0, 8, "Timing", color.white, panelCellBg)
-            f_setCell(dashboard, 1, 8, sessionText, color.white, dashboardTimingBg)
+            f_setCell(dashboard, 1, 8, liquiditySessionSummary + " | " + timezoneSummary + " | " + (strictModeEnabled ? (strictKzOk ? "Strict " + ipdaWindowSummary : "Need KZ") : "Normal"), color.white, strictModeEnabled ? (strictKzOk ? color.new(color.teal, 15) : panelCellBg) : color.new(neutralColor, 15))
             f_setCell(dashboard, 0, 9, "Next", color.white, panelCellBg)
             f_setCell(dashboard, 1, 9, nextText, color.white, dashboardNextBg)
     else if clearDash
