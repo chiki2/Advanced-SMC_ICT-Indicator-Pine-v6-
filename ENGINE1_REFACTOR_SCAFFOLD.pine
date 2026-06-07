@@ -26,15 +26,17 @@ f_ictContextHtf(float chartSeconds) =>
     na(chartSeconds) ? "" :
          chartSeconds == timeframe.in_seconds("1") ? TF_M15 :
          chartSeconds == timeframe.in_seconds("5") ? TF_M15 :
-         chartSeconds == timeframe.in_seconds("15") ? TF_H1 :
-         chartSeconds == timeframe.in_seconds("30") ? TF_H4 : ""
+         chartSeconds == timeframe.in_seconds("15") ? TF_M30 :
+         chartSeconds == timeframe.in_seconds("30") ? TF_H1 :
+         chartSeconds == timeframe.in_seconds("60") ? TF_H4 : ""
 
 f_ictNarrativeHtf(float chartSeconds) =>
     na(chartSeconds) ? "" :
-         chartSeconds == timeframe.in_seconds("1") ? TF_H1 :
-         chartSeconds == timeframe.in_seconds("5") ? TF_H4 :
-         chartSeconds == timeframe.in_seconds("15") ? TF_H4 :
-         chartSeconds == timeframe.in_seconds("30") ? TF_D1 : ""
+         chartSeconds == timeframe.in_seconds("1") ? TF_M30 :
+         chartSeconds == timeframe.in_seconds("5") ? TF_H1 :
+         chartSeconds == timeframe.in_seconds("15") ? TF_H1 :
+         chartSeconds == timeframe.in_seconds("30") ? TF_H4 :
+         chartSeconds == timeframe.in_seconds("60") ? TF_D1 : ""
 
 string eng_exec_tf = timeframe.main_period
 string eng_ctx_tf = f_ictContextHtf(timeframe.in_seconds())
@@ -241,6 +243,8 @@ var float m1_mss_ref_high = na
 var float m1_mss_ref_low = na
 var bool m1_bull_sweep = false
 var bool m1_bear_sweep = false
+var bool m1_bull_displacement = false
+var bool m1_bear_displacement = false
 var bool m1_bull_mss = false
 var bool m1_bear_mss = false
 
@@ -263,6 +267,8 @@ var float m5_mss_ref_high = na
 var float m5_mss_ref_low = na
 var bool m5_bull_sweep = false
 var bool m5_bear_sweep = false
+var bool m5_bull_displacement = false
+var bool m5_bear_displacement = false
 var bool m5_bull_mss = false
 var bool m5_bear_mss = false
 
@@ -285,6 +291,8 @@ var float m15_mss_ref_high = na
 var float m15_mss_ref_low = na
 var bool m15_bull_sweep = false
 var bool m15_bear_sweep = false
+var bool m15_bull_displacement = false
+var bool m15_bear_displacement = false
 var bool m15_bull_mss = false
 var bool m15_bear_mss = false
 
@@ -307,6 +315,8 @@ var float m30_mss_ref_high = na
 var float m30_mss_ref_low = na
 var bool m30_bull_sweep = false
 var bool m30_bear_sweep = false
+var bool m30_bull_displacement = false
+var bool m30_bear_displacement = false
 var bool m30_bull_mss = false
 var bool m30_bear_mss = false
 
@@ -329,6 +339,8 @@ var float h1_mss_ref_high = na
 var float h1_mss_ref_low = na
 var bool h1_bull_sweep = false
 var bool h1_bear_sweep = false
+var bool h1_bull_displacement = false
+var bool h1_bear_displacement = false
 var bool h1_bull_mss = false
 var bool h1_bear_mss = false
 
@@ -351,6 +363,8 @@ var float h4_mss_ref_high = na
 var float h4_mss_ref_low = na
 var bool h4_bull_sweep = false
 var bool h4_bear_sweep = false
+var bool h4_bull_displacement = false
+var bool h4_bear_displacement = false
 var bool h4_bull_mss = false
 var bool h4_bear_mss = false
 
@@ -373,6 +387,8 @@ var float d1_mss_ref_high = na
 var float d1_mss_ref_low = na
 var bool d1_bull_sweep = false
 var bool d1_bear_sweep = false
+var bool d1_bull_displacement = false
+var bool d1_bear_displacement = false
 var bool d1_bull_mss = false
 var bool d1_bear_mss = false
 
@@ -417,7 +433,15 @@ var float exe_mss_ref_high = na
 var float exe_mss_ref_low = na
 
 f_select_narrative_snapshot(string tf) =>
-    if tf == TF_H1
+    if tf == TF_M30
+        narr_bias := m30_trend_bias
+        narr_liq_high := m30_eqh_active ? m30_eqh : m30_last_swing_high
+        narr_liq_low := m30_eql_active ? m30_eql : m30_last_swing_low
+        narr_bull_sd_top := m30_bull_ob_top
+        narr_bull_sd_bottom := m30_bull_ob_bottom
+        narr_bear_sd_top := m30_bear_ob_top
+        narr_bear_sd_bottom := m30_bear_ob_bottom
+    else if tf == TF_H1
         narr_bias := h1_trend_bias
         narr_liq_high := h1_eqh_active ? h1_eqh : h1_last_swing_high
         narr_liq_low := h1_eql_active ? h1_eql : h1_last_swing_low
@@ -456,6 +480,18 @@ f_select_context_snapshot(string tf) =>
         ctx_bear_fvg_bottom := m15_bear_fvg_bottom
         ctx_liq_high := m15_eqh_active ? m15_eqh : m15_last_swing_high
         ctx_liq_low := m15_eql_active ? m15_eql : m15_last_swing_low
+    else if tf == TF_M30
+        ctx_trend_bias := m30_trend_bias
+        ctx_bull_ob_top := m30_bull_ob_top
+        ctx_bull_ob_bottom := m30_bull_ob_bottom
+        ctx_bull_fvg_top := m30_bull_fvg_top
+        ctx_bull_fvg_bottom := m30_bull_fvg_bottom
+        ctx_bear_ob_top := m30_bear_ob_top
+        ctx_bear_ob_bottom := m30_bear_ob_bottom
+        ctx_bear_fvg_top := m30_bear_fvg_top
+        ctx_bear_fvg_bottom := m30_bear_fvg_bottom
+        ctx_liq_high := m30_eqh_active ? m30_eqh : m30_last_swing_high
+        ctx_liq_low := m30_eql_active ? m30_eql : m30_last_swing_low
     else if tf == TF_H1
         ctx_trend_bias := h1_trend_bias
         ctx_bull_ob_top := h1_bull_ob_top
@@ -490,6 +526,8 @@ f_select_execution_snapshot(string tf) =>
         exe_trend_bias := m1_trend_bias
         exe_bull_sweep := m1_bull_sweep
         exe_bear_sweep := m1_bear_sweep
+        exe_bull_displacement := m1_bull_displacement
+        exe_bear_displacement := m1_bear_displacement
         exe_bull_mss := m1_bull_mss
         exe_bear_mss := m1_bear_mss
         exe_mss_ref_high := m1_mss_ref_high
@@ -498,6 +536,8 @@ f_select_execution_snapshot(string tf) =>
         exe_trend_bias := m5_trend_bias
         exe_bull_sweep := m5_bull_sweep
         exe_bear_sweep := m5_bear_sweep
+        exe_bull_displacement := m5_bull_displacement
+        exe_bear_displacement := m5_bear_displacement
         exe_bull_mss := m5_bull_mss
         exe_bear_mss := m5_bear_mss
         exe_mss_ref_high := m5_mss_ref_high
@@ -506,6 +546,8 @@ f_select_execution_snapshot(string tf) =>
         exe_trend_bias := m15_trend_bias
         exe_bull_sweep := m15_bull_sweep
         exe_bear_sweep := m15_bear_sweep
+        exe_bull_displacement := m15_bull_displacement
+        exe_bear_displacement := m15_bear_displacement
         exe_bull_mss := m15_bull_mss
         exe_bear_mss := m15_bear_mss
         exe_mss_ref_high := m15_mss_ref_high
@@ -514,12 +556,22 @@ f_select_execution_snapshot(string tf) =>
         exe_trend_bias := m30_trend_bias
         exe_bull_sweep := m30_bull_sweep
         exe_bear_sweep := m30_bear_sweep
+        exe_bull_displacement := m30_bull_displacement
+        exe_bear_displacement := m30_bear_displacement
         exe_bull_mss := m30_bull_mss
         exe_bear_mss := m30_bear_mss
         exe_mss_ref_high := m30_mss_ref_high
         exe_mss_ref_low := m30_mss_ref_low
-    exe_bull_displacement := false
-    exe_bear_displacement := false
+    else if tf == TF_H1
+        exe_trend_bias := h1_trend_bias
+        exe_bull_sweep := h1_bull_sweep
+        exe_bear_sweep := h1_bear_sweep
+        exe_bull_displacement := h1_bull_displacement
+        exe_bear_displacement := h1_bear_displacement
+        exe_bull_mss := h1_bull_mss
+        exe_bear_mss := h1_bear_mss
+        exe_mss_ref_high := h1_mss_ref_high
+        exe_mss_ref_low := h1_mss_ref_low
 
 //------------------------------------------------------------------------------
 // Update buffers
@@ -567,13 +619,13 @@ f_select_execution_snapshot(string tf) =>
 [h4_bull_fvg_top, h4_bull_fvg_bottom, _, h4_bear_fvg_top, h4_bear_fvg_bottom, _] = f_tf_build_fvg(buf_h4_high, buf_h4_low, buf_h4_close)
 [d1_bull_fvg_top, d1_bull_fvg_bottom, _, d1_bear_fvg_top, d1_bear_fvg_bottom, _] = f_tf_build_fvg(buf_d1_high, buf_d1_low, buf_d1_close)
 
-[m1_bull_sweep, m1_bear_sweep, _, _, m1_bull_mss, m1_bear_mss, m1_mss_ref_high, m1_mss_ref_low] = f_tf_build_execution(m1_last_swing_high, m1_last_swing_low, buf_m1_high, buf_m1_low, buf_m1_close)
-[m5_bull_sweep, m5_bear_sweep, _, _, m5_bull_mss, m5_bear_mss, m5_mss_ref_high, m5_mss_ref_low] = f_tf_build_execution(m5_last_swing_high, m5_last_swing_low, buf_m5_high, buf_m5_low, buf_m5_close)
-[m15_bull_sweep, m15_bear_sweep, _, _, m15_bull_mss, m15_bear_mss, m15_mss_ref_high, m15_mss_ref_low] = f_tf_build_execution(m15_last_swing_high, m15_last_swing_low, buf_m15_high, buf_m15_low, buf_m15_close)
-[m30_bull_sweep, m30_bear_sweep, _, _, m30_bull_mss, m30_bear_mss, m30_mss_ref_high, m30_mss_ref_low] = f_tf_build_execution(m30_last_swing_high, m30_last_swing_low, buf_m30_high, buf_m30_low, buf_m30_close)
-[h1_bull_sweep, h1_bear_sweep, _, _, h1_bull_mss, h1_bear_mss, h1_mss_ref_high, h1_mss_ref_low] = f_tf_build_execution(h1_last_swing_high, h1_last_swing_low, buf_h1_high, buf_h1_low, buf_h1_close)
-[h4_bull_sweep, h4_bear_sweep, _, _, h4_bull_mss, h4_bear_mss, h4_mss_ref_high, h4_mss_ref_low] = f_tf_build_execution(h4_last_swing_high, h4_last_swing_low, buf_h4_high, buf_h4_low, buf_h4_close)
-[d1_bull_sweep, d1_bear_sweep, _, _, d1_bull_mss, d1_bear_mss, d1_mss_ref_high, d1_mss_ref_low] = f_tf_build_execution(d1_last_swing_high, d1_last_swing_low, buf_d1_high, buf_d1_low, buf_d1_close)
+[m1_bull_sweep, m1_bear_sweep, m1_bull_displacement, m1_bear_displacement, m1_bull_mss, m1_bear_mss, m1_mss_ref_high, m1_mss_ref_low] = f_tf_build_execution(m1_last_swing_high, m1_last_swing_low, buf_m1_high, buf_m1_low, buf_m1_close)
+[m5_bull_sweep, m5_bear_sweep, m5_bull_displacement, m5_bear_displacement, m5_bull_mss, m5_bear_mss, m5_mss_ref_high, m5_mss_ref_low] = f_tf_build_execution(m5_last_swing_high, m5_last_swing_low, buf_m5_high, buf_m5_low, buf_m5_close)
+[m15_bull_sweep, m15_bear_sweep, m15_bull_displacement, m15_bear_displacement, m15_bull_mss, m15_bear_mss, m15_mss_ref_high, m15_mss_ref_low] = f_tf_build_execution(m15_last_swing_high, m15_last_swing_low, buf_m15_high, buf_m15_low, buf_m15_close)
+[m30_bull_sweep, m30_bear_sweep, m30_bull_displacement, m30_bear_displacement, m30_bull_mss, m30_bear_mss, m30_mss_ref_high, m30_mss_ref_low] = f_tf_build_execution(m30_last_swing_high, m30_last_swing_low, buf_m30_high, buf_m30_low, buf_m30_close)
+[h1_bull_sweep, h1_bear_sweep, h1_bull_displacement, h1_bear_displacement, h1_bull_mss, h1_bear_mss, h1_mss_ref_high, h1_mss_ref_low] = f_tf_build_execution(h1_last_swing_high, h1_last_swing_low, buf_h1_high, buf_h1_low, buf_h1_close)
+[h4_bull_sweep, h4_bear_sweep, h4_bull_displacement, h4_bear_displacement, h4_bull_mss, h4_bear_mss, h4_mss_ref_high, h4_mss_ref_low] = f_tf_build_execution(h4_last_swing_high, h4_last_swing_low, buf_h4_high, buf_h4_low, buf_h4_close)
+[d1_bull_sweep, d1_bear_sweep, d1_bull_displacement, d1_bear_displacement, d1_bull_mss, d1_bear_mss, d1_mss_ref_high, d1_mss_ref_low] = f_tf_build_execution(d1_last_swing_high, d1_last_swing_low, buf_d1_high, buf_d1_low, buf_d1_close)
 
 //------------------------------------------------------------------------------
 // Resolve active layer aliases
