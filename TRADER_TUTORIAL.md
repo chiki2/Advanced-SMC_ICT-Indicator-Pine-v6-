@@ -50,6 +50,7 @@ Timeframe eksekusi yang didukung:
 - `M5`
 - `M15`
 - `M30`
+- `H1`
 
 Di luar timeframe itu, indikator berhenti agar tetap jujur sebagai intraday setup engine.
 
