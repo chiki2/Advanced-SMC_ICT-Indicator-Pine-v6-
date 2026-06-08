@@ -21,7 +21,10 @@ Status: release-candidate freeze for `advanced_smc_ict_indicator.pine`.
 ## Freeze Scope
 
 - Engine 3 signal logic is frozen for this release hygiene pass.
-- The latest patch only changes Engine 2 visual budget/readability:
+- The release hygiene work after this snapshot is limited to non-signal hygiene:
+  source freeze evidence, Full-mode readability checks, and right-edge label
+  deduplication review.
+- The current visual budget/readability guardrails in the script are:
   - smaller structure labels in Full audit,
   - lower Full-mode structure/event caps,
   - lower Full-mode backfill scan caps,
@@ -46,3 +49,9 @@ Expected result:
 - Full mode remains audit-oriented but less cluttered,
 - POI, Trigger, Order, and Next stay consistent with Engine 3 lifecycle.
 
+## Verification Status
+
+- Local source freeze: verified.
+- Local diff hygiene: script has no active working-tree diff after freeze.
+- Local load-budget metrics: verified from source counts above.
+- TradingView compile/render after this freeze: pending external validation.
