@@ -332,7 +332,7 @@ f_formatLevel(float price) =>
     na(price) ? "-" : str.tostring(price, format.mintick)
 
 f_poiLifecycleDisplayText(string poiLifecycle, string poiType) =>
-    poiType == "FVG" and poiLifecycle == "Mitigated" ? "CE Mitigated" : poiLifecycle
+    poiType == "FVG" and poiLifecycle == "Mitigated" ? "CE Hit" : poiLifecycle
 
 f_levelMatches(float referenceLevel, float candidate) =>
     not na(referenceLevel) and not na(candidate) and math.abs(referenceLevel - candidate) <= levelMatchTolerance
@@ -3883,13 +3883,13 @@ if eng2AnyEventCreateReady
             f_eng2_emitSignalEvent(eng2EventTime, nz(tradeLongEntry, eng2EventLow), "Tapped", color.new(bullColor, 5), false, 1.50)
         if eng2ShowLongCeLabel
             eng2LongMitigatedEventTag := currentLongSetupTag
-            f_eng2_emitSignalEvent(eng2EventTime, nz(tradeLongEntry, eng2EventLow), "CE Mitigated", color.new(bullColor, 0), false, 1.72)
+            f_eng2_emitSignalEvent(eng2EventTime, nz(tradeLongEntry, eng2EventLow), "CE Hit", color.new(bullColor, 0), false, 1.72)
         if eng2ShowShortTappedLabel
             eng2ShortTappedEventTag := currentShortSetupTag
             f_eng2_emitSignalEvent(eng2EventTime, nz(tradeShortEntry, eng2EventHigh), "Tapped", color.new(bearColor, 5), true, 1.50)
         if eng2ShowShortCeLabel
             eng2ShortMitigatedEventTag := currentShortSetupTag
-            f_eng2_emitSignalEvent(eng2EventTime, nz(tradeShortEntry, eng2EventHigh), "CE Mitigated", color.new(bearColor, 0), true, 1.72)
+            f_eng2_emitSignalEvent(eng2EventTime, nz(tradeShortEntry, eng2EventHigh), "CE Hit", color.new(bearColor, 0), true, 1.72)
         bool eng2SetupExtraLabelsAllowed = not eng2FullLabelBudgetTight
         bool eng2LongContReady = eng2SetupExtraLabelsAllowed and eng2LongSetupEventStateReady and not longExecutionTerminal and not na(tradeLongEntry) and longPoiEventReached
         bool eng2ShortContReady = eng2SetupExtraLabelsAllowed and eng2ShortSetupEventStateReady and not shortExecutionTerminal and not na(tradeShortEntry) and shortPoiEventReached
