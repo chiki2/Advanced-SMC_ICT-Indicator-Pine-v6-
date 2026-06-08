@@ -3917,10 +3917,10 @@ if eng2AnyEventCreateReady
             bool eng2BearBreakerLabelEvent = eng2ShortSetupEventStateReady and eng2BearBreakerEvent
             if eng2BullBreakerLabelEvent
                 float eng2BullBreakerLevel = not na(eng1_ctx_bull_ob_top) and not na(eng1_ctx_bull_ob_bottom) ? f_zoneMid(eng1_ctx_bull_ob_top, eng1_ctx_bull_ob_bottom) : eng2EventLow
-                f_eng2_emitSignalEvent(nz(eng2BullBreakerLabelTime, time), eng2BullBreakerLevel, "Bull Breaker", color.new(bullColor, 0), false, 2.42)
+                f_eng2_emitSignalEvent(nz(eng2BullBreakerLabelTime, time), eng2BullBreakerLevel, "BRK+", color.new(bullColor, 0), false, 2.42)
             if eng2BearBreakerLabelEvent
                 float eng2BearBreakerLevel = not na(eng1_ctx_bear_ob_top) and not na(eng1_ctx_bear_ob_bottom) ? f_zoneMid(eng1_ctx_bear_ob_top, eng1_ctx_bear_ob_bottom) : eng2EventHigh
-                f_eng2_emitSignalEvent(nz(eng2BearBreakerLabelTime, time), eng2BearBreakerLevel, "Bear Breaker", color.new(bearColor, 0), true, 2.42)
+                f_eng2_emitSignalEvent(nz(eng2BearBreakerLabelTime, time), eng2BearBreakerLevel, "BRK-", color.new(bearColor, 0), true, 2.42)
 
 //------------------------------------------------------------------------------
 // Session range visuals
