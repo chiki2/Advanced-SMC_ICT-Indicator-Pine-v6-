@@ -1,6 +1,6 @@
 # Release Freeze - 2026-06-08
 
-Status: release-candidate freeze for `advanced_smc_ict_indicator.pine`.
+Status: verified release-candidate freeze for `advanced_smc_ict_indicator.pine`.
 
 ## Source Snapshot
 
@@ -54,4 +54,6 @@ Expected result:
 - Local source freeze: verified.
 - Local diff hygiene: script has no active working-tree diff after freeze.
 - Local load-budget metrics: verified from source counts above.
-- TradingView compile/render after this freeze: pending external validation.
+- TradingView compile/render after this freeze: verified from user-provided
+  M1/M5/M15/M30/H1 Standard + Full screenshots on 2026-06-08, with clean
+  compile and no token-limit or 20-second loading warning reported.
