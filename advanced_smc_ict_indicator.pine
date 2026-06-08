@@ -4206,7 +4206,7 @@ f_eng4_render_dashboard() =>
         bool idleNoLivePoi = cWait and not longPoiLive and not shortPoiLive
         bool showRetiredPoi = pValid and pRetired and not idleNoLivePoi
         string idlePoiReason = pRetWhy != "" ? pRetWhy : not pValid and pWhy != "No POI" ? pWhy : ""
-        string idlePoiText = pSide + "No live POI" + (idlePoiReason == "" ? "" : " | " + idlePoiReason)
+        string idlePoiText = pSide + "No live" + (idlePoiReason == "" ? "" : " | " + idlePoiReason)
         bool sweepOk = pLong ? dashLongTriggerSweepOk : dashShortTriggerSweepOk
         bool mssOk = pLong ? dashLongTriggerMssOk : dashShortTriggerMssOk
         bool dispOk = pLong ? dashLongTriggerDisplacementOk : dashShortTriggerDisplacementOk
