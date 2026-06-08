@@ -4166,12 +4166,16 @@ f_eng4_render_dashboard() =>
         bool waitBuy = cBias == -1 or (cBias == 0 and nBias == -1)
         string waitName = waitBuy ? (eng1_exe_eqh_active ? "EQH" : "BSL") : (eng1_exe_eql_active ? "EQL" : "SSL")
         float waitLvl = waitBuy ? eng1_exe_liq_high : eng1_exe_liq_low
+        bool longPoiLive = poi_long_contract_valid and not longRetired
+        bool shortPoiLive = poi_short_contract_valid and not shortRetired
         bool pLong = compactUseLong
         if cWait
-            if poi_long_contract_valid and not poi_short_contract_valid
+            if longPoiLive and not shortPoiLive
                 pLong := true
-            else if poi_short_contract_valid and not poi_long_contract_valid
+            else if shortPoiLive and not longPoiLive
                 pLong := false
+            else if longPoiLive and shortPoiLive
+                pLong := compactUseLong
             else
                 pLong := not waitBuy
         bool dLong = cWait ? pLong : compactUseLong
