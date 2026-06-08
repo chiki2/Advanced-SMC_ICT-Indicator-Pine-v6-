@@ -1182,10 +1182,7 @@ f_eng3_select_context_poi(bool preferOb, bool preferFvg, bool obIsBreaker, float
     bool poiTouched = selectedOb ? obTouched : selectedFvg ? fvgTouched : false
     [poiValid, poiType, poiTop, poiBottom, poiEntry, poiBar, poiTouched]
 
-f_eng3_build_trade_plan(bool isBull, bool poiValid, string poiType, float poiTop, float poiBottom, float poiEntry, int poiCreatedBar, bool poiTouched, float execLiqHigh, float execLiqLow, float execEqHigh, float execEqLow, float ctxHigh, float ctxLow) =>
-    bool isBreaker = poiValid and poiType == "Breaker"
-    bool isOb = poiValid and (poiType == "OB" or isBreaker)
-    bool isFvg = poiValid and poiType == "FVG"
+f_eng3_build_trade_plan(bool isBull, bool poiValid, float poiTop, float poiBottom, float poiEntry, int poiCreatedBar, float execLiqHigh, float execLiqLow, float execEqHigh, float execEqLow, float ctxHigh, float ctxLow) =>
     float entry = poiValid ? poiEntry : na
     float slAtr = math.max(nz(sessRefAtr, atrSafe), syminfo.mintick)
     float stop = not na(entry) ? (isBull ? entry - slAtr : entry + slAtr) : na
@@ -1195,7 +1192,7 @@ f_eng3_build_trade_plan(bool isBull, bool poiValid, string poiType, float poiTop
         float risk = not na(stop) ? (isBull ? entry - stop : stop - entry) : na
         if na(target) and not na(risk) and risk > 0
             target := isBull ? entry + risk * 2.0 : entry - risk * 2.0
-    [entry, stop, target, poiValid ? poiTop : na, poiValid ? poiBottom : na, isOb, isFvg, poiValid ? poiCreatedBar : na, poiValid ? poiTouched : false]
+    [entry, stop, target, poiValid ? poiTop : na, poiValid ? poiBottom : na, poiValid ? poiCreatedBar : na]
 
 f_eng3_validate_narrative_side(bool bullSide, bool execValid, int narrBias, int ctxTrendBias, bool ctxBullReversal, bool ctxBearReversal) =>
     bool ctxNeutral = ctxTrendBias == 0 and not ctxBullReversal and not ctxBearReversal
@@ -3388,8 +3385,14 @@ bool strictShortPdArrayOwned = not strictModeEnabled or (poi_short_type == "FVG"
 bool poi_long_contract_valid = eng1BullContextAllowed and poi_long_candidate_valid and eng3LongActivePoiReady and strictLongPdArrayOwned and eng3LongActivePoiIdentity != eng3LongConsumedPoiIdentity
 bool poi_short_contract_valid = eng1BearContextAllowed and poi_short_candidate_valid and eng3ShortActivePoiReady and strictShortPdArrayOwned and eng3ShortActivePoiIdentity != eng3ShortConsumedPoiIdentity
 
-[tradeLongEntry, tradeLongStop, tradeLongTarget, tradeLongValidTop, tradeLongValidBottom, tradeLongIsOb, tradeLongIsFvg, tradeLongCreatedBar, tradeLongTouched] = f_eng3_build_trade_plan(true, poi_long_contract_valid, poi_long_type, poi_long_top, poi_long_bottom, poi_long_entry, poi_long_bar, poi_long_touched, eng1_exe_liq_high, eng1_exe_liq_low, eng1_exe_eqh_active ? eng1_exe_eqh : na, eng1_exe_eql_active ? eng1_exe_eql : na, eng1CtxRangeHigh, eng1CtxRangeLow)
-[tradeShortEntry, tradeShortStop, tradeShortTarget, tradeShortValidTop, tradeShortValidBottom, tradeShortIsOb, tradeShortIsFvg, tradeShortCreatedBar, tradeShortTouched] = f_eng3_build_trade_plan(false, poi_short_contract_valid, poi_short_type, poi_short_top, poi_short_bottom, poi_short_entry, poi_short_bar, poi_short_touched, eng1_exe_liq_high, eng1_exe_liq_low, eng1_exe_eqh_active ? eng1_exe_eqh : na, eng1_exe_eql_active ? eng1_exe_eql : na, eng1CtxRangeHigh, eng1CtxRangeLow)
+[tradeLongEntry, tradeLongStop, tradeLongTarget, tradeLongValidTop, tradeLongValidBottom, tradeLongCreatedBar] = f_eng3_build_trade_plan(true, poi_long_contract_valid, poi_long_top, poi_long_bottom, poi_long_entry, poi_long_bar, eng1_exe_liq_high, eng1_exe_liq_low, eng1_exe_eqh_active ? eng1_exe_eqh : na, eng1_exe_eql_active ? eng1_exe_eql : na, eng1CtxRangeHigh, eng1CtxRangeLow)
+[tradeShortEntry, tradeShortStop, tradeShortTarget, tradeShortValidTop, tradeShortValidBottom, tradeShortCreatedBar] = f_eng3_build_trade_plan(false, poi_short_contract_valid, poi_short_top, poi_short_bottom, poi_short_entry, poi_short_bar, eng1_exe_liq_high, eng1_exe_liq_low, eng1_exe_eqh_active ? eng1_exe_eqh : na, eng1_exe_eql_active ? eng1_exe_eql : na, eng1CtxRangeHigh, eng1CtxRangeLow)
+bool lOb = poi_long_contract_valid and (poi_long_type == "OB" or poi_long_type == "Breaker")
+bool lFvg = poi_long_contract_valid and poi_long_type == "FVG"
+bool lTch = poi_long_contract_valid and poi_long_touched
+bool sOb = poi_short_contract_valid and (poi_short_type == "OB" or poi_short_type == "Breaker")
+bool sFvg = poi_short_contract_valid and poi_short_type == "FVG"
+bool sTch = poi_short_contract_valid and poi_short_touched
 
 bool ipdaLongDolAvailable = strictModeEnabled and (not na(eng1_narr_liq_high) or not na(eng1_d1_lb20_high) or not na(eng1_d1_lb40_high) or not na(eng1_d1_lb60_high) or not na(eng1_narr_bear_sd_top) or not na(eng1_narr_bear_sd_bottom))
 bool ipdaShortDolAvailable = strictModeEnabled and (not na(eng1_narr_liq_low) or not na(eng1_d1_lb20_low) or not na(eng1_d1_lb40_low) or not na(eng1_d1_lb60_low) or not na(eng1_narr_bull_sd_top) or not na(eng1_narr_bull_sd_bottom))
@@ -3401,10 +3404,10 @@ bool longUsesExternalDolTarget = strictModeEnabled and longQualifiedExternalDol
 bool shortUsesExternalDolTarget = strictModeEnabled and shortQualifiedExternalDol
 float activeLongTarget = longUsesExternalDolTarget ? longDolExternal : tradeLongTarget
 float activeShortTarget = shortUsesExternalDolTarget ? shortDolExternal : tradeShortTarget
-bool exe_long_pd_pass = tradeLongIsOb ? bullObPdPass : tradeLongIsFvg ? bullFvgPdPass : false
-bool exe_short_pd_pass = tradeShortIsOb ? bearObPdPass : tradeShortIsFvg ? bearFvgPdPass : false
-bool exe_long_ote_pass = tradeLongIsOb ? bullObOtePass : tradeLongIsFvg ? bullFvgOtePass : false
-bool exe_short_ote_pass = tradeShortIsOb ? bearObOtePass : tradeShortIsFvg ? bearFvgOtePass : false
+bool exe_long_pd_pass = lOb ? bullObPdPass : lFvg ? bullFvgPdPass : false
+bool exe_short_pd_pass = sOb ? bearObPdPass : sFvg ? bearFvgPdPass : false
+bool exe_long_ote_pass = lOb ? bullObOtePass : lFvg ? bullFvgOtePass : false
+bool exe_short_ote_pass = sOb ? bearObOtePass : sFvg ? bearFvgOtePass : false
 bool exe_long_dol_pass = strictModeEnabled ? longQualifiedExternalDol : not na(activeLongTarget)
 bool exe_short_dol_pass = strictModeEnabled ? shortQualifiedExternalDol : not na(activeShortTarget)
 
@@ -3424,7 +3427,7 @@ if longSetupMissing or longSetupChanged
     eng2LongMitigatedEventTag := ""
 if not longSetupMissing
     longPoiMitigatedLatched := longPoiMitigatedLatched or f_eng3_poi_ce_touched(true, poi_long_type, tradeLongValidTop, tradeLongValidBottom, tradeLongEntry, eng3SignalHigh, eng3SignalLow) or f_eng3_poi_full_filled(true, tradeLongValidTop, tradeLongValidBottom, eng3SignalHigh, eng3SignalLow)
-    longPoiTappedLatched := longPoiTappedLatched or tradeLongTouched or longPoiMitigatedLatched
+    longPoiTappedLatched := longPoiTappedLatched or lTch or longPoiMitigatedLatched
     longPoiInvalidatedLatched := longPoiInvalidatedLatched or f_eng3_poi_invalidated(true, tradeLongValidTop, tradeLongValidBottom, eng3SignalClose)
 bool longChased = not longPoiMitigatedLatched and not na(tradeLongValidTop) and not na(eng3SignalClose) and eng3SignalClose > tradeLongValidTop + atrSafe * setupChaseAtr
 float execBarRange = eng3ClosedFallbackAllowed ? eng3ExecHigh - eng3ExecLow : na
@@ -3446,13 +3449,13 @@ bool effectiveLongDisplacementSeen = strictModeEnabled ? strictLongDisplacementM
 bool effectiveLongStructureInvalidated = longPoiInvalidatedLatched or (displayExecBias == -1 and (displayCtxBias == -1 or eng1_ctx_bear_reversal or eng1_exe_bear_mss))
 bool normalLongDirectionalContext = displayCtxBias != -1 and (displayExecBias == 1 or effectiveLongDirectional or eng1_ctx_bull_reversal or eng1_ctx_bull_breakout)
 bool normalLongBiasPass = eng1_exec_valid
-bool normalLongContextPass = (tradeLongIsOb or tradeLongIsFvg) and normalLongDirectionalContext
+bool normalLongContextPass = (lOb or lFvg) and normalLongDirectionalContext
 bool normalLongTargetPass = not na(activeLongTarget)
 // Strict adds IPDA timing/DOL/OTE; normal stays OB/FVG + direction + MSS/disp + retest.
 bool strictLongBiasPass = not strictModeEnabled or (displayNarrBias == 1 and ipdaLongDolAvailable)
 bool strictLongDirectionalPass = not strictModeEnabled or displayExecBias == 1 or (displayExecBias == 0 and (strictLongMssMemoryPass or strictLongDisplacementMemoryPass))
-bool strictLongContextTfPass = not strictModeEnabled or ((displayCtxBias == 1 or eng1_ctx_bull_reversal or eng1_ctx_bull_breakout or (displayCtxBias == 0 and strictLongDirectionalPass)) and (tradeLongIsOb or tradeLongIsFvg))
-bool exe_long_sweep_signal = strictModeEnabled ? strictLongSweepMemoryPass : (eng1_exe_bull_sweep or longPriceInZone or longPriceNearZone or tradeLongTouched)
+bool strictLongContextTfPass = not strictModeEnabled or ((displayCtxBias == 1 or eng1_ctx_bull_reversal or eng1_ctx_bull_breakout or (displayCtxBias == 0 and strictLongDirectionalPass)) and (lOb or lFvg))
+bool exe_long_sweep_signal = strictModeEnabled ? strictLongSweepMemoryPass : (eng1_exe_bull_sweep or longPriceInZone or longPriceNearZone or lTch)
 bool exe_long_mss_signal = strictModeEnabled ? strictLongMssMemoryPass : effectiveLongMssSeen
 bool exe_long_displacement_signal = strictModeEnabled ? strictLongDisplacementMemoryPass : effectiveLongDisplacementSeen
 bool strictLongSweepPass = not strictModeEnabled or strictLongSweepMemoryPass
@@ -3462,14 +3465,14 @@ bool strictLongPdPass = not strictModeEnabled or exe_long_pd_pass
 bool strictLongOtePass = not strictModeEnabled or exe_long_ote_pass
 bool strictLongDolPass = not strictModeEnabled or exe_long_dol_pass
 bool strictLongKillzonePass = not strictModeEnabled or strictKillzoneActive
-bool longPoiRetestPass = longPriceInZone or longPriceNearZone or tradeLongTouched
+bool longPoiRetestPass = longPriceInZone or longPriceNearZone or lTch
 bool longEvidencePass = exe_long_mss_signal or exe_long_displacement_signal
 bool longHardSignalGate = strictModeEnabled ? (not na(tradeLongEntry) and strictLongBiasPass and strictLongContextTfPass and strictLongPdPass and strictLongOtePass and strictLongDolPass and strictLongKillzonePass and not longPoiInvalidatedLatched) : (not na(tradeLongEntry) and normalLongBiasPass and normalLongContextPass and normalLongTargetPass and longPoiRetestPass and longEvidencePass and not longPoiInvalidatedLatched)
 bool longScoreTargetClear = longHardSignalGate ? f_eng3_target_liquidity_clear(activeLongTarget, eng1_exe_liq_high, eng1_exe_eqh_active ? eng1_exe_eqh : na, eng1CtxRangeHigh, longUsesExternalDolTarget) : false
 bool scoreVolDrop = not na(volume) and not na(volume[1]) and volume < volume[1]
 bool longScoreHtfPenalty = longHardSignalGate ? (eng1_narr_strength == "Strong" and displayNarrBias == -1) : false
 bool longScorePdPenalty = longHardSignalGate ? (not na(tradeLongEntry) and eng1CtxRangeReady and not na(eng1CtxEquilibrium) and tradeLongEntry > eng1CtxEquilibrium) : false
-bool longScoreFvgPenalty = longHardSignalGate ? (tradeLongIsFvg and (longPoiMitigatedLatched or longChased)) : false
+bool longScoreFvgPenalty = longHardSignalGate ? (lFvg and (longPoiMitigatedLatched or longChased)) : false
 bool longScoreVolumeBonus = longHardSignalGate and longPoiRetestPass and scoreVolDrop
 int longSignalScore = longHardSignalGate ? f_eng3_dynamic_signal_score(effectiveLongSweepSeen, exe_long_displacement_signal, exe_long_mss_signal, hasBullFvg, exe_long_pd_pass, strictKillzoneActive, longScoreTargetClear, longScoreHtfPenalty, longScorePdPenalty, longScoreFvgPenalty) + (longScoreVolumeBonus ? 1 : 0) : 0
 bool exe_long_contract_confirm = strictModeEnabled ? (strictLongBiasPass and strictLongContextTfPass and strictLongSweepPass and strictLongMssPass and strictLongDisplacementPass and strictLongPdPass and strictLongOtePass and strictLongDolPass and strictLongKillzonePass) : longSignalScore >= 6
@@ -3504,7 +3507,7 @@ if shortSetupMissing or shortSetupChanged
     eng2ShortMitigatedEventTag := ""
 if not shortSetupMissing
     shortPoiMitigatedLatched := shortPoiMitigatedLatched or f_eng3_poi_ce_touched(false, poi_short_type, tradeShortValidTop, tradeShortValidBottom, tradeShortEntry, eng3SignalHigh, eng3SignalLow) or f_eng3_poi_full_filled(false, tradeShortValidTop, tradeShortValidBottom, eng3SignalHigh, eng3SignalLow)
-    shortPoiTappedLatched := shortPoiTappedLatched or tradeShortTouched or shortPoiMitigatedLatched
+    shortPoiTappedLatched := shortPoiTappedLatched or sTch or shortPoiMitigatedLatched
     shortPoiInvalidatedLatched := shortPoiInvalidatedLatched or f_eng3_poi_invalidated(false, tradeShortValidTop, tradeShortValidBottom, eng3SignalClose)
 bool shortChased = not shortPoiMitigatedLatched and not na(tradeShortValidBottom) and not na(eng3SignalClose) and eng3SignalClose < tradeShortValidBottom - atrSafe * setupChaseAtr
 bool effectiveShortDirectional = displayExecBias == -1 or shortDirectionalFallback
@@ -3522,12 +3525,12 @@ bool effectiveShortDisplacementSeen = strictModeEnabled ? strictShortDisplacemen
 bool effectiveShortStructureInvalidated = shortPoiInvalidatedLatched or (displayExecBias == 1 and (displayCtxBias == 1 or eng1_ctx_bull_reversal or eng1_exe_bull_mss))
 bool normalShortDirectionalContext = displayCtxBias != 1 and (displayExecBias == -1 or effectiveShortDirectional or eng1_ctx_bear_reversal or eng1_ctx_bear_breakout)
 bool normalShortBiasPass = eng1_exec_valid
-bool normalShortContextPass = (tradeShortIsOb or tradeShortIsFvg) and normalShortDirectionalContext
+bool normalShortContextPass = (sOb or sFvg) and normalShortDirectionalContext
 bool normalShortTargetPass = not na(activeShortTarget)
 bool strictShortBiasPass = not strictModeEnabled or (displayNarrBias == -1 and ipdaShortDolAvailable)
 bool strictShortDirectionalPass = not strictModeEnabled or displayExecBias == -1 or (displayExecBias == 0 and (strictShortMssMemoryPass or strictShortDisplacementMemoryPass))
-bool strictShortContextTfPass = not strictModeEnabled or ((displayCtxBias == -1 or eng1_ctx_bear_reversal or eng1_ctx_bear_breakout or (displayCtxBias == 0 and strictShortDirectionalPass)) and (tradeShortIsOb or tradeShortIsFvg))
-bool exe_short_sweep_signal = strictModeEnabled ? strictShortSweepMemoryPass : (eng1_exe_bear_sweep or shortPriceInZone or shortPriceNearZone or tradeShortTouched)
+bool strictShortContextTfPass = not strictModeEnabled or ((displayCtxBias == -1 or eng1_ctx_bear_reversal or eng1_ctx_bear_breakout or (displayCtxBias == 0 and strictShortDirectionalPass)) and (sOb or sFvg))
+bool exe_short_sweep_signal = strictModeEnabled ? strictShortSweepMemoryPass : (eng1_exe_bear_sweep or shortPriceInZone or shortPriceNearZone or sTch)
 bool exe_short_mss_signal = strictModeEnabled ? strictShortMssMemoryPass : effectiveShortMssSeen
 bool exe_short_displacement_signal = strictModeEnabled ? strictShortDisplacementMemoryPass : effectiveShortDisplacementSeen
 bool strictShortSweepPass = not strictModeEnabled or strictShortSweepMemoryPass
@@ -3537,13 +3540,13 @@ bool strictShortPdPass = not strictModeEnabled or exe_short_pd_pass
 bool strictShortOtePass = not strictModeEnabled or exe_short_ote_pass
 bool strictShortDolPass = not strictModeEnabled or exe_short_dol_pass
 bool strictShortKillzonePass = not strictModeEnabled or strictKillzoneActive
-bool shortPoiRetestPass = shortPriceInZone or shortPriceNearZone or tradeShortTouched
+bool shortPoiRetestPass = shortPriceInZone or shortPriceNearZone or sTch
 bool shortEvidencePass = exe_short_mss_signal or exe_short_displacement_signal
 bool shortHardSignalGate = strictModeEnabled ? (not na(tradeShortEntry) and strictShortBiasPass and strictShortContextTfPass and strictShortPdPass and strictShortOtePass and strictShortDolPass and strictShortKillzonePass and not shortPoiInvalidatedLatched) : (not na(tradeShortEntry) and normalShortBiasPass and normalShortContextPass and normalShortTargetPass and shortPoiRetestPass and shortEvidencePass and not shortPoiInvalidatedLatched)
 bool shortScoreTargetClear = shortHardSignalGate ? f_eng3_target_liquidity_clear(activeShortTarget, eng1_exe_liq_low, eng1_exe_eql_active ? eng1_exe_eql : na, eng1CtxRangeLow, shortUsesExternalDolTarget) : false
 bool shortScoreHtfPenalty = shortHardSignalGate ? (eng1_narr_strength == "Strong" and displayNarrBias == 1) : false
 bool shortScorePdPenalty = shortHardSignalGate ? (not na(tradeShortEntry) and eng1CtxRangeReady and not na(eng1CtxEquilibrium) and tradeShortEntry < eng1CtxEquilibrium) : false
-bool shortScoreFvgPenalty = shortHardSignalGate ? (tradeShortIsFvg and (shortPoiMitigatedLatched or shortChased)) : false
+bool shortScoreFvgPenalty = shortHardSignalGate ? (sFvg and (shortPoiMitigatedLatched or shortChased)) : false
 bool shortScoreVolumeBonus = shortHardSignalGate and shortPoiRetestPass and scoreVolDrop
 int shortSignalScore = shortHardSignalGate ? f_eng3_dynamic_signal_score(effectiveShortSweepSeen, exe_short_displacement_signal, exe_short_mss_signal, hasBearFvg, exe_short_pd_pass, strictKillzoneActive, shortScoreTargetClear, shortScoreHtfPenalty, shortScorePdPenalty, shortScoreFvgPenalty) + (shortScoreVolumeBonus ? 1 : 0) : 0
 bool exe_short_contract_confirm = strictModeEnabled ? (strictShortBiasPass and strictShortContextTfPass and strictShortSweepPass and strictShortMssPass and strictShortDisplacementPass and strictShortPdPass and strictShortOtePass and strictShortDolPass and strictShortKillzonePass) : shortSignalScore >= 6
@@ -3570,15 +3573,15 @@ bool dashShortTriggerDisplacementOk = strictModeEnabled ? strictShortDisplacemen
 // while the score only ranks confluence quality. Volume and value acceptance
 // are one-point bonuses, not mandatory AVP-style gates, so normal mode remains
 // simple and non-overfit.
-bool longZoneQualityResponsePass = strictModeEnabled ? (exe_long_pd_pass and exe_long_ote_pass) : (longPriceInZone or longPriceNearZone or tradeLongTouched or exe_long_pd_pass)
-bool shortZoneQualityResponsePass = strictModeEnabled ? (exe_short_pd_pass and exe_short_ote_pass) : (shortPriceInZone or shortPriceNearZone or tradeShortTouched or exe_short_pd_pass)
+bool longZoneQualityResponsePass = strictModeEnabled ? (exe_long_pd_pass and exe_long_ote_pass) : (longPriceInZone or longPriceNearZone or lTch or exe_long_pd_pass)
+bool shortZoneQualityResponsePass = strictModeEnabled ? (exe_short_pd_pass and exe_short_ote_pass) : (shortPriceInZone or shortPriceNearZone or sTch or exe_short_pd_pass)
 bool longLifecycleDirectionalPass = strictModeEnabled ? strictLongDirectionalPass : effectiveLongDirectional
 bool shortLifecycleDirectionalPass = strictModeEnabled ? strictShortDirectionalPass : effectiveShortDirectional
 bool longLifecycleBasePass = longArmedLatched or (not na(tradeLongEntry) and longLifecycleDirectionalPass and effectiveLongMssSeen and (effectiveLongSweepSeen or longPriceInZone or longPriceNearZone))
 bool shortLifecycleBasePass = shortArmedLatched or (not na(tradeShortEntry) and shortLifecycleDirectionalPass and effectiveShortMssSeen and (effectiveShortSweepSeen or shortPriceInZone or shortPriceNearZone))
 float contextDepartureRange = eng1CtxRangeReady ? eng1CtxRangeHigh - eng1CtxRangeLow : na
-bool longZoneOverlapBonus = (tradeLongIsOb or tradeLongIsFvg) and hasBullOb and hasBullFvg and f_zoneIntersects(ctxBullObTop, ctxBullObBottom, ctxBullFvgTop, ctxBullFvgBottom)
-bool shortZoneOverlapBonus = (tradeShortIsOb or tradeShortIsFvg) and hasBearOb and hasBearFvg and f_zoneIntersects(ctxBearObTop, ctxBearObBottom, ctxBearFvgTop, ctxBearFvgBottom)
+bool longZoneOverlapBonus = (lOb or lFvg) and hasBullOb and hasBullFvg and f_zoneIntersects(ctxBullObTop, ctxBullObBottom, ctxBullFvgTop, ctxBullFvgBottom)
+bool shortZoneOverlapBonus = (sOb or sFvg) and hasBearOb and hasBearFvg and f_zoneIntersects(ctxBearObTop, ctxBearObBottom, ctxBearFvgTop, ctxBearFvgBottom)
 int longZoneResponseScore = (not na(tradeLongEntry) ? (longZoneQualityResponsePass ? 2 : 1) : 0) + (longZoneOverlapBonus ? 1 : 0)
 int shortZoneResponseScore = (not na(tradeShortEntry) ? (shortZoneQualityResponsePass ? 2 : 1) : 0) + (shortZoneOverlapBonus ? 1 : 0)
 int longZoneDisplacementScore = effectiveLongDisplacementSeen ? 2 : 0
@@ -3650,8 +3653,8 @@ else
 // produced zone, confirmations, trade plan, and lifecycle snapshots.
 //------------------------------------------------------------------------------
 
-bool longDrawSel = longSelectedVisualActive and ((tradeLongIsOb and showOb) or (tradeLongIsFvg and showFvg))
-bool shortDrawSel = shortSelectedVisualActive and ((tradeShortIsOb and showOb) or (tradeShortIsFvg and showFvg))
+bool longDrawSel = longSelectedVisualActive and ((lOb and showOb) or (lFvg and showFvg))
+bool shortDrawSel = shortSelectedVisualActive and ((sOb and showOb) or (sFvg and showFvg))
 float longZoneTop = longDrawSel ? tradeLongValidTop : na
 float longZoneBot = longDrawSel ? tradeLongValidBottom : na
 float shortZoneTop = shortDrawSel ? tradeShortValidTop : na
@@ -3667,24 +3670,24 @@ if longTerminalSnapshot
     eng2LongHistoryRightBar := bar_index
     eng2LongHistoryTop := tradeLongValidTop
     eng2LongHistoryBottom := tradeLongValidBottom
-    eng2LongHistoryIsOb := tradeLongIsOb
-    eng2LongHistoryIsFvg := tradeLongIsFvg
+    eng2LongHistoryIsOb := lOb
+    eng2LongHistoryIsFvg := lFvg
 if shortTerminalSnapshot
     eng2ShortHistoryTag := currentShortSetupTag
     eng2ShortHistoryLeftBar := f_createdBarFallback(tradeShortCreatedBar)
     eng2ShortHistoryRightBar := bar_index
     eng2ShortHistoryTop := tradeShortValidTop
     eng2ShortHistoryBottom := tradeShortValidBottom
-    eng2ShortHistoryIsOb := tradeShortIsOb
-    eng2ShortHistoryIsFvg := tradeShortIsFvg
+    eng2ShortHistoryIsOb := sOb
+    eng2ShortHistoryIsFvg := sFvg
 
 bool histOn = eng1_exec_valid and draw_full and (showOb or showFvg) and not compactMode
 // Full audit can show raw context OB/FVG, but Engine 3 remains the sole POI owner.
 bool ctxOn = histOn
-bool lLiveBO = showLongLiveZone and tradeLongIsOb and f_eng2_same_zone_visual(eng1_ctx_bull_ob_top, eng1_ctx_bull_ob_bottom, eng1BullObCreatedBar, longZoneTop, longZoneBot, tradeLongCreatedBar)
-bool lLiveBF = showLongLiveZone and tradeLongIsFvg and f_eng2_same_zone_visual(eng1_ctx_bull_fvg_top, eng1_ctx_bull_fvg_bottom, eng1BullFvgCreatedBar, longZoneTop, longZoneBot, tradeLongCreatedBar)
-bool sLiveBO = showShortLiveZone and tradeShortIsOb and f_eng2_same_zone_visual(eng1_ctx_bear_ob_top, eng1_ctx_bear_ob_bottom, eng1BearObCreatedBar, shortZoneTop, shortZoneBot, tradeShortCreatedBar)
-bool sLiveBF = showShortLiveZone and tradeShortIsFvg and f_eng2_same_zone_visual(eng1_ctx_bear_fvg_top, eng1_ctx_bear_fvg_bottom, eng1BearFvgCreatedBar, shortZoneTop, shortZoneBot, tradeShortCreatedBar)
+bool lLiveBO = showLongLiveZone and lOb and f_eng2_same_zone_visual(eng1_ctx_bull_ob_top, eng1_ctx_bull_ob_bottom, eng1BullObCreatedBar, longZoneTop, longZoneBot, tradeLongCreatedBar)
+bool lLiveBF = showLongLiveZone and lFvg and f_eng2_same_zone_visual(eng1_ctx_bull_fvg_top, eng1_ctx_bull_fvg_bottom, eng1BullFvgCreatedBar, longZoneTop, longZoneBot, tradeLongCreatedBar)
+bool sLiveBO = showShortLiveZone and sOb and f_eng2_same_zone_visual(eng1_ctx_bear_ob_top, eng1_ctx_bear_ob_bottom, eng1BearObCreatedBar, shortZoneTop, shortZoneBot, tradeShortCreatedBar)
+bool sLiveBF = showShortLiveZone and sFvg and f_eng2_same_zone_visual(eng1_ctx_bear_fvg_top, eng1_ctx_bear_fvg_bottom, eng1BearFvgCreatedBar, shortZoneTop, shortZoneBot, tradeShortCreatedBar)
 bool lCtxBO = ctxOn and showOb and not na(eng1_ctx_bull_ob_top) and not na(eng1_ctx_bull_ob_bottom) and not lLiveBO
 bool lCtxBF = ctxOn and showFvg and not na(eng1_ctx_bull_fvg_top) and not na(eng1_ctx_bull_fvg_bottom) and not lLiveBF
 bool sCtxBO = ctxOn and showOb and not na(eng1_ctx_bear_ob_top) and not na(eng1_ctx_bear_ob_bottom) and not sLiveBO
@@ -3701,13 +3704,13 @@ int sHBar = eng2ShortHistoryLeftBar
 bool lHistType = (eng2LongHistoryIsOb and showOb) or (eng2LongHistoryIsFvg and showFvg)
 bool sHistType = (eng2ShortHistoryIsOb and showOb) or (eng2ShortHistoryIsFvg and showFvg)
 bool lHistCand = histOn and eng2LongHistoryTag != "" and not na(lHTop) and not na(lHBot) and lHistType and not f_eng3_poi_invalidated(true, lHTop, lHBot, eng3SignalClose)
-bool lHistLive = f_eng2_matches_history_zone(showLongLiveZone, (eng2LongHistoryIsOb and tradeLongIsOb) or (eng2LongHistoryIsFvg and tradeLongIsFvg), longZoneTop, longZoneBot, tradeLongCreatedBar, lHTop, lHBot, lHBar)
+bool lHistLive = f_eng2_matches_history_zone(showLongLiveZone, (eng2LongHistoryIsOb and lOb) or (eng2LongHistoryIsFvg and lFvg), longZoneTop, longZoneBot, tradeLongCreatedBar, lHTop, lHBot, lHBar)
 bool lHistBO = f_eng2_matches_history_zone(lCtxBO and eng2LongHistoryIsOb, true, eng1_ctx_bull_ob_top, eng1_ctx_bull_ob_bottom, eng1BullObCreatedBar, lHTop, lHBot, lHBar)
 bool lHistBF = f_eng2_matches_history_zone(lCtxBF and eng2LongHistoryIsFvg, true, eng1_ctx_bull_fvg_top, eng1_ctx_bull_fvg_bottom, eng1BullFvgCreatedBar, lHTop, lHBot, lHBar)
 bool lHistHide = lHistLive or lHistBO or lHistBF
 bool showLHistZone = lHistCand and not lHistHide
 bool sHistCand = histOn and eng2ShortHistoryTag != "" and not na(sHTop) and not na(sHBot) and sHistType and not f_eng3_poi_invalidated(false, sHTop, sHBot, eng3SignalClose)
-bool sHistLive = f_eng2_matches_history_zone(showShortLiveZone, (eng2ShortHistoryIsOb and tradeShortIsOb) or (eng2ShortHistoryIsFvg and tradeShortIsFvg), shortZoneTop, shortZoneBot, tradeShortCreatedBar, sHTop, sHBot, sHBar)
+bool sHistLive = f_eng2_matches_history_zone(showShortLiveZone, (eng2ShortHistoryIsOb and sOb) or (eng2ShortHistoryIsFvg and sFvg), shortZoneTop, shortZoneBot, tradeShortCreatedBar, sHTop, sHBot, sHBar)
 bool sHistBO = f_eng2_matches_history_zone(sCtxBO and eng2ShortHistoryIsOb, true, eng1_ctx_bear_ob_top, eng1_ctx_bear_ob_bottom, eng1BearObCreatedBar, sHTop, sHBot, sHBar)
 bool sHistBF = f_eng2_matches_history_zone(sCtxBF and eng2ShortHistoryIsFvg, true, eng1_ctx_bear_fvg_top, eng1_ctx_bear_fvg_bottom, eng1BearFvgCreatedBar, sHTop, sHBot, sHBar)
 bool sHistHide = sHistLive or sHistBO or sHistBF
@@ -3715,8 +3718,8 @@ bool showSHistZone = sHistCand and not sHistHide
 // Keep terminal history snapshots frozen so old zones do not read as live POI.
 string lzBad = f_executionStateBadge(longExecutionState, compactMode)
 string szBad = f_executionStateBadge(shortExecutionState, compactMode)
-string lzBase = longDrawSel ? (tradeLongIsOb ? f_obLabelText(true, eng1_ctx_bull_ob_breaker) : tradeLongIsFvg ? "FVG" : "") : ""
-string szBase = shortDrawSel ? (tradeShortIsOb ? f_obLabelText(false, eng1_ctx_bear_ob_breaker) : tradeShortIsFvg ? "FVG" : "") : ""
+string lzBase = longDrawSel ? (lOb ? f_obLabelText(true, eng1_ctx_bull_ob_breaker) : lFvg ? "FVG" : "") : ""
+string szBase = shortDrawSel ? (sOb ? f_obLabelText(false, eng1_ctx_bear_ob_breaker) : sFvg ? "FVG" : "") : ""
 string lzText = f_eng2_zone_label_text(lzBase, longPoiLifecycle, poi_long_type, lzBad, longZoneQualityText)
 string szText = f_eng2_zone_label_text(szBase, shortPoiLifecycle, poi_short_type, szBad, shortZoneQualityText)
 int lzBw = longPoiMitigated ? 1 : math.max(f_zoneQualityBorderWidth(longZoneQualityText), longExecutionActive ? 3 : 2)
@@ -3756,12 +3759,12 @@ if lastBar and ctxNeedSync
 bool lLiveSync = showLongLiveZone or not na(eng2LongZoneBox) or not na(eng2LongZoneLine) or not na(eng2LongZoneLabel)
 bool sLiveSync = showShortLiveZone or not na(eng2ShortZoneBox) or not na(eng2ShortZoneLine) or not na(eng2ShortZoneLabel)
 if lastBar and lLiveSync
-    [lzb, lzl, lzlab] = f_eng2_syncLiveZone(eng2LongZoneBox, eng2LongZoneLine, eng2LongZoneLabel, showLongLiveZone, tradeLongCreatedBar, longZoneTop, longZoneBot, tradeLongEntry, lzText, tradeLongIsOb ? label.style_label_right : label.style_label_left, lzBrd, lzFill, lzBw, tradeLongIsOb or tradeLongIsFvg, longExecutionState)
+    [lzb, lzl, lzlab] = f_eng2_syncLiveZone(eng2LongZoneBox, eng2LongZoneLine, eng2LongZoneLabel, showLongLiveZone, tradeLongCreatedBar, longZoneTop, longZoneBot, tradeLongEntry, lzText, lOb ? label.style_label_right : label.style_label_left, lzBrd, lzFill, lzBw, lOb or lFvg, longExecutionState)
     eng2LongZoneBox := lzb
     eng2LongZoneLine := lzl
     eng2LongZoneLabel := lzlab
 if lastBar and sLiveSync
-    [szb, szl, szlab] = f_eng2_syncLiveZone(eng2ShortZoneBox, eng2ShortZoneLine, eng2ShortZoneLabel, showShortLiveZone, tradeShortCreatedBar, shortZoneTop, shortZoneBot, tradeShortEntry, szText, tradeShortIsOb ? label.style_label_right : label.style_label_left, szBrd, szFill, szBw, tradeShortIsOb or tradeShortIsFvg, shortExecutionState)
+    [szb, szl, szlab] = f_eng2_syncLiveZone(eng2ShortZoneBox, eng2ShortZoneLine, eng2ShortZoneLabel, showShortLiveZone, tradeShortCreatedBar, shortZoneTop, shortZoneBot, tradeShortEntry, szText, sOb ? label.style_label_right : label.style_label_left, szBrd, szFill, szBw, sOb or sFvg, shortExecutionState)
     eng2ShortZoneBox := szb
     eng2ShortZoneLine := szl
     eng2ShortZoneLabel := szlab
