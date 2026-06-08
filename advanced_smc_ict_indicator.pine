@@ -1446,6 +1446,9 @@ f_eng1_build_structure_liquidity(array<int> arrT, array<float> arrH, array<float
                 eqhActive := eqhActive and array.get(arrH, i) <= eqh
                 if not eqhActive
                     break
+    if not eqhActive
+        eqh := na
+        eqhBar := na
     if not na(lastLow) and not na(prevLow) and not na(lastLowIdx) and not na(prevLowIdx) and math.abs(lastLow - prevLow) <= tolerance
         eql := math.min(lastLow, prevLow)
         int eqlAnchorIdx = math.min(lastLowIdx, prevLowIdx)
@@ -1456,8 +1459,11 @@ f_eng1_build_structure_liquidity(array<int> arrT, array<float> arrH, array<float
                 eqlActive := eqlActive and array.get(arrL, i) >= eql
                 if not eqlActive
                     break
+    if not eqlActive
+        eql := na
+        eqlBar := na
 
-    [lastHigh, lastHighBar, lastLow, lastLowBar, structureBiasLocal, eqh, eqhBar, eql, eqlBar, eqhActive, eqlActive]
+    [lastHigh, lastHighBar, lastLow, lastLowBar, structureBiasLocal, eqh, eqhBar, eql, eqlBar]
 
 f_eng1_structure_break_signals(float lastHigh, float lastLow, int priorStructureBias, array<float> arrC) =>
     bool bullBos = false
@@ -2319,7 +2325,7 @@ if eng1_any_new_closed_bar or barstate.isfirst
     int eng1_h4_prior_trend_bias = eng1_h4_trend_bias
     int eng1_d1_prior_trend_bias = eng1_d1_trend_bias
     if recalc_m1
-        [eng1_m1_last_swing_high_tmp, eng1_m1_last_swing_high_bar_tmp, eng1_m1_last_swing_low_tmp, eng1_m1_last_swing_low_bar_tmp, eng1_m1_trend_bias_tmp, eng1_m1_eqh_tmp, _, eng1_m1_eql_tmp, _, eng1_m1_eqh_active_tmp, eng1_m1_eql_active_tmp] = f_eng1_build_structure_liquidity(eng1_buf_m1_time, eng1_buf_m1_high, eng1_buf_m1_low, eng1_buf_m1_close, ENG1_SWING_LEN)
+        [eng1_m1_last_swing_high_tmp, eng1_m1_last_swing_high_bar_tmp, eng1_m1_last_swing_low_tmp, eng1_m1_last_swing_low_bar_tmp, eng1_m1_trend_bias_tmp, eng1_m1_eqh_tmp, _, eng1_m1_eql_tmp, _] = f_eng1_build_structure_liquidity(eng1_buf_m1_time, eng1_buf_m1_high, eng1_buf_m1_low, eng1_buf_m1_close, ENG1_SWING_LEN)
         eng1_m1_last_swing_high := eng1_m1_last_swing_high_tmp
         eng1_m1_last_swing_high_bar := eng1_m1_last_swing_high_bar_tmp
         eng1_m1_last_swing_low := eng1_m1_last_swing_low_tmp
@@ -2327,11 +2333,11 @@ if eng1_any_new_closed_bar or barstate.isfirst
         eng1_m1_trend_bias := eng1_m1_trend_bias_tmp
         eng1_m1_eqh := eng1_m1_eqh_tmp
         eng1_m1_eql := eng1_m1_eql_tmp
-        eng1_m1_eqh_active := eng1_m1_eqh_active_tmp
-        eng1_m1_eql_active := eng1_m1_eql_active_tmp
+        eng1_m1_eqh_active := not na(eng1_m1_eqh_tmp)
+        eng1_m1_eql_active := not na(eng1_m1_eql_tmp)
 
     if recalc_m5
-        [eng1_m5_last_swing_high_tmp, eng1_m5_last_swing_high_bar_tmp, eng1_m5_last_swing_low_tmp, eng1_m5_last_swing_low_bar_tmp, eng1_m5_trend_bias_tmp, eng1_m5_eqh_tmp, eng1_m5_eqh_bar_tmp, eng1_m5_eql_tmp, eng1_m5_eql_bar_tmp, eng1_m5_eqh_active_tmp, eng1_m5_eql_active_tmp] = f_eng1_build_structure_liquidity(eng1_buf_m5_time, eng1_buf_m5_high, eng1_buf_m5_low, eng1_buf_m5_close, ENG1_SWING_LEN)
+        [eng1_m5_last_swing_high_tmp, eng1_m5_last_swing_high_bar_tmp, eng1_m5_last_swing_low_tmp, eng1_m5_last_swing_low_bar_tmp, eng1_m5_trend_bias_tmp, eng1_m5_eqh_tmp, eng1_m5_eqh_bar_tmp, eng1_m5_eql_tmp, eng1_m5_eql_bar_tmp] = f_eng1_build_structure_liquidity(eng1_buf_m5_time, eng1_buf_m5_high, eng1_buf_m5_low, eng1_buf_m5_close, ENG1_SWING_LEN)
         eng1_m5_last_swing_high := eng1_m5_last_swing_high_tmp
         eng1_m5_last_swing_high_bar := eng1_m5_last_swing_high_bar_tmp
         eng1_m5_last_swing_low := eng1_m5_last_swing_low_tmp
@@ -2341,11 +2347,11 @@ if eng1_any_new_closed_bar or barstate.isfirst
         eng1_m5_eqh_bar := eng1_m5_eqh_bar_tmp
         eng1_m5_eql := eng1_m5_eql_tmp
         eng1_m5_eql_bar := eng1_m5_eql_bar_tmp
-        eng1_m5_eqh_active := eng1_m5_eqh_active_tmp
-        eng1_m5_eql_active := eng1_m5_eql_active_tmp
+        eng1_m5_eqh_active := not na(eng1_m5_eqh_tmp)
+        eng1_m5_eql_active := not na(eng1_m5_eql_tmp)
 
     if recalc_m15
-        [eng1_m15_last_swing_high_tmp, eng1_m15_last_swing_high_bar_tmp, eng1_m15_last_swing_low_tmp, eng1_m15_last_swing_low_bar_tmp, eng1_m15_trend_bias_tmp, eng1_m15_eqh_tmp, eng1_m15_eqh_bar_tmp, eng1_m15_eql_tmp, eng1_m15_eql_bar_tmp, eng1_m15_eqh_active_tmp, eng1_m15_eql_active_tmp] = f_eng1_build_structure_liquidity(eng1_buf_m15_time, eng1_buf_m15_high, eng1_buf_m15_low, eng1_buf_m15_close, ENG1_SWING_LEN)
+        [eng1_m15_last_swing_high_tmp, eng1_m15_last_swing_high_bar_tmp, eng1_m15_last_swing_low_tmp, eng1_m15_last_swing_low_bar_tmp, eng1_m15_trend_bias_tmp, eng1_m15_eqh_tmp, eng1_m15_eqh_bar_tmp, eng1_m15_eql_tmp, eng1_m15_eql_bar_tmp] = f_eng1_build_structure_liquidity(eng1_buf_m15_time, eng1_buf_m15_high, eng1_buf_m15_low, eng1_buf_m15_close, ENG1_SWING_LEN)
         eng1_m15_last_swing_high := eng1_m15_last_swing_high_tmp
         eng1_m15_last_swing_high_bar := eng1_m15_last_swing_high_bar_tmp
         eng1_m15_last_swing_low := eng1_m15_last_swing_low_tmp
@@ -2355,11 +2361,11 @@ if eng1_any_new_closed_bar or barstate.isfirst
         eng1_m15_eqh_bar := eng1_m15_eqh_bar_tmp
         eng1_m15_eql := eng1_m15_eql_tmp
         eng1_m15_eql_bar := eng1_m15_eql_bar_tmp
-        eng1_m15_eqh_active := eng1_m15_eqh_active_tmp
-        eng1_m15_eql_active := eng1_m15_eql_active_tmp
+        eng1_m15_eqh_active := not na(eng1_m15_eqh_tmp)
+        eng1_m15_eql_active := not na(eng1_m15_eql_tmp)
 
     if recalc_m30
-        [eng1_m30_last_swing_high_tmp, eng1_m30_last_swing_high_bar_tmp, eng1_m30_last_swing_low_tmp, eng1_m30_last_swing_low_bar_tmp, eng1_m30_trend_bias_tmp, eng1_m30_eqh_tmp, eng1_m30_eqh_bar_tmp, eng1_m30_eql_tmp, eng1_m30_eql_bar_tmp, eng1_m30_eqh_active_tmp, eng1_m30_eql_active_tmp] = f_eng1_build_structure_liquidity(eng1_buf_m30_time, eng1_buf_m30_high, eng1_buf_m30_low, eng1_buf_m30_close, ENG1_SWING_LEN)
+        [eng1_m30_last_swing_high_tmp, eng1_m30_last_swing_high_bar_tmp, eng1_m30_last_swing_low_tmp, eng1_m30_last_swing_low_bar_tmp, eng1_m30_trend_bias_tmp, eng1_m30_eqh_tmp, eng1_m30_eqh_bar_tmp, eng1_m30_eql_tmp, eng1_m30_eql_bar_tmp] = f_eng1_build_structure_liquidity(eng1_buf_m30_time, eng1_buf_m30_high, eng1_buf_m30_low, eng1_buf_m30_close, ENG1_SWING_LEN)
         eng1_m30_last_swing_high := eng1_m30_last_swing_high_tmp
         eng1_m30_last_swing_high_bar := eng1_m30_last_swing_high_bar_tmp
         eng1_m30_last_swing_low := eng1_m30_last_swing_low_tmp
@@ -2369,11 +2375,11 @@ if eng1_any_new_closed_bar or barstate.isfirst
         eng1_m30_eqh_bar := eng1_m30_eqh_bar_tmp
         eng1_m30_eql := eng1_m30_eql_tmp
         eng1_m30_eql_bar := eng1_m30_eql_bar_tmp
-        eng1_m30_eqh_active := eng1_m30_eqh_active_tmp
-        eng1_m30_eql_active := eng1_m30_eql_active_tmp
+        eng1_m30_eqh_active := not na(eng1_m30_eqh_tmp)
+        eng1_m30_eql_active := not na(eng1_m30_eql_tmp)
 
     if recalc_h1
-        [eng1_h1_last_swing_high_tmp, eng1_h1_last_swing_high_bar_tmp, eng1_h1_last_swing_low_tmp, eng1_h1_last_swing_low_bar_tmp, eng1_h1_trend_bias_tmp, eng1_h1_eqh_tmp, eng1_h1_eqh_bar_tmp, eng1_h1_eql_tmp, eng1_h1_eql_bar_tmp, eng1_h1_eqh_active_tmp, eng1_h1_eql_active_tmp] = f_eng1_build_structure_liquidity(eng1_buf_h1_time, eng1_buf_h1_high, eng1_buf_h1_low, eng1_buf_h1_close, ENG1_SWING_LEN)
+        [eng1_h1_last_swing_high_tmp, eng1_h1_last_swing_high_bar_tmp, eng1_h1_last_swing_low_tmp, eng1_h1_last_swing_low_bar_tmp, eng1_h1_trend_bias_tmp, eng1_h1_eqh_tmp, eng1_h1_eqh_bar_tmp, eng1_h1_eql_tmp, eng1_h1_eql_bar_tmp] = f_eng1_build_structure_liquidity(eng1_buf_h1_time, eng1_buf_h1_high, eng1_buf_h1_low, eng1_buf_h1_close, ENG1_SWING_LEN)
         eng1_h1_last_swing_high := eng1_h1_last_swing_high_tmp
         eng1_h1_last_swing_high_bar := eng1_h1_last_swing_high_bar_tmp
         eng1_h1_last_swing_low := eng1_h1_last_swing_low_tmp
@@ -2383,11 +2389,11 @@ if eng1_any_new_closed_bar or barstate.isfirst
         eng1_h1_eqh_bar := eng1_h1_eqh_bar_tmp
         eng1_h1_eql := eng1_h1_eql_tmp
         eng1_h1_eql_bar := eng1_h1_eql_bar_tmp
-        eng1_h1_eqh_active := eng1_h1_eqh_active_tmp
-        eng1_h1_eql_active := eng1_h1_eql_active_tmp
+        eng1_h1_eqh_active := not na(eng1_h1_eqh_tmp)
+        eng1_h1_eql_active := not na(eng1_h1_eql_tmp)
 
     if recalc_h4
-        [eng1_h4_last_swing_high_tmp, eng1_h4_last_swing_high_bar_tmp, eng1_h4_last_swing_low_tmp, eng1_h4_last_swing_low_bar_tmp, eng1_h4_trend_bias_tmp, eng1_h4_eqh_tmp, eng1_h4_eqh_bar_tmp, eng1_h4_eql_tmp, eng1_h4_eql_bar_tmp, eng1_h4_eqh_active_tmp, eng1_h4_eql_active_tmp] = f_eng1_build_structure_liquidity(eng1_buf_h4_time, eng1_buf_h4_high, eng1_buf_h4_low, eng1_buf_h4_close, ENG1_SWING_LEN)
+        [eng1_h4_last_swing_high_tmp, eng1_h4_last_swing_high_bar_tmp, eng1_h4_last_swing_low_tmp, eng1_h4_last_swing_low_bar_tmp, eng1_h4_trend_bias_tmp, eng1_h4_eqh_tmp, eng1_h4_eqh_bar_tmp, eng1_h4_eql_tmp, eng1_h4_eql_bar_tmp] = f_eng1_build_structure_liquidity(eng1_buf_h4_time, eng1_buf_h4_high, eng1_buf_h4_low, eng1_buf_h4_close, ENG1_SWING_LEN)
         eng1_h4_last_swing_high := eng1_h4_last_swing_high_tmp
         eng1_h4_last_swing_high_bar := eng1_h4_last_swing_high_bar_tmp
         eng1_h4_last_swing_low := eng1_h4_last_swing_low_tmp
@@ -2397,11 +2403,11 @@ if eng1_any_new_closed_bar or barstate.isfirst
         eng1_h4_eqh_bar := eng1_h4_eqh_bar_tmp
         eng1_h4_eql := eng1_h4_eql_tmp
         eng1_h4_eql_bar := eng1_h4_eql_bar_tmp
-        eng1_h4_eqh_active := eng1_h4_eqh_active_tmp
-        eng1_h4_eql_active := eng1_h4_eql_active_tmp
+        eng1_h4_eqh_active := not na(eng1_h4_eqh_tmp)
+        eng1_h4_eql_active := not na(eng1_h4_eql_tmp)
 
     if recalc_d1
-        [eng1_d1_last_swing_high_tmp, eng1_d1_last_swing_high_bar_tmp, eng1_d1_last_swing_low_tmp, eng1_d1_last_swing_low_bar_tmp, eng1_d1_trend_bias_tmp, eng1_d1_eqh_tmp, eng1_d1_eqh_bar_tmp, eng1_d1_eql_tmp, eng1_d1_eql_bar_tmp, eng1_d1_eqh_active_tmp, eng1_d1_eql_active_tmp] = f_eng1_build_structure_liquidity(eng1_buf_d1_time, eng1_buf_d1_high, eng1_buf_d1_low, eng1_buf_d1_close, ENG1_SWING_LEN)
+        [eng1_d1_last_swing_high_tmp, eng1_d1_last_swing_high_bar_tmp, eng1_d1_last_swing_low_tmp, eng1_d1_last_swing_low_bar_tmp, eng1_d1_trend_bias_tmp, eng1_d1_eqh_tmp, eng1_d1_eqh_bar_tmp, eng1_d1_eql_tmp, eng1_d1_eql_bar_tmp] = f_eng1_build_structure_liquidity(eng1_buf_d1_time, eng1_buf_d1_high, eng1_buf_d1_low, eng1_buf_d1_close, ENG1_SWING_LEN)
         eng1_d1_last_swing_high := eng1_d1_last_swing_high_tmp
         eng1_d1_last_swing_high_bar := eng1_d1_last_swing_high_bar_tmp
         eng1_d1_last_swing_low := eng1_d1_last_swing_low_tmp
@@ -2411,8 +2417,8 @@ if eng1_any_new_closed_bar or barstate.isfirst
         eng1_d1_eqh_bar := eng1_d1_eqh_bar_tmp
         eng1_d1_eql := eng1_d1_eql_tmp
         eng1_d1_eql_bar := eng1_d1_eql_bar_tmp
-        eng1_d1_eqh_active := eng1_d1_eqh_active_tmp
-        eng1_d1_eql_active := eng1_d1_eql_active_tmp
+        eng1_d1_eqh_active := not na(eng1_d1_eqh_tmp)
+        eng1_d1_eql_active := not na(eng1_d1_eql_tmp)
 
     if recalc_m1
         [eng1_m1_bull_bos_tmp, eng1_m1_bear_bos_tmp, eng1_m1_bull_choch_tmp, eng1_m1_bear_choch_tmp] = f_eng1_structure_break_signals(eng1_m1_last_swing_high, eng1_m1_last_swing_low, eng1_m1_prior_trend_bias, eng1_buf_m1_close)
