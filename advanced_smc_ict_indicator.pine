@@ -326,7 +326,7 @@ f_zoneMid(float zoneTop, float zoneBottom) =>
     (zoneTop + zoneBottom) * 0.5
 
 f_obLabelText(bool isBull, bool isBreaker) =>
-    isBreaker ? (isBull ? "BRK+" : "BRK-") : isBull ? "OB+" : "OB-"
+    isBreaker ? (isBull ? "BRK+" : "BRK-") : isBull ? "bOB+" : "bOB-"
 
 f_formatLevel(float price) =>
     na(price) ? "-" : str.tostring(price, format.mintick)
@@ -639,7 +639,7 @@ f_trimStructureVisuals(int cap) =>
 
 f_eng2_backfill_structure_node(bool internalLayer, int nodeTime, float nodeLevel, string nodeText, bool isHigh, int cap) =>
     string layerPrefix = internalLayer ? "i" : "s"
-    string labelSize = internalLayer ? size.small : size.normal
+    string labelSize = internalLayer ? size.tiny : size.small
     color nodeColor = nodeText == "HH" or nodeText == "HL" ? color.new(bullColor, 0) : nodeText == "LH" or nodeText == "LL" ? color.new(bearColor, 0) : color.new(neutralColor, 0)
     if internalLayer
         f_eng2_pushStructureNodeTime(eng2InternalStructureNodeHistory, nodeTime, nodeLevel, layerPrefix + nodeText, nodeColor, isHigh, cap, labelSize, layerPrefix)
@@ -649,7 +649,7 @@ f_eng2_backfill_structure_node(bool internalLayer, int nodeTime, float nodeLevel
 
 f_eng2_backfill_structure_event(bool internalLayer, int leftTime, int rightTime, float level, string eventText, int eventBias, int cap) =>
     string layerPrefix = internalLayer ? "i" : "s"
-    string labelSize = internalLayer ? size.small : size.normal
+    string labelSize = internalLayer ? size.tiny : size.small
     string eventStyle = internalLayer ? line.style_dotted : line.style_solid
     int eventWidth = internalLayer ? 1 : 2
     color eventColor = eventBias == 1 ? color.new(bullColor, 0) : color.new(bearColor, 0)
@@ -1118,9 +1118,9 @@ f_eng2_signal_event_cap() =>
     int tfSeconds = timeframe.in_seconds()
     int cap = 10
     if freeSafeMode
-        cap := draw_full ? (tfSeconds <= 60 ? 4 : tfSeconds <= 300 ? 5 : 6) : 5
+        cap := draw_full ? (tfSeconds <= 60 ? 3 : tfSeconds <= 300 ? 4 : 5) : 5
     else if draw_full
-        cap := tfSeconds <= 60 ? 8 : tfSeconds <= 300 ? 10 : 12
+        cap := tfSeconds <= 60 ? 6 : tfSeconds <= 300 ? 8 : 10
     cap
 
 f_eng2_emitSignalEvent(int eventTime, float level, string eventText, color eventColor, bool labelAbove, float lanePrefix) =>
@@ -1203,7 +1203,8 @@ f_eng3_build_trade_plan(bool isBull, bool poiValid, string poiType, float poiTop
 
 f_eng3_validate_narrative_side(bool bullSide, bool execValid, int narrBias, int ctxTrendBias, bool ctxBullReversal, bool ctxBearReversal) =>
     bool ctxNeutral = ctxTrendBias == 0 and not ctxBullReversal and not ctxBearReversal
-    bullSide ? (execValid and narrBias != -1 and (ctxTrendBias == 1 or ctxBullReversal or ctxNeutral)) : (execValid and narrBias != 1 and (ctxTrendBias == -1 or ctxBearReversal or ctxNeutral))
+    bool narrPass = not strictModeEnabled or (bullSide ? narrBias != -1 : narrBias != 1)
+    bullSide ? (execValid and narrPass and (ctxTrendBias == 1 or ctxBullReversal or ctxNeutral)) : (execValid and narrPass and (ctxTrendBias == -1 or ctxBearReversal or ctxNeutral))
 
 f_eng3_strict_pd_array_owned(bool poiIsFvg, int poiBar, int sweepAge, int mssAge, int displacementAge, int ownershipWindow) =>
     bool owned = false
@@ -1517,10 +1518,8 @@ f_eng1_segment_bounds(array<float> h, array<float> l, int startIdx, int endIdx) 
                 lo := math.min(lo, array.get(l, i))
     [hi, lo]
 
-f_eng1_ob_bounds(bool isBull, float candleOpen, float candleHigh, float candleLow) =>
-    float zoneTop = isBull ? candleOpen : candleHigh
-    float zoneBottom = isBull ? candleLow : candleOpen
-    [math.max(zoneTop, zoneBottom), math.min(zoneTop, zoneBottom)]
+f_eng1_ob_bounds(float candleOpen, float candleClose) =>
+    [math.max(candleOpen, candleClose), math.min(candleOpen, candleClose)]
 
 f_eng1_ob_entry_from_meta(float zoneTop, float zoneBottom) =>
     (zoneTop + zoneBottom) * 0.5
@@ -1629,7 +1628,7 @@ f_eng1_build_ob(array<int> arrT, array<float> arrO, array<float> arrH, array<flo
             // - A bullish OB invalidated to the downside becomes a *bearish* breaker block (bearBreaker=true).
             // - breakerTime stores the invalidation candle, while bullBar / bearBar keep the original OB candle.
             if bullObSequencePass and (na(bullTop) or na(bearTop))
-                [bullZoneTop, bullZoneBottom] = f_eng1_ob_bounds(true, obOpen, obHigh, obLow)
+                [bullZoneTop, bullZoneBottom] = f_eng1_ob_bounds(obOpen, obClose)
                 bool bullDispSeen = false
                 bool bullBreakSeen = false
                 bool bullInvalidated = false
@@ -1681,7 +1680,7 @@ f_eng1_build_ob(array<int> arrT, array<float> arrO, array<float> arrH, array<flo
                             bullBar := bullCandidateBar
                             bullBreaker := false
             if bearObSequencePass and (na(bearTop) or na(bullTop))
-                [bearZoneTop, bearZoneBottom] = f_eng1_ob_bounds(false, obOpen, obHigh, obLow)
+                [bearZoneTop, bearZoneBottom] = f_eng1_ob_bounds(obOpen, obClose)
                 bool bearDispSeen = false
                 bool bearBreakSeen = false
                 bool bearInvalidated = false
@@ -3164,12 +3163,12 @@ else
             bool needsStructRender = na(eng2StructureLastRenderBar) or eng2StructureRenderFingerprint != snapFp
             if needsStructRender
                 f_trimStructureVisuals(0)
-                int eng2ExecNodeCap = draw_full ? (freeSafeMode ? (eng1_exec_tf == "1" ? 8 : eng1_exec_tf == "5" ? 10 : 12) : (eng1_exec_tf == "1" ? 14 : eng1_exec_tf == "5" ? 18 : 22)) : (eng1_exec_tf == "1" ? 10 : eng1_exec_tf == "5" ? 14 : 20)
-                int eng2ExecEventCap = draw_full ? (freeSafeMode ? (eng1_exec_tf == "1" ? 4 : eng1_exec_tf == "5" ? 5 : 6) : (eng1_exec_tf == "1" ? 8 : eng1_exec_tf == "5" ? 10 : 12)) : (eng1_exec_tf == "1" ? 6 : eng1_exec_tf == "5" ? 8 : 12)
-                int eng2SwingNodeCap = freeSafeMode ? 8 : 14
-                int eng2SwingEventCap = freeSafeMode ? 4 : 6
-                int eng2ExecScanCap = draw_full ? (freeSafeMode ? 120 : 200) : (freeSafeMode ? 90 : 150)
-                int eng2CtxScanCap = draw_full ? (freeSafeMode ? 80 : 160) : (freeSafeMode ? 70 : 120)
+                int eng2ExecNodeCap = draw_full ? (freeSafeMode ? (eng1_exec_tf == "1" ? 6 : eng1_exec_tf == "5" ? 8 : 10) : (eng1_exec_tf == "1" ? 12 : eng1_exec_tf == "5" ? 16 : 20)) : (eng1_exec_tf == "1" ? 10 : eng1_exec_tf == "5" ? 14 : 20)
+                int eng2ExecEventCap = draw_full ? (freeSafeMode ? (eng1_exec_tf == "1" ? 3 : eng1_exec_tf == "5" ? 4 : 5) : (eng1_exec_tf == "1" ? 6 : eng1_exec_tf == "5" ? 8 : 10)) : (eng1_exec_tf == "1" ? 6 : eng1_exec_tf == "5" ? 8 : 12)
+                int eng2SwingNodeCap = freeSafeMode ? 6 : 12
+                int eng2SwingEventCap = freeSafeMode ? 3 : 5
+                int eng2ExecScanCap = draw_full ? (freeSafeMode ? 100 : 180) : (freeSafeMode ? 90 : 150)
+                int eng2CtxScanCap = draw_full ? (freeSafeMode ? 70 : 140) : (freeSafeMode ? 70 : 120)
                 if eng1_exec_tf == ENG1_TF_M1
                     f_eng2_backfill_structure_from_buffer(true, eng1_buf_m1_time, eng1_buf_m1_high, eng1_buf_m1_low, eng1_buf_m1_close, ENG1_SWING_LEN, eng2ExecScanCap, eng2ExecNodeCap, eng2ExecEventCap)
                 else if eng1_exec_tf == ENG1_TF_M5
@@ -3485,7 +3484,7 @@ bool effectiveLongMssSeen = strictModeEnabled ? strictLongMssMemoryPass : (eng1_
 bool effectiveLongDisplacementSeen = strictModeEnabled ? strictLongDisplacementMemoryPass : (eng1_exe_bull_displacement or longDispFallback)
 bool effectiveLongStructureInvalidated = longPoiInvalidatedLatched or (displayExecBias == -1 and (displayCtxBias == -1 or eng1_ctx_bear_reversal or eng1_exe_bear_mss))
 bool normalLongDirectionalContext = displayCtxBias != -1 and (displayExecBias == 1 or effectiveLongDirectional or eng1_ctx_bull_reversal or eng1_ctx_bull_breakout)
-bool normalLongBiasPass = eng1_exec_valid and displayNarrBias != -1 and normalLongDirectionalContext
+bool normalLongBiasPass = eng1_exec_valid
 bool normalLongContextPass = (tradeLongIsOb or tradeLongIsFvg) and normalLongDirectionalContext
 bool normalLongTargetPass = not na(activeLongTarget)
 // Strict adds IPDA timing/DOL/OTE; normal stays OB/FVG + direction + MSS/disp + retest.
@@ -3506,10 +3505,12 @@ bool longPoiRetestPass = longPriceInZone or longPriceNearZone or tradeLongTouche
 bool longEvidencePass = exe_long_mss_signal or exe_long_displacement_signal
 bool longHardSignalGate = strictModeEnabled ? (not na(tradeLongEntry) and strictLongBiasPass and strictLongContextTfPass and strictLongPdPass and strictLongOtePass and strictLongDolPass and strictLongKillzonePass and not longPoiInvalidatedLatched) : (not na(tradeLongEntry) and normalLongBiasPass and normalLongContextPass and normalLongTargetPass and longPoiRetestPass and longEvidencePass and not longPoiInvalidatedLatched)
 bool longScoreTargetClear = longHardSignalGate ? f_eng3_target_liquidity_clear(activeLongTarget, eng1_exe_liq_high, eng1_exe_eqh_active ? eng1_exe_eqh : na, eng1CtxRangeHigh, longUsesExternalDolTarget) : false
+bool scoreVolDrop = not na(volume) and not na(volume[1]) and volume < volume[1]
 bool longScoreHtfPenalty = longHardSignalGate ? (eng1_narr_strength == "Strong" and displayNarrBias == -1) : false
 bool longScorePdPenalty = longHardSignalGate ? (not na(tradeLongEntry) and eng1CtxRangeReady and not na(eng1CtxEquilibrium) and tradeLongEntry > eng1CtxEquilibrium) : false
 bool longScoreFvgPenalty = longHardSignalGate ? (tradeLongIsFvg and (longPoiMitigatedLatched or longChased)) : false
-int longSignalScore = longHardSignalGate ? f_eng3_dynamic_signal_score(effectiveLongSweepSeen, exe_long_displacement_signal, exe_long_mss_signal, hasBullFvg, exe_long_pd_pass, strictKillzoneActive, longScoreTargetClear, longScoreHtfPenalty, longScorePdPenalty, longScoreFvgPenalty) : 0
+bool longScoreVolumeBonus = longHardSignalGate and longPoiRetestPass and scoreVolDrop
+int longSignalScore = longHardSignalGate ? f_eng3_dynamic_signal_score(effectiveLongSweepSeen, exe_long_displacement_signal, exe_long_mss_signal, hasBullFvg, exe_long_pd_pass, strictKillzoneActive, longScoreTargetClear, longScoreHtfPenalty, longScorePdPenalty, longScoreFvgPenalty) + (longScoreVolumeBonus ? 1 : 0) : 0
 bool exe_long_contract_confirm = strictModeEnabled ? (strictLongBiasPass and strictLongContextTfPass and strictLongSweepPass and strictLongMssPass and strictLongDisplacementPass and strictLongPdPass and strictLongOtePass and strictLongDolPass and strictLongKillzonePass) : longSignalScore >= 6
 bool exe_long_confirm = eng1_exec_valid and not na(tradeLongEntry) and exe_long_contract_confirm
 longArmedLatched := longArmedLatched or exe_long_confirm
@@ -3559,7 +3560,7 @@ bool effectiveShortMssSeen = strictModeEnabled ? strictShortMssMemoryPass : (eng
 bool effectiveShortDisplacementSeen = strictModeEnabled ? strictShortDisplacementMemoryPass : (eng1_exe_bear_displacement or shortDispFallback)
 bool effectiveShortStructureInvalidated = shortPoiInvalidatedLatched or (displayExecBias == 1 and (displayCtxBias == 1 or eng1_ctx_bull_reversal or eng1_exe_bull_mss))
 bool normalShortDirectionalContext = displayCtxBias != 1 and (displayExecBias == -1 or effectiveShortDirectional or eng1_ctx_bear_reversal or eng1_ctx_bear_breakout)
-bool normalShortBiasPass = eng1_exec_valid and displayNarrBias != 1 and normalShortDirectionalContext
+bool normalShortBiasPass = eng1_exec_valid
 bool normalShortContextPass = (tradeShortIsOb or tradeShortIsFvg) and normalShortDirectionalContext
 bool normalShortTargetPass = not na(activeShortTarget)
 bool strictShortBiasPass = not strictModeEnabled or (displayNarrBias == -1 and ipdaShortDolAvailable)
@@ -3582,7 +3583,8 @@ bool shortScoreTargetClear = shortHardSignalGate ? f_eng3_target_liquidity_clear
 bool shortScoreHtfPenalty = shortHardSignalGate ? (eng1_narr_strength == "Strong" and displayNarrBias == 1) : false
 bool shortScorePdPenalty = shortHardSignalGate ? (not na(tradeShortEntry) and eng1CtxRangeReady and not na(eng1CtxEquilibrium) and tradeShortEntry < eng1CtxEquilibrium) : false
 bool shortScoreFvgPenalty = shortHardSignalGate ? (tradeShortIsFvg and (shortPoiMitigatedLatched or shortChased)) : false
-int shortSignalScore = shortHardSignalGate ? f_eng3_dynamic_signal_score(effectiveShortSweepSeen, exe_short_displacement_signal, exe_short_mss_signal, hasBearFvg, exe_short_pd_pass, strictKillzoneActive, shortScoreTargetClear, shortScoreHtfPenalty, shortScorePdPenalty, shortScoreFvgPenalty) : 0
+bool shortScoreVolumeBonus = shortHardSignalGate and shortPoiRetestPass and scoreVolDrop
+int shortSignalScore = shortHardSignalGate ? f_eng3_dynamic_signal_score(effectiveShortSweepSeen, exe_short_displacement_signal, exe_short_mss_signal, hasBearFvg, exe_short_pd_pass, strictKillzoneActive, shortScoreTargetClear, shortScoreHtfPenalty, shortScorePdPenalty, shortScoreFvgPenalty) + (shortScoreVolumeBonus ? 1 : 0) : 0
 bool exe_short_contract_confirm = strictModeEnabled ? (strictShortBiasPass and strictShortContextTfPass and strictShortSweepPass and strictShortMssPass and strictShortDisplacementPass and strictShortPdPass and strictShortOtePass and strictShortDolPass and strictShortKillzonePass) : shortSignalScore >= 6
 bool exe_short_confirm = eng1_exec_valid and not na(tradeShortEntry) and exe_short_contract_confirm
 shortArmedLatched := shortArmedLatched or exe_short_confirm
@@ -4023,7 +4025,7 @@ oteLongTopLevel = showOteVisual and dealingRangeValid ? dealingBuyOteTop : na
 oteLongBottomLevel = showOteVisual and dealingRangeValid ? dealingBuyOteBottom : na
 oteShortTopLevel = showOteVisual and dealingRangeValid ? dealingSellOteTop : na
 oteShortBottomLevel = showOteVisual and dealingRangeValid ? dealingSellOteBottom : na
-rightEdgeLabelTolerance = atrSafe * 0.15
+rightEdgeLabelTolerance = atrSafe * 0.25
 pdhLevel = showCalendarLiquidityVisual ? prevDayHigh : na
 pdlLevel = showCalendarLiquidityVisual ? prevDayLow : na
 pwhLevel = showCalendarLiquidityVisual and not f_levelsClose(prevWeekHigh, pdhLevel, rightEdgeLabelTolerance) ? prevWeekHigh : na
@@ -4234,7 +4236,7 @@ f_eng4_render_dashboard() =>
         ordText := cBoth ? "Focus " + sideFull + "| " + ordText : ordText
         string trigText = not pValid ? pSide + pWhy : pRetired ? pSide + (pRetWhy == "" ? "POI Retired" : "POI " + pRetWhy) : pSide + (sMode ? stepTxt : not sweepOk ? "Need Sweep" : not mssOk ? "Need MSS" : not dispOk ? "Need Disp" : "Trigger OK")
         bool pGate = sMode and pActive and not (sweepOk and mssOk and dispOk and strictOk)
-        string pText = not pValid ? pSide + pWhy : pRetired ? pSide + (pRetWhy == "" ? "Retired" : "Retired: " + pRetWhy) : pSide + (pType == "Breaker" ? "BRK" : pType) + " " + f_formatLevel(pEntry) + " | " + f_poiLifecycleDisplayText(pLife, pType)
+        string pText = not pValid ? pSide + pWhy : pRetired ? pSide + (pRetWhy == "" ? "Retired" : "Retired: " + pRetWhy) : pSide + (pType == "Breaker" ? "BRK" : pType == "OB" ? "bOB" : pType) + " " + f_formatLevel(pEntry) + " | " + f_poiLifecycleDisplayText(pLife, pType)
         pText := pGate ? pText + " | " + stepTxt : pText
         bool triggerReady = pActive and sweepOk and mssOk and dispOk and (not sMode or strictOk)
         color dNeu = color.new(neutralColor, 18)

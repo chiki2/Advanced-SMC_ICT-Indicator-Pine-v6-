@@ -65,11 +65,7 @@ f_buf_get_int(array<int> buf, int idx) =>
     array.size(buf) > idx ? array.get(buf, idx) : na
 
 f_tf_closed_ohlc(string tf) =>
-    int t = request.security(syminfo.tickerid, tf, time[1], lookahead=barmerge.lookahead_off)
-    float o = request.security(syminfo.tickerid, tf, open[1], lookahead=barmerge.lookahead_off)
-    float h = request.security(syminfo.tickerid, tf, high[1], lookahead=barmerge.lookahead_off)
-    float l = request.security(syminfo.tickerid, tf, low[1], lookahead=barmerge.lookahead_off)
-    float c = request.security(syminfo.tickerid, tf, close[1], lookahead=barmerge.lookahead_off)
+    [t, o, h, l, c] = request.security(syminfo.tickerid, tf, [time[1], open[1], high[1], low[1], close[1]], lookahead=barmerge.lookahead_off)
     [t, o, h, l, c]
 
 f_tf_update_ohlc_buffer(string tf, int lastClosedTime, array<int> arrT, array<float> arrO, array<float> arrH, array<float> arrL, array<float> arrC, int cap) =>
