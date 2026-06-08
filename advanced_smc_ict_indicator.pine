@@ -4264,7 +4264,7 @@ f_eng4_render_dashboard() =>
             f_setCell(dashboardCompact, 0, 4, "POI", color.white, panelCellBg)
             f_setCell(dashboardCompact, 1, 4, pText, color.white, dPoi)
             f_setCell(dashboardCompact, 0, 5, "Order", color.white, panelCellBg)
-            f_setCell(dashboardCompact, 1, 5, waitLeg ? "Need Leg" : not planOk ? "No order" : ordGate ? "Gate " + stepTxt : riskOk ? "Order OK" : "Plan", color.white, dOrder)
+            f_setCell(dashboardCompact, 1, 5, waitLeg ? "Need Leg" : not planOk ? "No order" : ordGate ? "Gate " + stepTxt : riskOk ? "Ready" : "Plan", color.white, dOrder)
             f_setCell(dashboardCompact, 0, 6, "Next", color.white, panelCellBg)
             f_setCell(dashboardCompact, 1, 6, nextText, color.white, dNext)
         else
