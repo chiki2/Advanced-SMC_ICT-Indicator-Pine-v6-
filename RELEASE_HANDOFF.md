@@ -19,6 +19,15 @@ Status: verified release candidate.
 - Right-edge labels remain useful on the validated timeframes.
 - Engine 3 signal logic was not changed during the final release hygiene pass.
 
+## Maintenance Patch
+
+- Dashboard `Next` idle text changed from `Wait` to `Watch` to avoid repeating
+  the `Setup = Idle ...` message.
+- Updated script hash after this text-only patch:
+  `ff70f58e8bb56234f9c733a06aa528f022f7284db281075c5af9deaac952a1e0`
+- TradingView compile and visual check: clean, no warnings reported.
+- No signal, POI, scoring, order, trigger, object, or input change.
+
 ## Release Procedure
 
 1. Open `advanced_smc_ict_indicator.pine` in TradingView.
@@ -37,4 +46,3 @@ Status: verified release candidate.
 - Keep future production patches small.
 - Prefer visual/dashboard changes outside Engine 3.
 - Re-run the same five-timeframe Standard + Full validation after every Pine source change.
-

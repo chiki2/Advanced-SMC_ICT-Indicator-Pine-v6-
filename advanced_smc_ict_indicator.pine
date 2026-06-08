@@ -966,7 +966,7 @@ f_executionStateBadge(string s, bool c) =>
     s == "Active" ? (c ? "ACT" : "Active") : s == "Armed" ? (c ? "ARM" : "Armed") : s == "Managed" ? (c ? "MNG" : "Managed") : s == "Ambiguous" ? (c ? "AMB" : "Ambiguous") : s == "Completed" ? (c ? "CMP" : "Completed") : ""
 
 f_eng4_next_text(bool w, string wt, string s, bool strict, bool p, bool r, string step) =>
-    w ? "Wait " + wt : s == "Active" ? "Trigger" : s == "Armed" ? "Retest" : s == "Confirming" ? (strict ? step : "Confirm") : s == "Managed" ? "Manage" : s == "Ambiguous" ? "Review" : s == "Completed" ? "Next" : s == "Expired" or s == "Invalidated" ? "Stand" : strict and p and not r ? step : "Wait"
+    w ? "Watch " + wt : s == "Active" ? "Trigger" : s == "Armed" ? "Retest" : s == "Confirming" ? (strict ? step : "Confirm") : s == "Managed" ? "Manage" : s == "Ambiguous" ? "Review" : s == "Completed" ? "Next" : s == "Expired" or s == "Invalidated" ? "Stand" : strict and p and not r ? step : "Wait"
 
 f_executionSelectedFillAlpha(string s) =>
     s == "Active" ? 78 : s == "Armed" ? 82 : s == "Managed" ? 88 : s == "Completed" ? 92 : 86
