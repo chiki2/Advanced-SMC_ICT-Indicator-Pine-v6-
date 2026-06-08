@@ -21,7 +21,7 @@ Anda bebas memilih:
 | Engine | Nilai |
 |---|---|
 | Gaya trading | `Intraday ICT` |
-| Timeframe entry | `M1`, `M5`, `M15`, `M30` |
+| Timeframe entry | `M1`, `M5`, `M15`, `M30`, `H1` |
 | Di luar TF itu | indikator berhenti |
 
 > Indikator ini bukan untuk semua timeframe. Fokusnya adalah `intraday setup engine`.
@@ -45,10 +45,11 @@ Jika salah satu dari tiga hal ini belum jelas, `wait`:
 
 | TF | Peran | HTF Pair | Profile Cocok | Gaya Pakai |
 |---|---|---|---|---|
-| `M1` | Precision entry | `15M / 1H` | `Compact` atau `Strict Confirm` | Pakai setelah arah sudah jelas dari `M5/M15` |
-| `M5` | Entry utama | `15M / 4H` | `Standard` atau `Strict Confirm` | Chart eksekusi paling seimbang |
-| `M15` | Setup / scan utama | `1H / 4H` | `Standard` | Scan struktur dan kualitas setup |
-| `M30` | Planning chart | `4H / 1D` | `Standard` | Untuk directional plan, bukan trigger cepat |
+| `M1` | Precision entry | `15M / 30M` | `Compact` atau `Strict Confirm` | Pakai setelah arah sudah jelas dari `M5/M15` |
+| `M5` | Entry utama | `15M / 1H` | `Standard` atau `Strict Confirm` | Chart eksekusi paling seimbang |
+| `M15` | Setup / scan utama | `30M / 1H` | `Standard` | Scan struktur dan kualitas setup |
+| `M30` | Planning chart | `1H / 4H` | `Standard` | Untuk directional plan, bukan trigger cepat |
+| `H1` | Planning besar | `4H / 1D` | `Standard` | Untuk membaca arah lebih luas, bukan trigger cepat |
 
 **Urutan pakai paling sehat**
 - `M15` untuk scan
