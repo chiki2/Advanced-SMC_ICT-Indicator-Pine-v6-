@@ -1164,9 +1164,6 @@ f_eng3_poi_identity(string sideText, string poiType, int poiBar, float poiTop, f
 f_eng3_poi_retire_reason(bool completed, bool invalidated, bool expired, bool chased, bool staleRetired) =>
     completed ? "Done" : invalidated ? "Invalid" : expired or chased ? "Expired" : staleRetired ? "Stale" : ""
 
-f_eng3_setup_tag(string setupText, int setupBar, float validTop, float validBottom) =>
-    not na(setupBar) ? setupText + "|" + str.tostring(setupBar) + "|" + str.tostring(validTop) + "|" + str.tostring(validBottom) : ""
-
 f_eng3_changed(bool valid, int oldBar, int newBar, float oldTop, float newTop, float oldBottom, float newBottom) =>
     valid and (na(oldBar) or oldBar != newBar or na(oldTop) or oldTop != newTop or na(oldBottom) or oldBottom != newBottom)
 
@@ -1193,13 +1190,12 @@ f_eng3_build_trade_plan(bool isBull, bool poiValid, string poiType, float poiTop
     float slAtr = math.max(nz(sessRefAtr, atrSafe), syminfo.mintick)
     float stop = not na(entry) ? (isBull ? entry - slAtr : entry + slAtr) : na
     float target = na
-    string setup = poiValid ? (isBull ? (isBreaker ? "Bullish Breaker" : isOb ? "Bullish OB" : "Bullish FVG") : (isBreaker ? "Bearish Breaker" : isOb ? "Bearish OB" : "Bearish FVG")) : "Waiting"
     if not na(entry)
         target := isBull ? f_nearestAbove(entry, execLiqHigh, execEqHigh, ctxHigh, na, na, na, na) : f_nearestBelow(entry, execLiqLow, execEqLow, ctxLow, na, na, na, na)
         float risk = not na(stop) ? (isBull ? entry - stop : stop - entry) : na
         if na(target) and not na(risk) and risk > 0
             target := isBull ? entry + risk * 2.0 : entry - risk * 2.0
-    [entry, stop, target, setup, poiValid ? poiTop : na, poiValid ? poiBottom : na, isOb, isFvg, poiValid ? poiCreatedBar : na, poiValid ? poiTouched : false]
+    [entry, stop, target, poiValid ? poiTop : na, poiValid ? poiBottom : na, isOb, isFvg, poiValid ? poiCreatedBar : na, poiValid ? poiTouched : false]
 
 f_eng3_validate_narrative_side(bool bullSide, bool execValid, int narrBias, int ctxTrendBias, bool ctxBullReversal, bool ctxBearReversal) =>
     bool ctxNeutral = ctxTrendBias == 0 and not ctxBullReversal and not ctxBearReversal
@@ -3427,8 +3423,8 @@ bool strictShortPdArrayOwned = not strictModeEnabled or (poi_short_type == "FVG"
 bool poi_long_contract_valid = eng1BullContextAllowed and poi_long_candidate_valid and eng3LongActivePoiReady and strictLongPdArrayOwned and eng3LongActivePoiIdentity != eng3LongConsumedPoiIdentity
 bool poi_short_contract_valid = eng1BearContextAllowed and poi_short_candidate_valid and eng3ShortActivePoiReady and strictShortPdArrayOwned and eng3ShortActivePoiIdentity != eng3ShortConsumedPoiIdentity
 
-[tradeLongEntry, tradeLongStop, tradeLongTarget, tradeLongSetup, tradeLongValidTop, tradeLongValidBottom, tradeLongIsOb, tradeLongIsFvg, tradeLongCreatedBar, tradeLongTouched] = f_eng3_build_trade_plan(true, poi_long_contract_valid, poi_long_type, poi_long_top, poi_long_bottom, poi_long_entry, poi_long_bar, poi_long_touched, eng1_exe_liq_high, eng1_exe_liq_low, eng1_exe_eqh_active ? eng1_exe_eqh : na, eng1_exe_eql_active ? eng1_exe_eql : na, eng1CtxRangeHigh, eng1CtxRangeLow)
-[tradeShortEntry, tradeShortStop, tradeShortTarget, tradeShortSetup, tradeShortValidTop, tradeShortValidBottom, tradeShortIsOb, tradeShortIsFvg, tradeShortCreatedBar, tradeShortTouched] = f_eng3_build_trade_plan(false, poi_short_contract_valid, poi_short_type, poi_short_top, poi_short_bottom, poi_short_entry, poi_short_bar, poi_short_touched, eng1_exe_liq_high, eng1_exe_liq_low, eng1_exe_eqh_active ? eng1_exe_eqh : na, eng1_exe_eql_active ? eng1_exe_eql : na, eng1CtxRangeHigh, eng1CtxRangeLow)
+[tradeLongEntry, tradeLongStop, tradeLongTarget, tradeLongValidTop, tradeLongValidBottom, tradeLongIsOb, tradeLongIsFvg, tradeLongCreatedBar, tradeLongTouched] = f_eng3_build_trade_plan(true, poi_long_contract_valid, poi_long_type, poi_long_top, poi_long_bottom, poi_long_entry, poi_long_bar, poi_long_touched, eng1_exe_liq_high, eng1_exe_liq_low, eng1_exe_eqh_active ? eng1_exe_eqh : na, eng1_exe_eql_active ? eng1_exe_eql : na, eng1CtxRangeHigh, eng1CtxRangeLow)
+[tradeShortEntry, tradeShortStop, tradeShortTarget, tradeShortValidTop, tradeShortValidBottom, tradeShortIsOb, tradeShortIsFvg, tradeShortCreatedBar, tradeShortTouched] = f_eng3_build_trade_plan(false, poi_short_contract_valid, poi_short_type, poi_short_top, poi_short_bottom, poi_short_entry, poi_short_bar, poi_short_touched, eng1_exe_liq_high, eng1_exe_liq_low, eng1_exe_eqh_active ? eng1_exe_eqh : na, eng1_exe_eql_active ? eng1_exe_eql : na, eng1CtxRangeHigh, eng1CtxRangeLow)
 
 bool ipdaLongDolAvailable = strictModeEnabled and (not na(eng1_narr_liq_high) or not na(eng1_d1_lb20_high) or not na(eng1_d1_lb40_high) or not na(eng1_d1_lb60_high) or not na(eng1_narr_bear_sd_top) or not na(eng1_narr_bear_sd_bottom))
 bool ipdaShortDolAvailable = strictModeEnabled and (not na(eng1_narr_liq_low) or not na(eng1_d1_lb20_low) or not na(eng1_d1_lb40_low) or not na(eng1_d1_lb60_low) or not na(eng1_narr_bull_sd_top) or not na(eng1_narr_bull_sd_bottom))
@@ -3451,7 +3447,7 @@ float longRisk = not na(tradeLongEntry) and not na(tradeLongStop) ? tradeLongEnt
 bool longPriceInZone = not na(tradeLongValidBottom) and not na(eng3SignalClose) and eng3SignalClose >= tradeLongValidBottom and eng3SignalClose <= tradeLongValidTop
 bool longPriceNearZone = not na(tradeLongEntry) and not na(eng3SignalClose) and math.abs(eng3SignalClose - tradeLongEntry) <= atrSafe * 0.25
 int longSetupAge = not na(tradeLongCreatedBar) ? bar_index - tradeLongCreatedBar : na
-string currentLongSetupTag = f_eng3_setup_tag(tradeLongSetup, tradeLongCreatedBar, tradeLongValidTop, tradeLongValidBottom)
+string currentLongSetupTag = not na(tradeLongCreatedBar) ? eng3LongActivePoiIdentity : ""
 bool longSetupMissing = currentLongSetupTag == ""
 bool longSetupChanged = not longSetupMissing and currentLongSetupTag != lastLongSetupTag
 if longSetupMissing or longSetupChanged
@@ -3531,7 +3527,7 @@ float shortRisk = not na(tradeShortEntry) and not na(tradeShortStop) ? tradeShor
 bool shortPriceInZone = not na(tradeShortValidBottom) and not na(eng3SignalClose) and eng3SignalClose >= tradeShortValidBottom and eng3SignalClose <= tradeShortValidTop
 bool shortPriceNearZone = not na(tradeShortEntry) and not na(eng3SignalClose) and math.abs(eng3SignalClose - tradeShortEntry) <= atrSafe * 0.25
 int shortSetupAge = not na(tradeShortCreatedBar) ? bar_index - tradeShortCreatedBar : na
-string currentShortSetupTag = f_eng3_setup_tag(tradeShortSetup, tradeShortCreatedBar, tradeShortValidTop, tradeShortValidBottom)
+string currentShortSetupTag = not na(tradeShortCreatedBar) ? eng3ShortActivePoiIdentity : ""
 bool shortSetupMissing = currentShortSetupTag == ""
 bool shortSetupChanged = not shortSetupMissing and currentShortSetupTag != lastShortSetupTag
 if shortSetupMissing or shortSetupChanged
