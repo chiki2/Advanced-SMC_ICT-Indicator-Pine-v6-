@@ -4248,10 +4248,11 @@ f_eng4_render_dashboard() =>
         pText := pGate ? pText + " | " + stepTxt : pText
         bool triggerReady = pActive and sweepOk and mssOk and dispOk and (not sMode or strictOk)
         color dNeu = color.new(neutralColor, 18)
+        color dBias = bAlign ? aCol : dNeu
         color dSetup = cWait ? dNeu : ordGate ? panelCellBg : aCol
         color dPoi = pActive and not pGate ? aCol : panelCellBg
         color dOrder = riskOk ? aCol : panelCellBg
-        color dNext = cWait ? dNeu : sMode ? (triggerReady ? aCol : panelCellBg) : aCol
+        color dNext = waitLeg ? panelCellBg : cWait ? dNeu : sMode ? (triggerReady ? aCol : panelCellBg) : aCol
         if showCompact
             f_prepareDashboardTable(dashboardCompact, 6, dashboard, 10)
             f_setCell(dashboardCompact, 0, 1, "TRADE", color.white, panelHeaderBg)
@@ -4259,7 +4260,7 @@ f_eng4_render_dashboard() =>
             f_setCell(dashboardCompact, 0, 2, "Setup", color.white, panelCellBg)
             f_setCell(dashboardCompact, 1, 2, setupMini, color.white, dSetup)
             f_setCell(dashboardCompact, 0, 3, "Bias", color.white, panelCellBg)
-            f_setCell(dashboardCompact, 1, 3, bAlign ? "Al " + (eBias == 1 ? "Bu" : "Be") : bNarr ? "Nar!" : bMixed ? "Mix" : "Bld", color.white, panelCellBg)
+            f_setCell(dashboardCompact, 1, 3, bAlign ? "Al " + (eBias == 1 ? "Bu" : "Be") : bNarr ? "Nar!" : bMixed ? "Mix" : "Bld", color.white, dBias)
             f_setCell(dashboardCompact, 0, 4, "POI", color.white, panelCellBg)
             f_setCell(dashboardCompact, 1, 4, pText, color.white, dPoi)
             f_setCell(dashboardCompact, 0, 5, "Order", color.white, panelCellBg)
@@ -4273,7 +4274,7 @@ f_eng4_render_dashboard() =>
             f_setCell(dashboard, 0, 2, "Setup", color.white, panelCellBg)
             f_setCell(dashboard, 1, 2, setupTxt, color.white, dSetup)
             f_setCell(dashboard, 0, 3, "Bias", color.white, panelCellBg)
-            f_setCell(dashboard, 1, 3, (bAlign ? "Aligned " + (eBias == 1 ? "Bullish" : "Bearish") : bNarr ? "Narr Conflict" : bMixed ? "Mixed" : "Building") + " | TF " + eng1_exec_tf + ">" + eng1_ctx_tf + "/" + eng1_narr_tf, color.white, bAlign ? aCol : dNeu)
+            f_setCell(dashboard, 1, 3, (bAlign ? "Aligned " + (eBias == 1 ? "Bullish" : "Bearish") : bNarr ? "Narr Conflict" : bMixed ? "Mixed" : "Building") + " | TF " + eng1_exec_tf + ">" + eng1_ctx_tf + "/" + eng1_narr_tf, color.white, dBias)
             f_setCell(dashboard, 0, 4, "Liquidity", color.white, panelCellBg)
             f_setCell(dashboard, 1, 4, liqTxt, color.white, panelCellBg)
             f_setCell(dashboard, 0, 5, "POI", color.white, panelCellBg)
