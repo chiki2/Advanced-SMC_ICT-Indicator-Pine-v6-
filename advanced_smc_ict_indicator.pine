@@ -4226,7 +4226,7 @@ f_eng4_render_dashboard() =>
         liqTxt := dolTgt and not na(tpLvl) ? "DOL " + f_formatLevel(tpLvl) + " | " + liqTxt : liqTxt
         string slAtrTxt = not na(sessRefAtr) and sessRefCode != "" ? "ATR " + sessRefCode + " " + f_formatLevel(sessRefAtr) : "ATR -"
         string sGate = not sBiasOk ? "Need Bias" : not sCtxOk ? "Need Ctx" : not sPdOk ? "Need PD" : not sOteOk ? "Need OTE" : not sDolOk ? "Need DOL" : not sKzOk ? "Need KZ" : "Strict OK"
-        string stepTxt = not sweepOk ? "Need ERL" : not mssOk ? "Need MSS" : not dispOk ? "Need Disp" : sGate
+        string stepTxt = not sweepOk ? "Need Sweep" : not mssOk ? "Need MSS" : not dispOk ? "Need Disp" : sGate
         bool waitLeg = not pRetired and not pValid and poiZoneOk and poiMapOk and (not poiLegOk or not pStrictOk)
         string nextText = waitLeg ? "Wait Leg" : f_eng4_next_text(cWait, waitTxt, eState, sMode, pValid, pRetired, stepTxt)
         string pxText = syminfo.ticker + " " + timeframe.period + " | Px " + f_formatLevel(dPx)
