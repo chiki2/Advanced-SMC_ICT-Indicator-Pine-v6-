@@ -1585,13 +1585,11 @@ f_eng1_build_fvg(array<int> arrT, array<float> arrO, array<float> arrH, array<fl
 f_eng1_build_ob(array<int> arrT, array<float> arrO, array<float> arrH, array<float> arrL, array<float> arrC) =>
     float bullTop = na
     float bullBottom = na
-    float bullEntry = na
     int bullBar = na
     bool bullBreaker = false
     int bullBreakerTime = na
     float bearTop = na
     float bearBottom = na
-    float bearEntry = na
     int bearBar = na
     bool bearBreaker = false
     int bearBreakerTime = na
@@ -1655,13 +1653,11 @@ f_eng1_build_ob(array<int> arrT, array<float> arrO, array<float> arrH, array<flo
                 if bullPattern
                     float bullCandidateTop = bullZoneTop
                     float bullCandidateBottom = bullZoneBottom
-                    float bullCandidateEntry = f_eng1_ob_entry_from_meta(bullCandidateTop, bullCandidateBottom)
                     int bullCandidateBar = array.get(arrT, idx)
                     if bullInvalidated and not bullBreakerMitigated
                         if na(bearTop)
                             bearTop := bullCandidateTop
                             bearBottom := bullCandidateBottom
-                            bearEntry := bullCandidateEntry
                             bearBar := bullCandidateBar
                             bearBreaker := true
                             bearBreakerTime := bullInvalidatedTime
@@ -1669,7 +1665,6 @@ f_eng1_build_ob(array<int> arrT, array<float> arrO, array<float> arrH, array<flo
                         if na(bullTop)
                             bullTop := bullCandidateTop
                             bullBottom := bullCandidateBottom
-                            bullEntry := bullCandidateEntry
                             bullBar := bullCandidateBar
                             bullBreaker := false
             if bearObSequencePass and (na(bearTop) or na(bullTop))
@@ -1707,13 +1702,11 @@ f_eng1_build_ob(array<int> arrT, array<float> arrO, array<float> arrH, array<flo
                 if bearPattern
                     float bearCandidateTop = bearZoneTop
                     float bearCandidateBottom = bearZoneBottom
-                    float bearCandidateEntry = f_eng1_ob_entry_from_meta(bearCandidateTop, bearCandidateBottom)
                     int bearCandidateBar = array.get(arrT, idx)
                     if bearInvalidated and not bearBreakerMitigated
                         if na(bullTop)
                             bullTop := bearCandidateTop
                             bullBottom := bearCandidateBottom
-                            bullEntry := bearCandidateEntry
                             bullBar := bearCandidateBar
                             bullBreaker := true
                             bullBreakerTime := bearInvalidatedTime
@@ -1721,12 +1714,11 @@ f_eng1_build_ob(array<int> arrT, array<float> arrO, array<float> arrH, array<flo
                         if na(bearTop)
                             bearTop := bearCandidateTop
                             bearBottom := bearCandidateBottom
-                            bearEntry := bearCandidateEntry
                             bearBar := bearCandidateBar
                             bearBreaker := false
             if not na(bullTop) and not na(bearTop)
                 break
-    [bullTop, bullBottom, bullEntry, bullBar, bullBreaker, bullBreakerTime, bearTop, bearBottom, bearEntry, bearBar, bearBreaker, bearBreakerTime]
+    [bullTop, bullBottom, bullBar, bullBreaker, bullBreakerTime, bearTop, bearBottom, bearBar, bearBreaker, bearBreakerTime]
 
 f_eng1_build_execution(float lastHigh, float lastLow, array<float> arrO, array<float> arrH, array<float> arrL, array<float> arrC) =>
     bool bullSweep = false
@@ -1893,12 +1885,10 @@ var float eng1_m15_eql = na
 var int eng1_m15_eql_bar = na
 var float eng1_m15_bull_ob_top = na
 var float eng1_m15_bull_ob_bottom = na
-var float eng1_m15_bull_ob_entry = na
 var int eng1_m15_bull_ob_bar = na
 var bool eng1_m15_bull_ob_breaker = false
 var float eng1_m15_bear_ob_top = na
 var float eng1_m15_bear_ob_bottom = na
-var float eng1_m15_bear_ob_entry = na
 var int eng1_m15_bear_ob_bar = na
 var bool eng1_m15_bear_ob_breaker = false
 var float eng1_m15_bull_fvg_top = na
@@ -1927,12 +1917,10 @@ var float eng1_m30_eql = na
 var int eng1_m30_eql_bar = na
 var float eng1_m30_bull_ob_top = na
 var float eng1_m30_bull_ob_bottom = na
-var float eng1_m30_bull_ob_entry = na
 var int eng1_m30_bull_ob_bar = na
 var bool eng1_m30_bull_ob_breaker = false
 var float eng1_m30_bear_ob_top = na
 var float eng1_m30_bear_ob_bottom = na
-var float eng1_m30_bear_ob_entry = na
 var int eng1_m30_bear_ob_bar = na
 var bool eng1_m30_bear_ob_breaker = false
 var float eng1_m30_bull_fvg_top = na
@@ -1961,12 +1949,10 @@ var float eng1_h1_eql = na
 var int eng1_h1_eql_bar = na
 var float eng1_h1_bull_ob_top = na
 var float eng1_h1_bull_ob_bottom = na
-var float eng1_h1_bull_ob_entry = na
 var int eng1_h1_bull_ob_bar = na
 var bool eng1_h1_bull_ob_breaker = false
 var float eng1_h1_bear_ob_top = na
 var float eng1_h1_bear_ob_bottom = na
-var float eng1_h1_bear_ob_entry = na
 var int eng1_h1_bear_ob_bar = na
 var bool eng1_h1_bear_ob_breaker = false
 var float eng1_h1_bull_fvg_top = na
@@ -1995,12 +1981,10 @@ var float eng1_h4_eql = na
 var int eng1_h4_eql_bar = na
 var float eng1_h4_bull_ob_top = na
 var float eng1_h4_bull_ob_bottom = na
-var float eng1_h4_bull_ob_entry = na
 var int eng1_h4_bull_ob_bar = na
 var bool eng1_h4_bull_ob_breaker = false
 var float eng1_h4_bear_ob_top = na
 var float eng1_h4_bear_ob_bottom = na
-var float eng1_h4_bear_ob_entry = na
 var int eng1_h4_bear_ob_bar = na
 var bool eng1_h4_bear_ob_breaker = false
 var float eng1_h4_bull_fvg_top = na
@@ -2023,12 +2007,10 @@ var float eng1_d1_eql = na
 var int eng1_d1_eql_bar = na
 var float eng1_d1_bull_ob_top = na
 var float eng1_d1_bull_ob_bottom = na
-var float eng1_d1_bull_ob_entry = na
 var int eng1_d1_bull_ob_bar = na
 var bool eng1_d1_bull_ob_breaker = false
 var float eng1_d1_bear_ob_top = na
 var float eng1_d1_bear_ob_bottom = na
-var float eng1_d1_bear_ob_entry = na
 var int eng1_d1_bear_ob_bar = na
 var bool eng1_d1_bear_ob_breaker = false
 var float eng1_d1_bull_fvg_top = na
@@ -2482,72 +2464,62 @@ if eng1_any_new_closed_bar or barstate.isfirst
         eng1_d1_bear_choch := eng1_d1_bear_choch_tmp
     
     if recalc_m15
-        [eng1_m15_bull_ob_top_tmp, eng1_m15_bull_ob_bottom_tmp, eng1_m15_bull_ob_entry_tmp, eng1_m15_bull_ob_bar_tmp, eng1_m15_bull_ob_breaker_tmp, eng1_m15_bull_ob_breaker_time_tmp, eng1_m15_bear_ob_top_tmp, eng1_m15_bear_ob_bottom_tmp, eng1_m15_bear_ob_entry_tmp, eng1_m15_bear_ob_bar_tmp, eng1_m15_bear_ob_breaker_tmp, eng1_m15_bear_ob_breaker_time_tmp] = f_eng1_build_ob(eng1_buf_m15_time, eng1_buf_m15_open, eng1_buf_m15_high, eng1_buf_m15_low, eng1_buf_m15_close)
+        [eng1_m15_bull_ob_top_tmp, eng1_m15_bull_ob_bottom_tmp, eng1_m15_bull_ob_bar_tmp, eng1_m15_bull_ob_breaker_tmp, eng1_m15_bull_ob_breaker_time_tmp, eng1_m15_bear_ob_top_tmp, eng1_m15_bear_ob_bottom_tmp, eng1_m15_bear_ob_bar_tmp, eng1_m15_bear_ob_breaker_tmp, eng1_m15_bear_ob_breaker_time_tmp] = f_eng1_build_ob(eng1_buf_m15_time, eng1_buf_m15_open, eng1_buf_m15_high, eng1_buf_m15_low, eng1_buf_m15_close)
         eng1_m15_bull_ob_top := eng1_m15_bull_ob_top_tmp
         eng1_m15_bull_ob_bottom := eng1_m15_bull_ob_bottom_tmp
-        eng1_m15_bull_ob_entry := eng1_m15_bull_ob_entry_tmp
         eng1_m15_bull_ob_bar := eng1_m15_bull_ob_bar_tmp
         eng1_m15_bull_ob_breaker := eng1_m15_bull_ob_breaker_tmp
         array.set(eng1_ctx_bull_ob_breaker_time_by_tf, 0, eng1_m15_bull_ob_breaker_time_tmp)
         eng1_m15_bear_ob_top := eng1_m15_bear_ob_top_tmp
         eng1_m15_bear_ob_bottom := eng1_m15_bear_ob_bottom_tmp
-        eng1_m15_bear_ob_entry := eng1_m15_bear_ob_entry_tmp
         eng1_m15_bear_ob_bar := eng1_m15_bear_ob_bar_tmp
         eng1_m15_bear_ob_breaker := eng1_m15_bear_ob_breaker_tmp
         array.set(eng1_ctx_bear_ob_breaker_time_by_tf, 0, eng1_m15_bear_ob_breaker_time_tmp)
     if recalc_m30
-        [eng1_m30_bull_ob_top_tmp, eng1_m30_bull_ob_bottom_tmp, eng1_m30_bull_ob_entry_tmp, eng1_m30_bull_ob_bar_tmp, eng1_m30_bull_ob_breaker_tmp, eng1_m30_bull_ob_breaker_time_tmp, eng1_m30_bear_ob_top_tmp, eng1_m30_bear_ob_bottom_tmp, eng1_m30_bear_ob_entry_tmp, eng1_m30_bear_ob_bar_tmp, eng1_m30_bear_ob_breaker_tmp, eng1_m30_bear_ob_breaker_time_tmp] = f_eng1_build_ob(eng1_buf_m30_time, eng1_buf_m30_open, eng1_buf_m30_high, eng1_buf_m30_low, eng1_buf_m30_close)
+        [eng1_m30_bull_ob_top_tmp, eng1_m30_bull_ob_bottom_tmp, eng1_m30_bull_ob_bar_tmp, eng1_m30_bull_ob_breaker_tmp, eng1_m30_bull_ob_breaker_time_tmp, eng1_m30_bear_ob_top_tmp, eng1_m30_bear_ob_bottom_tmp, eng1_m30_bear_ob_bar_tmp, eng1_m30_bear_ob_breaker_tmp, eng1_m30_bear_ob_breaker_time_tmp] = f_eng1_build_ob(eng1_buf_m30_time, eng1_buf_m30_open, eng1_buf_m30_high, eng1_buf_m30_low, eng1_buf_m30_close)
         eng1_m30_bull_ob_top := eng1_m30_bull_ob_top_tmp
         eng1_m30_bull_ob_bottom := eng1_m30_bull_ob_bottom_tmp
-        eng1_m30_bull_ob_entry := eng1_m30_bull_ob_entry_tmp
         eng1_m30_bull_ob_bar := eng1_m30_bull_ob_bar_tmp
         eng1_m30_bull_ob_breaker := eng1_m30_bull_ob_breaker_tmp
         array.set(eng1_ctx_bull_ob_breaker_time_by_tf, 1, eng1_m30_bull_ob_breaker_time_tmp)
         eng1_m30_bear_ob_top := eng1_m30_bear_ob_top_tmp
         eng1_m30_bear_ob_bottom := eng1_m30_bear_ob_bottom_tmp
-        eng1_m30_bear_ob_entry := eng1_m30_bear_ob_entry_tmp
         eng1_m30_bear_ob_bar := eng1_m30_bear_ob_bar_tmp
         eng1_m30_bear_ob_breaker := eng1_m30_bear_ob_breaker_tmp
         array.set(eng1_ctx_bear_ob_breaker_time_by_tf, 1, eng1_m30_bear_ob_breaker_time_tmp)
     if recalc_h1
-        [eng1_h1_bull_ob_top_tmp, eng1_h1_bull_ob_bottom_tmp, eng1_h1_bull_ob_entry_tmp, eng1_h1_bull_ob_bar_tmp, eng1_h1_bull_ob_breaker_tmp, eng1_h1_bull_ob_breaker_time_tmp, eng1_h1_bear_ob_top_tmp, eng1_h1_bear_ob_bottom_tmp, eng1_h1_bear_ob_entry_tmp, eng1_h1_bear_ob_bar_tmp, eng1_h1_bear_ob_breaker_tmp, eng1_h1_bear_ob_breaker_time_tmp] = f_eng1_build_ob(eng1_buf_h1_time, eng1_buf_h1_open, eng1_buf_h1_high, eng1_buf_h1_low, eng1_buf_h1_close)
+        [eng1_h1_bull_ob_top_tmp, eng1_h1_bull_ob_bottom_tmp, eng1_h1_bull_ob_bar_tmp, eng1_h1_bull_ob_breaker_tmp, eng1_h1_bull_ob_breaker_time_tmp, eng1_h1_bear_ob_top_tmp, eng1_h1_bear_ob_bottom_tmp, eng1_h1_bear_ob_bar_tmp, eng1_h1_bear_ob_breaker_tmp, eng1_h1_bear_ob_breaker_time_tmp] = f_eng1_build_ob(eng1_buf_h1_time, eng1_buf_h1_open, eng1_buf_h1_high, eng1_buf_h1_low, eng1_buf_h1_close)
         eng1_h1_bull_ob_top := eng1_h1_bull_ob_top_tmp
         eng1_h1_bull_ob_bottom := eng1_h1_bull_ob_bottom_tmp
-        eng1_h1_bull_ob_entry := eng1_h1_bull_ob_entry_tmp
         eng1_h1_bull_ob_bar := eng1_h1_bull_ob_bar_tmp
         eng1_h1_bull_ob_breaker := eng1_h1_bull_ob_breaker_tmp
         array.set(eng1_ctx_bull_ob_breaker_time_by_tf, 2, eng1_h1_bull_ob_breaker_time_tmp)
         eng1_h1_bear_ob_top := eng1_h1_bear_ob_top_tmp
         eng1_h1_bear_ob_bottom := eng1_h1_bear_ob_bottom_tmp
-        eng1_h1_bear_ob_entry := eng1_h1_bear_ob_entry_tmp
         eng1_h1_bear_ob_bar := eng1_h1_bear_ob_bar_tmp
         eng1_h1_bear_ob_breaker := eng1_h1_bear_ob_breaker_tmp
         array.set(eng1_ctx_bear_ob_breaker_time_by_tf, 2, eng1_h1_bear_ob_breaker_time_tmp)
     if recalc_h4
-        [eng1_h4_bull_ob_top_tmp, eng1_h4_bull_ob_bottom_tmp, eng1_h4_bull_ob_entry_tmp, eng1_h4_bull_ob_bar_tmp, eng1_h4_bull_ob_breaker_tmp, eng1_h4_bull_ob_breaker_time_tmp, eng1_h4_bear_ob_top_tmp, eng1_h4_bear_ob_bottom_tmp, eng1_h4_bear_ob_entry_tmp, eng1_h4_bear_ob_bar_tmp, eng1_h4_bear_ob_breaker_tmp, eng1_h4_bear_ob_breaker_time_tmp] = f_eng1_build_ob(eng1_buf_h4_time, eng1_buf_h4_open, eng1_buf_h4_high, eng1_buf_h4_low, eng1_buf_h4_close)
+        [eng1_h4_bull_ob_top_tmp, eng1_h4_bull_ob_bottom_tmp, eng1_h4_bull_ob_bar_tmp, eng1_h4_bull_ob_breaker_tmp, eng1_h4_bull_ob_breaker_time_tmp, eng1_h4_bear_ob_top_tmp, eng1_h4_bear_ob_bottom_tmp, eng1_h4_bear_ob_bar_tmp, eng1_h4_bear_ob_breaker_tmp, eng1_h4_bear_ob_breaker_time_tmp] = f_eng1_build_ob(eng1_buf_h4_time, eng1_buf_h4_open, eng1_buf_h4_high, eng1_buf_h4_low, eng1_buf_h4_close)
         eng1_h4_bull_ob_top := eng1_h4_bull_ob_top_tmp
         eng1_h4_bull_ob_bottom := eng1_h4_bull_ob_bottom_tmp
-        eng1_h4_bull_ob_entry := eng1_h4_bull_ob_entry_tmp
         eng1_h4_bull_ob_bar := eng1_h4_bull_ob_bar_tmp
         eng1_h4_bull_ob_breaker := eng1_h4_bull_ob_breaker_tmp
         array.set(eng1_ctx_bull_ob_breaker_time_by_tf, 3, eng1_h4_bull_ob_breaker_time_tmp)
         eng1_h4_bear_ob_top := eng1_h4_bear_ob_top_tmp
         eng1_h4_bear_ob_bottom := eng1_h4_bear_ob_bottom_tmp
-        eng1_h4_bear_ob_entry := eng1_h4_bear_ob_entry_tmp
         eng1_h4_bear_ob_bar := eng1_h4_bear_ob_bar_tmp
         eng1_h4_bear_ob_breaker := eng1_h4_bear_ob_breaker_tmp
         array.set(eng1_ctx_bear_ob_breaker_time_by_tf, 3, eng1_h4_bear_ob_breaker_time_tmp)
     if recalc_d1
-        [eng1_d1_bull_ob_top_tmp, eng1_d1_bull_ob_bottom_tmp, eng1_d1_bull_ob_entry_tmp, eng1_d1_bull_ob_bar_tmp, eng1_d1_bull_ob_breaker_tmp, eng1_d1_bull_ob_breaker_time_tmp, eng1_d1_bear_ob_top_tmp, eng1_d1_bear_ob_bottom_tmp, eng1_d1_bear_ob_entry_tmp, eng1_d1_bear_ob_bar_tmp, eng1_d1_bear_ob_breaker_tmp, eng1_d1_bear_ob_breaker_time_tmp] = f_eng1_build_ob(eng1_buf_d1_time, eng1_buf_d1_open, eng1_buf_d1_high, eng1_buf_d1_low, eng1_buf_d1_close)
+        [eng1_d1_bull_ob_top_tmp, eng1_d1_bull_ob_bottom_tmp, eng1_d1_bull_ob_bar_tmp, eng1_d1_bull_ob_breaker_tmp, eng1_d1_bull_ob_breaker_time_tmp, eng1_d1_bear_ob_top_tmp, eng1_d1_bear_ob_bottom_tmp, eng1_d1_bear_ob_bar_tmp, eng1_d1_bear_ob_breaker_tmp, eng1_d1_bear_ob_breaker_time_tmp] = f_eng1_build_ob(eng1_buf_d1_time, eng1_buf_d1_open, eng1_buf_d1_high, eng1_buf_d1_low, eng1_buf_d1_close)
         eng1_d1_bull_ob_top := eng1_d1_bull_ob_top_tmp
         eng1_d1_bull_ob_bottom := eng1_d1_bull_ob_bottom_tmp
-        eng1_d1_bull_ob_entry := eng1_d1_bull_ob_entry_tmp
         eng1_d1_bull_ob_bar := eng1_d1_bull_ob_bar_tmp
         eng1_d1_bull_ob_breaker := eng1_d1_bull_ob_breaker_tmp
         array.set(eng1_ctx_bull_ob_breaker_time_by_tf, 4, eng1_d1_bull_ob_breaker_time_tmp)
         eng1_d1_bear_ob_top := eng1_d1_bear_ob_top_tmp
         eng1_d1_bear_ob_bottom := eng1_d1_bear_ob_bottom_tmp
-        eng1_d1_bear_ob_entry := eng1_d1_bear_ob_entry_tmp
         eng1_d1_bear_ob_bar := eng1_d1_bear_ob_bar_tmp
         eng1_d1_bear_ob_breaker := eng1_d1_bear_ob_breaker_tmp
         array.set(eng1_ctx_bear_ob_breaker_time_by_tf, 4, eng1_d1_bear_ob_breaker_time_tmp)
@@ -2734,14 +2706,12 @@ if eng1_ctx_tf == ENG1_TF_M15
     eng1_ctx_bear_ob_breaker_time := array.get(eng1_ctx_bear_ob_breaker_time_by_tf, 0)
     eng1_ctx_bull_ob_top := eng1_m15_bull_ob_top
     eng1_ctx_bull_ob_bottom := eng1_m15_bull_ob_bottom
-    eng1_ctx_bull_ob_entry := eng1_m15_bull_ob_entry
     eng1_ctx_bull_ob_bar := eng1_m15_bull_ob_bar
     eng1_ctx_bull_fvg_top := eng1_m15_bull_fvg_top
     eng1_ctx_bull_fvg_bottom := eng1_m15_bull_fvg_bottom
     eng1_ctx_bull_fvg_bar := eng1_m15_bull_fvg_bar
     eng1_ctx_bear_ob_top := eng1_m15_bear_ob_top
     eng1_ctx_bear_ob_bottom := eng1_m15_bear_ob_bottom
-    eng1_ctx_bear_ob_entry := eng1_m15_bear_ob_entry
     eng1_ctx_bear_ob_bar := eng1_m15_bear_ob_bar
     eng1_ctx_bear_fvg_top := eng1_m15_bear_fvg_top
     eng1_ctx_bear_fvg_bottom := eng1_m15_bear_fvg_bottom
@@ -2760,14 +2730,12 @@ else if eng1_ctx_tf == ENG1_TF_M30
     eng1_ctx_bear_ob_breaker_time := array.get(eng1_ctx_bear_ob_breaker_time_by_tf, 1)
     eng1_ctx_bull_ob_top := eng1_m30_bull_ob_top
     eng1_ctx_bull_ob_bottom := eng1_m30_bull_ob_bottom
-    eng1_ctx_bull_ob_entry := eng1_m30_bull_ob_entry
     eng1_ctx_bull_ob_bar := eng1_m30_bull_ob_bar
     eng1_ctx_bull_fvg_top := eng1_m30_bull_fvg_top
     eng1_ctx_bull_fvg_bottom := eng1_m30_bull_fvg_bottom
     eng1_ctx_bull_fvg_bar := eng1_m30_bull_fvg_bar
     eng1_ctx_bear_ob_top := eng1_m30_bear_ob_top
     eng1_ctx_bear_ob_bottom := eng1_m30_bear_ob_bottom
-    eng1_ctx_bear_ob_entry := eng1_m30_bear_ob_entry
     eng1_ctx_bear_ob_bar := eng1_m30_bear_ob_bar
     eng1_ctx_bear_fvg_top := eng1_m30_bear_fvg_top
     eng1_ctx_bear_fvg_bottom := eng1_m30_bear_fvg_bottom
@@ -2786,14 +2754,12 @@ else if eng1_ctx_tf == ENG1_TF_H1
     eng1_ctx_bear_ob_breaker_time := array.get(eng1_ctx_bear_ob_breaker_time_by_tf, 2)
     eng1_ctx_bull_ob_top := eng1_h1_bull_ob_top
     eng1_ctx_bull_ob_bottom := eng1_h1_bull_ob_bottom
-    eng1_ctx_bull_ob_entry := eng1_h1_bull_ob_entry
     eng1_ctx_bull_ob_bar := eng1_h1_bull_ob_bar
     eng1_ctx_bull_fvg_top := eng1_h1_bull_fvg_top
     eng1_ctx_bull_fvg_bottom := eng1_h1_bull_fvg_bottom
     eng1_ctx_bull_fvg_bar := eng1_h1_bull_fvg_bar
     eng1_ctx_bear_ob_top := eng1_h1_bear_ob_top
     eng1_ctx_bear_ob_bottom := eng1_h1_bear_ob_bottom
-    eng1_ctx_bear_ob_entry := eng1_h1_bear_ob_entry
     eng1_ctx_bear_ob_bar := eng1_h1_bear_ob_bar
     eng1_ctx_bear_fvg_top := eng1_h1_bear_fvg_top
     eng1_ctx_bear_fvg_bottom := eng1_h1_bear_fvg_bottom
@@ -2812,14 +2778,12 @@ else if eng1_ctx_tf == ENG1_TF_H4
     eng1_ctx_bear_ob_breaker_time := array.get(eng1_ctx_bear_ob_breaker_time_by_tf, 3)
     eng1_ctx_bull_ob_top := eng1_h4_bull_ob_top
     eng1_ctx_bull_ob_bottom := eng1_h4_bull_ob_bottom
-    eng1_ctx_bull_ob_entry := eng1_h4_bull_ob_entry
     eng1_ctx_bull_ob_bar := eng1_h4_bull_ob_bar
     eng1_ctx_bull_fvg_top := eng1_h4_bull_fvg_top
     eng1_ctx_bull_fvg_bottom := eng1_h4_bull_fvg_bottom
     eng1_ctx_bull_fvg_bar := eng1_h4_bull_fvg_bar
     eng1_ctx_bear_ob_top := eng1_h4_bear_ob_top
     eng1_ctx_bear_ob_bottom := eng1_h4_bear_ob_bottom
-    eng1_ctx_bear_ob_entry := eng1_h4_bear_ob_entry
     eng1_ctx_bear_ob_bar := eng1_h4_bear_ob_bar
     eng1_ctx_bear_fvg_top := eng1_h4_bear_fvg_top
     eng1_ctx_bear_fvg_bottom := eng1_h4_bear_fvg_bottom
@@ -2838,14 +2802,12 @@ else if eng1_ctx_tf == ENG1_TF_D1
     eng1_ctx_bear_ob_breaker_time := array.get(eng1_ctx_bear_ob_breaker_time_by_tf, 4)
     eng1_ctx_bull_ob_top := eng1_d1_bull_ob_top
     eng1_ctx_bull_ob_bottom := eng1_d1_bull_ob_bottom
-    eng1_ctx_bull_ob_entry := eng1_d1_bull_ob_entry
     eng1_ctx_bull_ob_bar := eng1_d1_bull_ob_bar
     eng1_ctx_bull_fvg_top := eng1_d1_bull_fvg_top
     eng1_ctx_bull_fvg_bottom := eng1_d1_bull_fvg_bottom
     eng1_ctx_bull_fvg_bar := eng1_d1_bull_fvg_bar
     eng1_ctx_bear_ob_top := eng1_d1_bear_ob_top
     eng1_ctx_bear_ob_bottom := eng1_d1_bear_ob_bottom
-    eng1_ctx_bear_ob_entry := eng1_d1_bear_ob_entry
     eng1_ctx_bear_ob_bar := eng1_d1_bear_ob_bar
     eng1_ctx_bear_fvg_top := eng1_d1_bear_fvg_top
     eng1_ctx_bear_fvg_bottom := eng1_d1_bear_fvg_bottom
@@ -2854,6 +2816,8 @@ else if eng1_ctx_tf == ENG1_TF_D1
     eng1_ctx_liq_low := eng1_d1_eql_active ? eng1_d1_eql : eng1_d1_last_swing_low
     eng1_ctx_liq_high_bar := eng1_d1_eqh_active ? eng1_d1_eqh_bar : eng1_d1_last_swing_high_bar
     eng1_ctx_liq_low_bar := eng1_d1_eql_active ? eng1_d1_eql_bar : eng1_d1_last_swing_low_bar
+eng1_ctx_bull_ob_entry := not na(eng1_ctx_bull_ob_top) and not na(eng1_ctx_bull_ob_bottom) ? f_eng1_ob_entry_from_meta(eng1_ctx_bull_ob_top, eng1_ctx_bull_ob_bottom) : na
+eng1_ctx_bear_ob_entry := not na(eng1_ctx_bear_ob_top) and not na(eng1_ctx_bear_ob_bottom) ? f_eng1_ob_entry_from_meta(eng1_ctx_bear_ob_top, eng1_ctx_bear_ob_bottom) : na
 eng1_ctx_bull_breakout := false
 eng1_ctx_bear_breakout := false
 eng1_ctx_bull_choch := false
