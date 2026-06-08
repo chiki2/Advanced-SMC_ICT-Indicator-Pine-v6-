@@ -4199,7 +4199,7 @@ f_eng4_render_dashboard() =>
         bool pStrictOk = pLong ? strictLongPdArrayOwned : strictShortPdArrayOwned
         bool poiUsed = pLong ? eng3LongActivePoiIdentity == eng3LongConsumedPoiIdentity : eng3ShortActivePoiIdentity == eng3ShortConsumedPoiIdentity
         string pSide = pLong ? "L " : "S "
-        string pWhy = not poiCtxOk ? "No POI: Gate" : not poiZoneOk ? "No POI: Zone" : not poiMapOk ? "No POI: Map" : not poiLegOk ? "Audit Leg" : not poiPickOk ? "No POI: Select" : not poiIdOk ? "No POI: Sync" : not pStrictOk ? "Audit Leg" : poiUsed ? "No POI: Used" : "No POI"
+        string pWhy = not poiCtxOk ? "No POI: Gate" : not poiZoneOk ? "No POI: Zone" : not poiMapOk ? "No POI: Map" : not poiLegOk ? "Need Leg" : not poiPickOk ? "No POI: Select" : not poiIdOk ? "No POI: Sync" : not pStrictOk ? "Need Leg" : poiUsed ? "No POI: Used" : "No POI"
         string pRetWhy = pLong ? longPoiRetireReason : shortPoiRetireReason
         bool pRetired = pLong ? longRetired : shortRetired
         bool pActive = pValid and not pRetired
@@ -4228,7 +4228,7 @@ f_eng4_render_dashboard() =>
         string sGate = not sBiasOk ? "Need Bias" : not sCtxOk ? "Need Ctx" : not sPdOk ? "Need PD" : not sOteOk ? "Need OTE" : not sDolOk ? "Need DOL" : not sKzOk ? "Need KZ" : "Strict OK"
         string stepTxt = not sweepOk ? "Need Sweep" : not mssOk ? "Need MSS" : not dispOk ? "Need Disp" : sGate
         bool waitLeg = not pRetired and not pValid and poiZoneOk and poiMapOk and (not poiLegOk or not pStrictOk)
-        string nextText = waitLeg ? "Wait Leg" : f_eng4_next_text(cWait, waitTxt, eState, sMode, pValid, pRetired, stepTxt)
+        string nextText = waitLeg ? "Need Leg" : f_eng4_next_text(cWait, waitTxt, eState, sMode, pValid, pRetired, stepTxt)
         string pxText = syminfo.ticker + " " + timeframe.period + " | Px " + f_formatLevel(dPx)
         string sideFull = dLong ? "Long " : "Short "
         string sideMini = dLong ? "L " : "S "
@@ -4240,7 +4240,7 @@ f_eng4_render_dashboard() =>
         setupTxt := ordGate ? (cBoth ? "Focus " + sideFull : sideFull) + "Gate " + stepTxt + " " + f_formatLevel(eLvl) : setupTxt
         setupMini := ordGate ? sideMini + "Gate " + stepTxt : setupMini
         bool riskOk = planOk and f_executionRiskVisible(eState) and ordOk
-        string ordText = waitLeg ? "Audit Leg" : not planOk ? "No order" : (ordGate ? "Gate " + stepTxt + " | Plan E " : riskOk ? "E " : "Plan E ") + f_formatLevel(eLvl) + " | SL " + f_formatLevel(slLvl) + " | TP " + f_formatLevel(tpLvl)
+        string ordText = waitLeg ? "Need Leg" : not planOk ? "No order" : (ordGate ? "Gate " + stepTxt + " | Plan E " : riskOk ? "E " : "Plan E ") + f_formatLevel(eLvl) + " | SL " + f_formatLevel(slLvl) + " | TP " + f_formatLevel(tpLvl)
         ordText := cBoth ? "Focus " + sideFull + "| " + ordText : ordText
         string trigText = idleNoLivePoi ? pSide + "Wait new POI" : not pValid ? pSide + pWhy : showRetiredPoi ? pSide + (pRetWhy == "" ? "POI Retired" : "POI " + pRetWhy) : pSide + (sMode ? stepTxt : not sweepOk ? "Need Sweep" : not mssOk ? "Need MSS" : not dispOk ? "Need Disp" : "Trigger OK")
         bool pGate = sMode and pActive and not (sweepOk and mssOk and dispOk and strictOk)
@@ -4264,7 +4264,7 @@ f_eng4_render_dashboard() =>
             f_setCell(dashboardCompact, 0, 4, "POI", color.white, panelCellBg)
             f_setCell(dashboardCompact, 1, 4, pText, color.white, dPoi)
             f_setCell(dashboardCompact, 0, 5, "Order", color.white, panelCellBg)
-            f_setCell(dashboardCompact, 1, 5, waitLeg ? "Audit Leg" : not planOk ? "No order" : ordGate ? "Gate " + stepTxt : riskOk ? "Order OK" : "Plan", color.white, dOrder)
+            f_setCell(dashboardCompact, 1, 5, waitLeg ? "Need Leg" : not planOk ? "No order" : ordGate ? "Gate " + stepTxt : riskOk ? "Order OK" : "Plan", color.white, dOrder)
             f_setCell(dashboardCompact, 0, 6, "Next", color.white, panelCellBg)
             f_setCell(dashboardCompact, 1, 6, nextText, color.white, dNext)
         else
