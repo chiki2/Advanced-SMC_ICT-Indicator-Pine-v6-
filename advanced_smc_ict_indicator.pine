@@ -1173,17 +1173,15 @@ f_eng3_ready(bool hasContext, float top, float bottom, int createdBar) =>
 f_eng3_select_context_poi(bool preferOb, bool preferFvg, bool obIsBreaker, float obTop, float obBottom, float obEntry, int obCreatedBar, bool obTouched, float fvgTop, float fvgBottom, int fvgCreatedBar, bool fvgTouched) =>
     bool selectedOb = preferOb and not na(obTop) and not na(obBottom) and not na(obEntry)
     bool selectedFvg = not selectedOb and preferFvg and not na(fvgTop) and not na(fvgBottom)
-    bool poiValid = selectedOb or selectedFvg
     string poiType = selectedOb ? (obIsBreaker ? "Breaker" : "OB") : selectedFvg ? "FVG" : ""
     float poiTop = selectedOb ? obTop : selectedFvg ? fvgTop : na
     float poiBottom = selectedOb ? obBottom : selectedFvg ? fvgBottom : na
     float poiEntry = selectedOb ? obEntry : selectedFvg ? f_zoneMid(fvgTop, fvgBottom) : na
     int poiBar = selectedOb ? obCreatedBar : selectedFvg ? fvgCreatedBar : na
     bool poiTouched = selectedOb ? obTouched : selectedFvg ? fvgTouched : false
-    [poiValid, poiType, poiTop, poiBottom, poiEntry, poiBar, poiTouched]
+    [poiType, poiTop, poiBottom, poiEntry, poiBar, poiTouched]
 
-f_eng3_build_trade_plan(bool isBull, bool poiValid, float poiTop, float poiBottom, float poiEntry, int poiCreatedBar, float execLiqHigh, float execLiqLow, float execEqHigh, float execEqLow, float ctxHigh, float ctxLow) =>
-    float entry = poiValid ? poiEntry : na
+f_eng3_build_trade_plan(bool isBull, float entry, float execLiqHigh, float execLiqLow, float execEqHigh, float execEqLow, float ctxHigh, float ctxLow) =>
     float slAtr = math.max(nz(sessRefAtr, atrSafe), syminfo.mintick)
     float stop = not na(entry) ? (isBull ? entry - slAtr : entry + slAtr) : na
     float target = na
@@ -1192,7 +1190,7 @@ f_eng3_build_trade_plan(bool isBull, bool poiValid, float poiTop, float poiBotto
         float risk = not na(stop) ? (isBull ? entry - stop : stop - entry) : na
         if na(target) and not na(risk) and risk > 0
             target := isBull ? entry + risk * 2.0 : entry - risk * 2.0
-    [entry, stop, target, poiValid ? poiTop : na, poiValid ? poiBottom : na, poiValid ? poiCreatedBar : na]
+    [entry, stop, target]
 
 f_eng3_validate_narrative_side(bool bullSide, bool execValid, int narrBias, int ctxTrendBias, bool ctxBullReversal, bool ctxBearReversal) =>
     bool ctxNeutral = ctxTrendBias == 0 and not ctxBullReversal and not ctxBearReversal
@@ -3344,19 +3342,25 @@ bool bearObInZone = hasBearOb and not na(eng3SignalClose) and eng3SignalClose >=
 [preferBullOb, preferBullFvg] = f_eng3_select_poi_preference(strictModeEnabled, hasBullOb, hasBullFvg, bullObZoneConfirmPass, bullFvgZoneConfirmPass, bullObInZone, bullFvgInZone, bullObStrictPdOwned, bullFvgStrictPdOwned)
 [preferBearOb, preferBearFvg] = f_eng3_select_poi_preference(strictModeEnabled, hasBearOb, hasBearFvg, bearObZoneConfirmPass, bearFvgZoneConfirmPass, bearObInZone, bearFvgInZone, bearObStrictPdOwned, bearFvgStrictPdOwned)
 
-[poi_long_candidate_valid, poi_long_type, poi_long_top, poi_long_bottom, poi_long_entry, poi_long_bar, poi_long_touched] = f_eng3_select_context_poi(preferBullOb, preferBullFvg, ctxBullObBreaker, ctxBullObTop, ctxBullObBottom, ctxBullObEntry, ctxBullObCreatedBar, ctxBullObTouched, ctxBullFvgTop, ctxBullFvgBottom, ctxBullFvgCreatedBar, ctxBullFvgTouched)
-[poi_short_candidate_valid, poi_short_type, poi_short_top, poi_short_bottom, poi_short_entry, poi_short_bar, poi_short_touched] = f_eng3_select_context_poi(preferBearOb, preferBearFvg, ctxBearObBreaker, ctxBearObTop, ctxBearObBottom, ctxBearObEntry, ctxBearObCreatedBar, ctxBearObTouched, ctxBearFvgTop, ctxBearFvgBottom, ctxBearFvgCreatedBar, ctxBearFvgTouched)
+[poi_long_type, poi_long_top, poi_long_bottom, poi_long_entry, poi_long_bar, poi_long_touched] = f_eng3_select_context_poi(preferBullOb, preferBullFvg, ctxBullObBreaker, ctxBullObTop, ctxBullObBottom, ctxBullObEntry, ctxBullObCreatedBar, ctxBullObTouched, ctxBullFvgTop, ctxBullFvgBottom, ctxBullFvgCreatedBar, ctxBullFvgTouched)
+[poi_short_type, poi_short_top, poi_short_bottom, poi_short_entry, poi_short_bar, poi_short_touched] = f_eng3_select_context_poi(preferBearOb, preferBearFvg, ctxBearObBreaker, ctxBearObTop, ctxBearObBottom, ctxBearObEntry, ctxBearObCreatedBar, ctxBearObTouched, ctxBearFvgTop, ctxBearFvgBottom, ctxBearFvgCreatedBar, ctxBearFvgTouched)
 eng3LongActivePoiIdentity := f_eng3_poi_identity("L", poi_long_type, poi_long_bar, poi_long_top, poi_long_bottom)
 eng3ShortActivePoiIdentity := f_eng3_poi_identity("S", poi_short_type, poi_short_bar, poi_short_top, poi_short_bottom)
 bool eng3LongActivePoiReady = eng3LongActivePoiIdentity != ""
 bool eng3ShortActivePoiReady = eng3ShortActivePoiIdentity != ""
 bool strictLongPdArrayOwned = not strictModeEnabled or (poi_long_type == "FVG" and bullFvgStrictPdOwned) or ((poi_long_type == "OB" or poi_long_type == "Breaker") and bullObStrictPdOwned)
 bool strictShortPdArrayOwned = not strictModeEnabled or (poi_short_type == "FVG" and bearFvgStrictPdOwned) or ((poi_short_type == "OB" or poi_short_type == "Breaker") and bearObStrictPdOwned)
-bool poi_long_contract_valid = eng1BullContextAllowed and poi_long_candidate_valid and eng3LongActivePoiReady and strictLongPdArrayOwned and eng3LongActivePoiIdentity != eng3LongConsumedPoiIdentity
-bool poi_short_contract_valid = eng1BearContextAllowed and poi_short_candidate_valid and eng3ShortActivePoiReady and strictShortPdArrayOwned and eng3ShortActivePoiIdentity != eng3ShortConsumedPoiIdentity
+bool poi_long_contract_valid = eng1BullContextAllowed and poi_long_type != "" and eng3LongActivePoiReady and strictLongPdArrayOwned and eng3LongActivePoiIdentity != eng3LongConsumedPoiIdentity
+bool poi_short_contract_valid = eng1BearContextAllowed and poi_short_type != "" and eng3ShortActivePoiReady and strictShortPdArrayOwned and eng3ShortActivePoiIdentity != eng3ShortConsumedPoiIdentity
 
-[tradeLongEntry, tradeLongStop, tradeLongTarget, tradeLongValidTop, tradeLongValidBottom, tradeLongCreatedBar] = f_eng3_build_trade_plan(true, poi_long_contract_valid, poi_long_top, poi_long_bottom, poi_long_entry, poi_long_bar, eng1_exe_liq_high, eng1_exe_liq_low, eng1_exe_eqh_active ? eng1_exe_eqh : na, eng1_exe_eql_active ? eng1_exe_eql : na, eng1CtxRangeHigh, eng1CtxRangeLow)
-[tradeShortEntry, tradeShortStop, tradeShortTarget, tradeShortValidTop, tradeShortValidBottom, tradeShortCreatedBar] = f_eng3_build_trade_plan(false, poi_short_contract_valid, poi_short_top, poi_short_bottom, poi_short_entry, poi_short_bar, eng1_exe_liq_high, eng1_exe_liq_low, eng1_exe_eqh_active ? eng1_exe_eqh : na, eng1_exe_eql_active ? eng1_exe_eql : na, eng1CtxRangeHigh, eng1CtxRangeLow)
+[tradeLongEntry, tradeLongStop, tradeLongTarget] = f_eng3_build_trade_plan(true, poi_long_contract_valid ? poi_long_entry : na, eng1_exe_liq_high, eng1_exe_liq_low, eng1_exe_eqh_active ? eng1_exe_eqh : na, eng1_exe_eql_active ? eng1_exe_eql : na, eng1CtxRangeHigh, eng1CtxRangeLow)
+[tradeShortEntry, tradeShortStop, tradeShortTarget] = f_eng3_build_trade_plan(false, poi_short_contract_valid ? poi_short_entry : na, eng1_exe_liq_high, eng1_exe_liq_low, eng1_exe_eqh_active ? eng1_exe_eqh : na, eng1_exe_eql_active ? eng1_exe_eql : na, eng1CtxRangeHigh, eng1CtxRangeLow)
+float tradeLongValidTop = poi_long_contract_valid ? poi_long_top : na
+float tradeLongValidBottom = poi_long_contract_valid ? poi_long_bottom : na
+int tradeLongCreatedBar = poi_long_contract_valid ? poi_long_bar : na
+float tradeShortValidTop = poi_short_contract_valid ? poi_short_top : na
+float tradeShortValidBottom = poi_short_contract_valid ? poi_short_bottom : na
+int tradeShortCreatedBar = poi_short_contract_valid ? poi_short_bar : na
 bool lOb = poi_long_contract_valid and (poi_long_type == "OB" or poi_long_type == "Breaker")
 bool lFvg = poi_long_contract_valid and poi_long_type == "FVG"
 bool lTch = poi_long_contract_valid and poi_long_touched
@@ -4128,7 +4132,7 @@ f_eng4_render_dashboard() =>
         bool poiZoneOk = pLong ? (hasBullOb or hasBullFvg) : (hasBearOb or hasBearFvg)
         bool poiMapOk = pLong ? (eng3BullObTrackValid or eng3BullFvgTrackValid) : (eng3BearObTrackValid or eng3BearFvgTrackValid)
         bool poiLegOk = not sMode or (pLong ? (bullObStrictPdOwned or bullFvgStrictPdOwned) : (bearObStrictPdOwned or bearFvgStrictPdOwned))
-        bool poiPickOk = pLong ? poi_long_candidate_valid : poi_short_candidate_valid
+        bool poiPickOk = pType != ""
         bool poiIdOk = pLong ? eng3LongActivePoiReady : eng3ShortActivePoiReady
         bool pStrictOk = pLong ? strictLongPdArrayOwned : strictShortPdArrayOwned
         bool poiUsed = pLong ? eng3LongActivePoiIdentity == eng3LongConsumedPoiIdentity : eng3ShortActivePoiIdentity == eng3ShortConsumedPoiIdentity
