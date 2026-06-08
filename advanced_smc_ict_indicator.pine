@@ -4242,7 +4242,7 @@ f_eng4_render_dashboard() =>
         bool riskOk = planOk and f_executionRiskVisible(eState) and ordOk
         string ordText = waitLeg ? "Need Leg" : not planOk ? "No order" : (ordGate ? "Gate " + stepTxt + " | Plan E " : riskOk ? "E " : "Plan E ") + f_formatLevel(eLvl) + " | SL " + f_formatLevel(slLvl) + " | TP " + f_formatLevel(tpLvl)
         ordText := cBoth ? "Focus " + sideFull + "| " + ordText : ordText
-        string trigText = idleNoLivePoi ? pSide + "Wait new POI" : not pValid ? pSide + pWhy : showRetiredPoi ? pSide + (pRetWhy == "" ? "POI Retired" : "POI " + pRetWhy) : pSide + (sMode ? stepTxt : not sweepOk ? "Need Sweep" : not mssOk ? "Need MSS" : not dispOk ? "Need Disp" : "Trigger OK")
+        string trigText = idleNoLivePoi ? pSide + "Wait POI" : not pValid ? pSide + pWhy : showRetiredPoi ? pSide + (pRetWhy == "" ? "POI Retired" : "POI " + pRetWhy) : pSide + (sMode ? stepTxt : not sweepOk ? "Need Sweep" : not mssOk ? "Need MSS" : not dispOk ? "Need Disp" : "Ready")
         bool pGate = sMode and pActive and not (sweepOk and mssOk and dispOk and strictOk)
         string pText = idleNoLivePoi ? idlePoiText : not pValid ? pSide + pWhy : showRetiredPoi ? pSide + (pRetWhy == "" ? "Retired" : "Retired: " + pRetWhy) : pSide + (pType == "Breaker" ? "BRK" : pType == "OB" ? "bOB" : pType) + " " + f_formatLevel(pEntry) + " | " + f_poiLifecycleDisplayText(pLife, pType)
         pText := pGate ? pText + " | " + stepTxt : pText
