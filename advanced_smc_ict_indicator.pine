@@ -4205,7 +4205,8 @@ f_eng4_render_dashboard() =>
         bool pActive = pValid and not pRetired
         bool idleNoLivePoi = cWait and not longPoiLive and not shortPoiLive
         bool showRetiredPoi = pValid and pRetired and not idleNoLivePoi
-        string idlePoiText = pSide + "No live POI" + (pRetWhy == "" ? "" : " | " + pRetWhy)
+        string idlePoiReason = pRetWhy != "" ? pRetWhy : not pValid and pWhy != "No POI" ? pWhy : ""
+        string idlePoiText = pSide + "No live POI" + (idlePoiReason == "" ? "" : " | " + idlePoiReason)
         bool sweepOk = pLong ? dashLongTriggerSweepOk : dashShortTriggerSweepOk
         bool mssOk = pLong ? dashLongTriggerMssOk : dashShortTriggerMssOk
         bool dispOk = pLong ? dashLongTriggerDisplacementOk : dashShortTriggerDisplacementOk
@@ -4241,9 +4242,9 @@ f_eng4_render_dashboard() =>
         bool riskOk = planOk and f_executionRiskVisible(eState) and ordOk
         string ordText = waitLeg ? "Audit Leg" : not planOk ? "No order" : (ordGate ? "Gate " + stepTxt + " | Plan E " : riskOk ? "E " : "Plan E ") + f_formatLevel(eLvl) + " | SL " + f_formatLevel(slLvl) + " | TP " + f_formatLevel(tpLvl)
         ordText := cBoth ? "Focus " + sideFull + "| " + ordText : ordText
-        string trigText = idleNoLivePoi and pRetired ? pSide + "Wait new POI" : not pValid ? pSide + pWhy : showRetiredPoi ? pSide + (pRetWhy == "" ? "POI Retired" : "POI " + pRetWhy) : pSide + (sMode ? stepTxt : not sweepOk ? "Need Sweep" : not mssOk ? "Need MSS" : not dispOk ? "Need Disp" : "Trigger OK")
+        string trigText = idleNoLivePoi ? pSide + "Wait new POI" : not pValid ? pSide + pWhy : showRetiredPoi ? pSide + (pRetWhy == "" ? "POI Retired" : "POI " + pRetWhy) : pSide + (sMode ? stepTxt : not sweepOk ? "Need Sweep" : not mssOk ? "Need MSS" : not dispOk ? "Need Disp" : "Trigger OK")
         bool pGate = sMode and pActive and not (sweepOk and mssOk and dispOk and strictOk)
-        string pText = idleNoLivePoi and pRetired ? idlePoiText : not pValid ? pSide + pWhy : showRetiredPoi ? pSide + (pRetWhy == "" ? "Retired" : "Retired: " + pRetWhy) : pSide + (pType == "Breaker" ? "BRK" : pType == "OB" ? "bOB" : pType) + " " + f_formatLevel(pEntry) + " | " + f_poiLifecycleDisplayText(pLife, pType)
+        string pText = idleNoLivePoi ? idlePoiText : not pValid ? pSide + pWhy : showRetiredPoi ? pSide + (pRetWhy == "" ? "Retired" : "Retired: " + pRetWhy) : pSide + (pType == "Breaker" ? "BRK" : pType == "OB" ? "bOB" : pType) + " " + f_formatLevel(pEntry) + " | " + f_poiLifecycleDisplayText(pLife, pType)
         pText := pGate ? pText + " | " + stepTxt : pText
         bool triggerReady = pActive and sweepOk and mssOk and dispOk and (not sMode or strictOk)
         color dNeu = color.new(neutralColor, 18)
