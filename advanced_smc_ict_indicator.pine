@@ -1153,7 +1153,7 @@ f_eng3_poi_invalidated(bool isBull, float poiTop, float poiBottom, float signalC
     not na(safeTop) and not na(safeBottom) and not na(signalClose) and (isBull ? signalClose < safeBottom : signalClose > safeTop)
 
 f_eng3_poi_lifecycle(bool poiValid, string poiType, bool poiTouched, bool mitigated, bool invalidated) =>
-    not poiValid ? "No POI" : invalidated ? "Invalidated/Superseded" : mitigated ? "Mitigated" : poiType == "Breaker" ? "Inverted/Breaker" : poiTouched ? "Tapped" : "Fresh"
+    not poiValid ? "No POI" : invalidated ? "Invalid" : mitigated ? "Mitigated" : poiType == "Breaker" ? "Inverted/Breaker" : poiTouched ? "Tapped" : "Fresh"
 
 f_eng3_poi_actionable(string poiLifecycle) =>
     poiLifecycle == "Fresh" or poiLifecycle == "Tapped" or poiLifecycle == "Inverted/Breaker"
