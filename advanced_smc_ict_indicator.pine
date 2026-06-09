@@ -143,7 +143,6 @@ var label[] eng2SwingStructureNodeHistory = array.new_label()
 var label[] eng2SwingStructureEventHistory = array.new_label()
 var line[] eng2SwingStructureEventLineHistory = array.new_line()
 var label[] eng2SignalEventLabelHistory = array.new_label()
-var int eng2EventCapCache = 0
 var int eng2LastLongSweepLabelBar = na
 var int eng2LastShortSweepLabelBar = na
 var int eng2LastBullDispLabelBar = na
@@ -1132,7 +1131,6 @@ f_eng2_emitSignalEvent(int eventTime, float level, string eventText, color event
         string labelStyle = labelAbove ? label.style_label_down : label.style_label_up
         label newLabel = label.new(x=labelTime, y=labelY, xloc=xloc.bar_time, yloc=yloc.price, text=eventText, style=labelStyle, color=eventColor, textcolor=color.white, size=size.tiny, textalign=text.align_center)
         array.push(eng2SignalEventLabelHistory, newLabel)
-        f_eng2_trim_label_history(eng2SignalEventLabelHistory, eng2EventCapCache)
     true
 
 //------------------------------------------------------------------------------
@@ -3700,7 +3698,6 @@ bool eng2RawEventLabelsAllowed = eng1_exec_valid and eng2SignalEventsStateReady 
 bool eng2KeepSweepLabels = displaySweepMarkers and eng2RawEventLabelsAllowed
 bool eng2KeepSetupLabels = eng2LongSetupEventAllowed or eng2ShortSetupEventAllowed
 int eng2EventKeepCap = eng2KeepSweepLabels or eng2KeepSetupLabels ? f_eng2_signal_event_cap() : 0
-eng2EventCapCache := eng2EventKeepCap
 f_eng2_trim_label_history(eng2SignalEventLabelHistory, eng2EventKeepCap)
 if not eng2LongSetupEventAllowed and (eng2LongTappedEventTag != "" or eng2LongMitigatedEventTag != "")
     eng2LongTappedEventTag := ""
@@ -3799,6 +3796,7 @@ if eng2AnyEventCreateReady
             if eng2BearBreakerLabelEvent
                 float eng2BearBreakerLevel = not na(eng1_ctx_bear_ob_top) and not na(eng1_ctx_bear_ob_bottom) ? f_zoneMid(eng1_ctx_bear_ob_top, eng1_ctx_bear_ob_bottom) : eng2EventHigh
                 f_eng2_emitSignalEvent(nz(eng2BearBreakerLabelTime, time), eng2BearBreakerLevel, "BRK-", color.new(bearColor, 0), true, 2.42)
+    f_eng2_trim_label_history(eng2SignalEventLabelHistory, eng2EventKeepCap)
 
 //------------------------------------------------------------------------------
 // Session range visuals
