@@ -970,9 +970,6 @@ f_eng4_next_text(bool w, string wt, string s, bool strict, bool p, bool r, strin
 f_executionSelectedFillAlpha(string s) =>
     s == "Active" ? 78 : s == "Armed" ? 82 : s == "Managed" ? 88 : s == "Completed" ? 92 : 86
 
-f_executionSelectedLineWidth(string s) =>
-    s == "Active" ? 3 : s == "Armed" ? 2 : 1
-
 f_eng2_syncLiveZone(box b, line ln, label lab, bool en, int cb, float top, float bot, float entry, string txt, string sty, color bc, color fc, int bw, bool showLine, string state) =>
     box nextBox = b
     line nextLine = ln
@@ -994,7 +991,7 @@ f_eng2_syncLiveZone(box b, line ln, label lab, bool en, int cb, float top, float
             box.set_border_color(nextBox, bc)
         box.set_border_width(nextBox, bw)
         if showLine and not na(entry)
-            int selectedLineWidth = f_executionSelectedLineWidth(state)
+            int selectedLineWidth = state == "Active" ? 3 : state == "Armed" ? 2 : 1
             if na(nextLine)
                 nextLine := line.new(x1=leftBar, y1=entry, x2=rightBar, y2=entry, xloc=xloc.bar_index, extend=extend.none, color=bc, width=selectedLineWidth, style=line.style_dotted)
             else
