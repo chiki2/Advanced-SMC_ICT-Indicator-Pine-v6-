@@ -2067,8 +2067,6 @@ var bool eng1_ctx_bull_breakout = false
 var bool eng1_ctx_bear_breakout = false
 var bool eng1_ctx_bull_choch = false
 var bool eng1_ctx_bear_choch = false
-var bool eng1_ctx_bull_reversal = false
-var bool eng1_ctx_bear_reversal = false
 var float eng1_ctx_bull_ob_top = na
 var float eng1_ctx_bull_ob_bottom = na
 var float eng1_ctx_bull_ob_entry = na
@@ -2634,8 +2632,6 @@ else if eng1_narr_tf == ENG1_TF_D1
     eng1_narr_bear_sd_bottom := eng1_d1_bear_ob_bottom
     eng1_narr_strength := f_eng1_regime_strength_from_buffer(eng1_narr_bias, eng1_buf_d1_close, eng1_buf_d1_high, eng1_buf_d1_low)
 eng1_ctx_trend_bias := 0
-eng1_ctx_bull_reversal := false
-eng1_ctx_bear_reversal := false
 eng1_ctx_bull_ob_top := na
 eng1_ctx_bull_ob_bottom := na
 eng1_ctx_bull_ob_entry := na
@@ -2660,8 +2656,6 @@ eng1_ctx_liq_high_bar := na
 eng1_ctx_liq_low_bar := na
 if eng1_ctx_tf == ENG1_TF_M15
     eng1_ctx_trend_bias := eng1_m15_trend_bias
-    eng1_ctx_bull_reversal := eng1_m15_bull_ob_breaker
-    eng1_ctx_bear_reversal := eng1_m15_bear_ob_breaker
     eng1_ctx_bull_ob_breaker := eng1_m15_bull_ob_breaker
     eng1_ctx_bear_ob_breaker := eng1_m15_bear_ob_breaker
     eng1_ctx_bull_ob_breaker_time := array.get(eng1_ctx_bull_ob_breaker_time_by_tf, 0)
@@ -2684,8 +2678,6 @@ if eng1_ctx_tf == ENG1_TF_M15
     eng1_ctx_liq_low_bar := eng1_m15_eql_active ? eng1_m15_eql_bar : eng1_m15_last_swing_low_bar
 else if eng1_ctx_tf == ENG1_TF_M30
     eng1_ctx_trend_bias := eng1_m30_trend_bias
-    eng1_ctx_bull_reversal := eng1_m30_bull_ob_breaker
-    eng1_ctx_bear_reversal := eng1_m30_bear_ob_breaker
     eng1_ctx_bull_ob_breaker := eng1_m30_bull_ob_breaker
     eng1_ctx_bear_ob_breaker := eng1_m30_bear_ob_breaker
     eng1_ctx_bull_ob_breaker_time := array.get(eng1_ctx_bull_ob_breaker_time_by_tf, 1)
@@ -2708,8 +2700,6 @@ else if eng1_ctx_tf == ENG1_TF_M30
     eng1_ctx_liq_low_bar := eng1_m30_eql_active ? eng1_m30_eql_bar : eng1_m30_last_swing_low_bar
 else if eng1_ctx_tf == ENG1_TF_H1
     eng1_ctx_trend_bias := eng1_h1_trend_bias
-    eng1_ctx_bull_reversal := eng1_h1_bull_ob_breaker
-    eng1_ctx_bear_reversal := eng1_h1_bear_ob_breaker
     eng1_ctx_bull_ob_breaker := eng1_h1_bull_ob_breaker
     eng1_ctx_bear_ob_breaker := eng1_h1_bear_ob_breaker
     eng1_ctx_bull_ob_breaker_time := array.get(eng1_ctx_bull_ob_breaker_time_by_tf, 2)
@@ -2732,8 +2722,6 @@ else if eng1_ctx_tf == ENG1_TF_H1
     eng1_ctx_liq_low_bar := eng1_h1_eql_active ? eng1_h1_eql_bar : eng1_h1_last_swing_low_bar
 else if eng1_ctx_tf == ENG1_TF_H4
     eng1_ctx_trend_bias := eng1_h4_trend_bias
-    eng1_ctx_bull_reversal := eng1_h4_bull_ob_breaker
-    eng1_ctx_bear_reversal := eng1_h4_bear_ob_breaker
     eng1_ctx_bull_ob_breaker := eng1_h4_bull_ob_breaker
     eng1_ctx_bear_ob_breaker := eng1_h4_bear_ob_breaker
     eng1_ctx_bull_ob_breaker_time := array.get(eng1_ctx_bull_ob_breaker_time_by_tf, 3)
@@ -2756,8 +2744,6 @@ else if eng1_ctx_tf == ENG1_TF_H4
     eng1_ctx_liq_low_bar := eng1_h4_eql_active ? eng1_h4_eql_bar : eng1_h4_last_swing_low_bar
 else if eng1_ctx_tf == ENG1_TF_D1
     eng1_ctx_trend_bias := eng1_d1_trend_bias
-    eng1_ctx_bull_reversal := eng1_d1_bull_ob_breaker
-    eng1_ctx_bear_reversal := eng1_d1_bear_ob_breaker
     eng1_ctx_bull_ob_breaker := eng1_d1_bull_ob_breaker
     eng1_ctx_bear_ob_breaker := eng1_d1_bear_ob_breaker
     eng1_ctx_bull_ob_breaker_time := array.get(eng1_ctx_bull_ob_breaker_time_by_tf, 4)
@@ -2876,8 +2862,6 @@ else
     eng1_ctx_bear_breakout := false
     eng1_ctx_bull_choch := false
     eng1_ctx_bear_choch := false
-    eng1_ctx_bull_reversal := false
-    eng1_ctx_bear_reversal := false
     eng1_ctx_bull_ob_top := na
     eng1_ctx_bull_ob_bottom := na
     eng1_ctx_bull_ob_entry := na
@@ -3131,10 +3115,10 @@ bool ipdaMainKillzoneActive = ipdaLondonKillzoneActive or ipdaNewYorkKillzoneAct
 string ipdaWindowSummary = ipdaNewYorkKillzoneActive ? "NY KZ" : ipdaLondonKillzoneActive ? "LDN KZ" : ipdaAsiaKillzoneActive ? "AS KZ" : strictModeEnabled and f_inIpdaWindow(ipdaObservationSession) ? "Observe" : "Off"
 liquiditySessionSummary = "Sess " + f_sessionCode(vNyOn ? "New York" : vLdOn ? "London" : vAsOn ? "Asia" : "Inter-session") + ">" + f_sessionCode(vNyOn ? "Asia" : vLdOn ? "New York" : vAsOn ? "London" : "Asia")
 timezoneSummary = "UTC"
-float effectiveOteLongTop = eng1CtxRangeReady and displayNarrBias != -1 and (displayCtxBias == 1 or eng1_ctx_bull_reversal) ? eng1CtxOteLongTop : na
-float effectiveOteLongBottom = eng1CtxRangeReady and displayNarrBias != -1 and (displayCtxBias == 1 or eng1_ctx_bull_reversal) ? eng1CtxOteLongBottom : na
-float effectiveOteShortTop = eng1CtxRangeReady and displayNarrBias != 1 and (displayCtxBias == -1 or eng1_ctx_bear_reversal) ? eng1CtxOteShortTop : na
-float effectiveOteShortBottom = eng1CtxRangeReady and displayNarrBias != 1 and (displayCtxBias == -1 or eng1_ctx_bear_reversal) ? eng1CtxOteShortBottom : na
+float effectiveOteLongTop = eng1CtxRangeReady and displayNarrBias != -1 and (displayCtxBias == 1 or eng1_ctx_bull_ob_breaker) ? eng1CtxOteLongTop : na
+float effectiveOteLongBottom = eng1CtxRangeReady and displayNarrBias != -1 and (displayCtxBias == 1 or eng1_ctx_bull_ob_breaker) ? eng1CtxOteLongBottom : na
+float effectiveOteShortTop = eng1CtxRangeReady and displayNarrBias != 1 and (displayCtxBias == -1 or eng1_ctx_bear_ob_breaker) ? eng1CtxOteShortTop : na
+float effectiveOteShortBottom = eng1CtxRangeReady and displayNarrBias != 1 and (displayCtxBias == -1 or eng1_ctx_bear_ob_breaker) ? eng1CtxOteShortBottom : na
 bool effectiveLongOteReady = not na(effectiveOteLongTop) and not na(effectiveOteLongBottom)
 bool effectiveShortOteReady = not na(effectiveOteShortTop) and not na(effectiveOteShortBottom)
 
@@ -3143,8 +3127,8 @@ bool effectiveShortOteReady = not na(effectiveOteShortTop) and not na(effectiveO
 // MAIN_CONTRACT order 5-7: build context OB/FVG zone, validate confirmations, then
 // build/update trade plan + lifecycle.
 //------------------------------------------------------------------------------
-bool eng1BullContextAllowed = f_eng3_validate_narrative_side(true, eng1_exec_valid, displayNarrBias, displayCtxBias, eng1_ctx_bull_reversal, eng1_ctx_bear_reversal)
-bool eng1BearContextAllowed = f_eng3_validate_narrative_side(false, eng1_exec_valid, displayNarrBias, displayCtxBias, eng1_ctx_bull_reversal, eng1_ctx_bear_reversal)
+bool eng1BullContextAllowed = f_eng3_validate_narrative_side(true, eng1_exec_valid, displayNarrBias, displayCtxBias, eng1_ctx_bull_ob_breaker, eng1_ctx_bear_ob_breaker)
+bool eng1BearContextAllowed = f_eng3_validate_narrative_side(false, eng1_exec_valid, displayNarrBias, displayCtxBias, eng1_ctx_bull_ob_breaker, eng1_ctx_bear_ob_breaker)
 bool eng1HasBullObContext = eng1BullContextAllowed and not na(eng1_ctx_bull_ob_entry)
 bool eng1HasBullFvgContext = eng1BullContextAllowed and not na(eng1_ctx_bull_fvg_top) and not na(eng1_ctx_bull_fvg_bottom)
 bool eng1HasBearObContext = eng1BearContextAllowed and not na(eng1_ctx_bear_ob_entry)
@@ -3376,15 +3360,15 @@ bool longDispFallbackContext = eng1_exe_bull_sweep or longMssFallbackRecent or e
 bool longDispFallback = not strictModeEnabled and longDispFallbackRecent and longDispFallbackContext
 bool effectiveLongMssSeen = strictModeEnabled ? strictLongMssMemoryPass : (eng1_exe_bull_mss or longMssFallbackRecent)
 bool effectiveLongDisplacementSeen = strictModeEnabled ? strictLongDisplacementMemoryPass : (eng1_exe_bull_displacement or longDispFallback)
-bool effectiveLongStructureInvalidated = longPoiInvalidatedLatched or (displayExecBias == -1 and (displayCtxBias == -1 or eng1_ctx_bear_reversal or eng1_exe_bear_mss))
-bool normalLongDirectionalContext = displayCtxBias != -1 and (displayExecBias == 1 or effectiveLongDirectional or eng1_ctx_bull_reversal or eng1_ctx_bull_breakout)
+bool effectiveLongStructureInvalidated = longPoiInvalidatedLatched or (displayExecBias == -1 and (displayCtxBias == -1 or eng1_ctx_bear_ob_breaker or eng1_exe_bear_mss))
+bool normalLongDirectionalContext = displayCtxBias != -1 and (displayExecBias == 1 or effectiveLongDirectional or eng1_ctx_bull_ob_breaker or eng1_ctx_bull_breakout)
 bool normalLongBiasPass = eng1_exec_valid
 bool normalLongContextPass = (lOb or lFvg) and normalLongDirectionalContext
 bool normalLongTargetPass = not na(activeLongTarget)
 // Strict adds IPDA timing/DOL/OTE; normal stays OB/FVG + direction + MSS/disp + retest.
 bool strictLongBiasPass = not strictModeEnabled or (displayNarrBias == 1 and ipdaLongDolAvailable)
 bool strictLongDirectionalPass = not strictModeEnabled or displayExecBias == 1 or (displayExecBias == 0 and (strictLongMssMemoryPass or strictLongDisplacementMemoryPass))
-bool strictLongContextTfPass = not strictModeEnabled or ((displayCtxBias == 1 or eng1_ctx_bull_reversal or eng1_ctx_bull_breakout or (displayCtxBias == 0 and strictLongDirectionalPass)) and (lOb or lFvg))
+bool strictLongContextTfPass = not strictModeEnabled or ((displayCtxBias == 1 or eng1_ctx_bull_ob_breaker or eng1_ctx_bull_breakout or (displayCtxBias == 0 and strictLongDirectionalPass)) and (lOb or lFvg))
 bool exe_long_sweep_signal = strictModeEnabled ? strictLongSweepMemoryPass : (eng1_exe_bull_sweep or longPriceInZone or longPriceNearZone or lTch)
 bool exe_long_mss_signal = strictModeEnabled ? strictLongMssMemoryPass : effectiveLongMssSeen
 bool exe_long_displacement_signal = strictModeEnabled ? strictLongDisplacementMemoryPass : effectiveLongDisplacementSeen
@@ -3452,14 +3436,14 @@ bool shortDispFallbackContext = eng1_exe_bear_sweep or shortMssFallbackRecent or
 bool shortDispFallback = not strictModeEnabled and shortDispFallbackRecent and shortDispFallbackContext
 bool effectiveShortMssSeen = strictModeEnabled ? strictShortMssMemoryPass : (eng1_exe_bear_mss or shortMssFallbackRecent)
 bool effectiveShortDisplacementSeen = strictModeEnabled ? strictShortDisplacementMemoryPass : (eng1_exe_bear_displacement or shortDispFallback)
-bool effectiveShortStructureInvalidated = shortPoiInvalidatedLatched or (displayExecBias == 1 and (displayCtxBias == 1 or eng1_ctx_bull_reversal or eng1_exe_bull_mss))
-bool normalShortDirectionalContext = displayCtxBias != 1 and (displayExecBias == -1 or effectiveShortDirectional or eng1_ctx_bear_reversal or eng1_ctx_bear_breakout)
+bool effectiveShortStructureInvalidated = shortPoiInvalidatedLatched or (displayExecBias == 1 and (displayCtxBias == 1 or eng1_ctx_bull_ob_breaker or eng1_exe_bull_mss))
+bool normalShortDirectionalContext = displayCtxBias != 1 and (displayExecBias == -1 or effectiveShortDirectional or eng1_ctx_bear_ob_breaker or eng1_ctx_bear_breakout)
 bool normalShortBiasPass = eng1_exec_valid
 bool normalShortContextPass = (sOb or sFvg) and normalShortDirectionalContext
 bool normalShortTargetPass = not na(activeShortTarget)
 bool strictShortBiasPass = not strictModeEnabled or (displayNarrBias == -1 and ipdaShortDolAvailable)
 bool strictShortDirectionalPass = not strictModeEnabled or displayExecBias == -1 or (displayExecBias == 0 and (strictShortMssMemoryPass or strictShortDisplacementMemoryPass))
-bool strictShortContextTfPass = not strictModeEnabled or ((displayCtxBias == -1 or eng1_ctx_bear_reversal or eng1_ctx_bear_breakout or (displayCtxBias == 0 and strictShortDirectionalPass)) and (sOb or sFvg))
+bool strictShortContextTfPass = not strictModeEnabled or ((displayCtxBias == -1 or eng1_ctx_bear_ob_breaker or eng1_ctx_bear_breakout or (displayCtxBias == 0 and strictShortDirectionalPass)) and (sOb or sFvg))
 bool exe_short_sweep_signal = strictModeEnabled ? strictShortSweepMemoryPass : (eng1_exe_bear_sweep or shortPriceInZone or shortPriceNearZone or sTch)
 bool exe_short_mss_signal = strictModeEnabled ? strictShortMssMemoryPass : effectiveShortMssSeen
 bool exe_short_displacement_signal = strictModeEnabled ? strictShortDisplacementMemoryPass : effectiveShortDisplacementSeen
