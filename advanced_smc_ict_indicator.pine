@@ -2239,46 +2239,34 @@ f_eng1_select_execution_snapshot(string tf) =>
 f_eng1_select_execution_snapshot_levels(string tf) =>
     float exeEqh = na
     float exeEql = na
-    bool exeEqhActive = false
-    bool exeEqlActive = false
     float exeSwingHigh = na
     float exeSwingLow = na
     if tf == ENG1_TF_M1
         exeEqh := eng1_m1_eqh
         exeEql := eng1_m1_eql
-        exeEqhActive := eng1_m1_eqh_active
-        exeEqlActive := eng1_m1_eql_active
         exeSwingHigh := eng1_m1_last_swing_high
         exeSwingLow := eng1_m1_last_swing_low
     else if tf == ENG1_TF_M5
         exeEqh := eng1_m5_eqh
         exeEql := eng1_m5_eql
-        exeEqhActive := eng1_m5_eqh_active
-        exeEqlActive := eng1_m5_eql_active
         exeSwingHigh := eng1_m5_last_swing_high
         exeSwingLow := eng1_m5_last_swing_low
     else if tf == ENG1_TF_M15
         exeEqh := eng1_m15_eqh
         exeEql := eng1_m15_eql
-        exeEqhActive := eng1_m15_eqh_active
-        exeEqlActive := eng1_m15_eql_active
         exeSwingHigh := eng1_m15_last_swing_high
         exeSwingLow := eng1_m15_last_swing_low
     else if tf == ENG1_TF_M30
         exeEqh := eng1_m30_eqh
         exeEql := eng1_m30_eql
-        exeEqhActive := eng1_m30_eqh_active
-        exeEqlActive := eng1_m30_eql_active
         exeSwingHigh := eng1_m30_last_swing_high
         exeSwingLow := eng1_m30_last_swing_low
     else if tf == ENG1_TF_H1
         exeEqh := eng1_h1_eqh
         exeEql := eng1_h1_eql
-        exeEqhActive := eng1_h1_eqh_active
-        exeEqlActive := eng1_h1_eql_active
         exeSwingHigh := eng1_h1_last_swing_high
         exeSwingLow := eng1_h1_last_swing_low
-    [exeEqh, exeEql, exeEqhActive, exeEqlActive, exeSwingHigh, exeSwingLow]
+    [exeEqh, exeEql, exeSwingHigh, exeSwingLow]
 
 // MAIN_CONTRACT order 2: update raw closed-candle buffers only for active TFs.
 [eng1_m1_new_closed_bar_tmp, eng1_m1_last_closed_time_tmp] = f_eng1_update_ohlc_buffer(eng1_m1_active_tf, ENG1_TF_M1, eng1_m1_last_closed_time, eng1_buf_m1_time, eng1_buf_m1_open, eng1_buf_m1_high, eng1_buf_m1_low, eng1_buf_m1_close, ENG1_BUF_CAP)
@@ -2852,7 +2840,7 @@ else if eng1_ctx_tf == ENG1_TF_D1
     eng1_ctx_bull_choch := eng1_d1_bull_choch
     eng1_ctx_bear_choch := eng1_d1_bear_choch
 [eng1_exe_bull_sweep_tmp, eng1_exe_bear_sweep_tmp, eng1_exe_bull_mss_tmp, eng1_exe_bear_mss_tmp, eng1_exe_bull_displacement_tmp, eng1_exe_bear_displacement_tmp, eng1_exe_trend_bias_tmp] = f_eng1_select_execution_snapshot(eng1_exec_tf)
-[eng1_exe_eqh_tmp, eng1_exe_eql_tmp, eng1_exe_eqh_active_tmp, eng1_exe_eql_active_tmp, eng1_exe_swing_high_tmp, eng1_exe_swing_low_tmp] = f_eng1_select_execution_snapshot_levels(eng1_exec_tf)
+[eng1_exe_eqh_tmp, eng1_exe_eql_tmp, eng1_exe_swing_high_tmp, eng1_exe_swing_low_tmp] = f_eng1_select_execution_snapshot_levels(eng1_exec_tf)
 
 eng1_exe_bull_bos := false
 eng1_exe_bear_bos := false
@@ -2894,12 +2882,12 @@ if eng1_exec_valid
     eng1_exe_bear_displacement := eng1_exe_bear_displacement_tmp
     eng1_exe_mss_ref_high := eng1_exe_swing_high_tmp
     eng1_exe_mss_ref_low := eng1_exe_swing_low_tmp
-    eng1_exe_liq_high := eng1_exe_eqh_active_tmp ? eng1_exe_eqh_tmp : eng1_exe_swing_high_tmp
-    eng1_exe_liq_low := eng1_exe_eql_active_tmp ? eng1_exe_eql_tmp : eng1_exe_swing_low_tmp
     eng1_exe_eqh := eng1_exe_eqh_tmp
     eng1_exe_eql := eng1_exe_eql_tmp
-    eng1_exe_eqh_active := eng1_exe_eqh_active_tmp
-    eng1_exe_eql_active := eng1_exe_eql_active_tmp
+    eng1_exe_eqh_active := not na(eng1_exe_eqh_tmp)
+    eng1_exe_eql_active := not na(eng1_exe_eql_tmp)
+    eng1_exe_liq_high := eng1_exe_eqh_active ? eng1_exe_eqh_tmp : eng1_exe_swing_high_tmp
+    eng1_exe_liq_low := eng1_exe_eql_active ? eng1_exe_eql_tmp : eng1_exe_swing_low_tmp
 else
     // Keep Engine 2 literal to Engine 1 ownership: unsupported execution TFs must
     // not reuse the last valid narrative/context/execution snapshot.
