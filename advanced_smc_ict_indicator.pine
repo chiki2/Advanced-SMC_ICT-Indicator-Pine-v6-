@@ -1864,12 +1864,8 @@ var int eng1_m5_last_swing_high_bar = na
 var float eng1_m5_last_swing_low = na
 var int eng1_m5_last_swing_low_bar = na
 var float eng1_m5_eqh = na
-var int eng1_m5_eqh_bar = na
 var float eng1_m5_eql = na
-var int eng1_m5_eql_bar = na
 var int eng1_m5_trend_bias = 0
-var bool eng1_m5_eqh_active = false
-var bool eng1_m5_eql_active = false
 var bool eng1_m5_bull_sweep = false
 var bool eng1_m5_bear_sweep = false
 var bool eng1_m5_bull_mss = false
@@ -2313,18 +2309,14 @@ if eng1_any_new_closed_bar or barstate.isfirst
         eng1_m1_eql := eng1_m1_eql_tmp
 
     if recalc_m5
-        [eng1_m5_last_swing_high_tmp, eng1_m5_last_swing_high_bar_tmp, eng1_m5_last_swing_low_tmp, eng1_m5_last_swing_low_bar_tmp, eng1_m5_trend_bias_tmp, eng1_m5_eqh_tmp, eng1_m5_eqh_bar_tmp, eng1_m5_eql_tmp, eng1_m5_eql_bar_tmp] = f_eng1_build_structure_liquidity(eng1_buf_m5_time, eng1_buf_m5_high, eng1_buf_m5_low, eng1_buf_m5_close, ENG1_SWING_LEN)
+        [eng1_m5_last_swing_high_tmp, eng1_m5_last_swing_high_bar_tmp, eng1_m5_last_swing_low_tmp, eng1_m5_last_swing_low_bar_tmp, eng1_m5_trend_bias_tmp, eng1_m5_eqh_tmp, _, eng1_m5_eql_tmp, _] = f_eng1_build_structure_liquidity(eng1_buf_m5_time, eng1_buf_m5_high, eng1_buf_m5_low, eng1_buf_m5_close, ENG1_SWING_LEN)
         eng1_m5_last_swing_high := eng1_m5_last_swing_high_tmp
         eng1_m5_last_swing_high_bar := eng1_m5_last_swing_high_bar_tmp
         eng1_m5_last_swing_low := eng1_m5_last_swing_low_tmp
         eng1_m5_last_swing_low_bar := eng1_m5_last_swing_low_bar_tmp
         eng1_m5_trend_bias := eng1_m5_trend_bias_tmp
         eng1_m5_eqh := eng1_m5_eqh_tmp
-        eng1_m5_eqh_bar := eng1_m5_eqh_bar_tmp
         eng1_m5_eql := eng1_m5_eql_tmp
-        eng1_m5_eql_bar := eng1_m5_eql_bar_tmp
-        eng1_m5_eqh_active := not na(eng1_m5_eqh_tmp)
-        eng1_m5_eql_active := not na(eng1_m5_eql_tmp)
 
     if recalc_m15
         [eng1_m15_last_swing_high_tmp, eng1_m15_last_swing_high_bar_tmp, eng1_m15_last_swing_low_tmp, eng1_m15_last_swing_low_bar_tmp, eng1_m15_trend_bias_tmp, eng1_m15_eqh_tmp, eng1_m15_eqh_bar_tmp, eng1_m15_eql_tmp, eng1_m15_eql_bar_tmp] = f_eng1_build_structure_liquidity(eng1_buf_m15_time, eng1_buf_m15_high, eng1_buf_m15_low, eng1_buf_m15_close, ENG1_SWING_LEN)
