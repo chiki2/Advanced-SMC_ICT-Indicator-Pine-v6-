@@ -2108,8 +2108,6 @@ var float eng1_exe_mss_ref_high = na
 var float eng1_exe_mss_ref_low = na
 var float eng1_exe_liq_high = na
 var float eng1_exe_liq_low = na
-var float eng1_exe_eqh = na
-var float eng1_exe_eql = na
 var bool eng1_exe_eqh_active = false
 var bool eng1_exe_eql_active = false
 var float eng1_d1_lb20_high = na
@@ -2868,8 +2866,6 @@ if eng1_exec_valid
     eng1_exe_bear_displacement := eng1_exe_bear_displacement_tmp
     eng1_exe_mss_ref_high := eng1_exe_swing_high_tmp
     eng1_exe_mss_ref_low := eng1_exe_swing_low_tmp
-    eng1_exe_eqh := eng1_exe_eqh_tmp
-    eng1_exe_eql := eng1_exe_eql_tmp
     eng1_exe_eqh_active := not na(eng1_exe_eqh_tmp)
     eng1_exe_eql_active := not na(eng1_exe_eql_tmp)
     eng1_exe_liq_high := eng1_exe_eqh_active ? eng1_exe_eqh_tmp : eng1_exe_swing_high_tmp
@@ -2931,8 +2927,6 @@ else
     eng1_exe_mss_ref_low := na
     eng1_exe_liq_high := na
     eng1_exe_liq_low := na
-    eng1_exe_eqh := na
-    eng1_exe_eql := na
     eng1_exe_eqh_active := false
     eng1_exe_eql_active := false
 
@@ -3327,8 +3321,8 @@ bool strictShortPdArrayOwned = not strictModeEnabled or (poi_short_type == "FVG"
 bool poi_long_contract_valid = eng1BullContextAllowed and poi_long_type != "" and eng3LongActivePoiReady and strictLongPdArrayOwned and eng3LongActivePoiIdentity != eng3LongConsumedPoiIdentity
 bool poi_short_contract_valid = eng1BearContextAllowed and poi_short_type != "" and eng3ShortActivePoiReady and strictShortPdArrayOwned and eng3ShortActivePoiIdentity != eng3ShortConsumedPoiIdentity
 
-[tradeLongEntry, tradeLongStop, tradeLongTarget] = f_eng3_build_trade_plan(true, poi_long_contract_valid ? poi_long_entry : na, eng1_exe_liq_high, eng1_exe_liq_low, eng1_exe_eqh_active ? eng1_exe_eqh : na, eng1_exe_eql_active ? eng1_exe_eql : na, eng1CtxRangeHigh, eng1CtxRangeLow)
-[tradeShortEntry, tradeShortStop, tradeShortTarget] = f_eng3_build_trade_plan(false, poi_short_contract_valid ? poi_short_entry : na, eng1_exe_liq_high, eng1_exe_liq_low, eng1_exe_eqh_active ? eng1_exe_eqh : na, eng1_exe_eql_active ? eng1_exe_eql : na, eng1CtxRangeHigh, eng1CtxRangeLow)
+[tradeLongEntry, tradeLongStop, tradeLongTarget] = f_eng3_build_trade_plan(true, poi_long_contract_valid ? poi_long_entry : na, eng1_exe_liq_high, eng1_exe_liq_low, eng1_exe_eqh_active ? eng1_exe_liq_high : na, eng1_exe_eql_active ? eng1_exe_liq_low : na, eng1CtxRangeHigh, eng1CtxRangeLow)
+[tradeShortEntry, tradeShortStop, tradeShortTarget] = f_eng3_build_trade_plan(false, poi_short_contract_valid ? poi_short_entry : na, eng1_exe_liq_high, eng1_exe_liq_low, eng1_exe_eqh_active ? eng1_exe_liq_high : na, eng1_exe_eql_active ? eng1_exe_liq_low : na, eng1CtxRangeHigh, eng1CtxRangeLow)
 float tradeLongValidTop = poi_long_contract_valid ? poi_long_top : na
 float tradeLongValidBottom = poi_long_contract_valid ? poi_long_bottom : na
 int tradeLongCreatedBar = poi_long_contract_valid ? poi_long_bar : na
@@ -3416,7 +3410,7 @@ bool strictLongKillzonePass = not strictModeEnabled or strictKillzoneActive
 bool longPoiRetestPass = longPriceInZone or longPriceNearZone or lTch
 bool longEvidencePass = exe_long_mss_signal or exe_long_displacement_signal
 bool longHardSignalGate = strictModeEnabled ? (not na(tradeLongEntry) and strictLongBiasPass and strictLongContextTfPass and strictLongPdPass and strictLongOtePass and strictLongDolPass and strictLongKillzonePass and not longPoiInvalidatedLatched) : (not na(tradeLongEntry) and normalLongBiasPass and normalLongContextPass and normalLongTargetPass and longPoiRetestPass and longEvidencePass and not longPoiInvalidatedLatched)
-bool longScoreTargetClear = longHardSignalGate ? f_eng3_target_liquidity_clear(activeLongTarget, eng1_exe_liq_high, eng1_exe_eqh_active ? eng1_exe_eqh : na, eng1CtxRangeHigh, longUsesExternalDolTarget) : false
+bool longScoreTargetClear = longHardSignalGate ? f_eng3_target_liquidity_clear(activeLongTarget, eng1_exe_liq_high, eng1_exe_eqh_active ? eng1_exe_liq_high : na, eng1CtxRangeHigh, longUsesExternalDolTarget) : false
 bool scoreVolDrop = not na(volume) and not na(volume[1]) and volume < volume[1]
 bool longScoreHtfPenalty = longHardSignalGate ? (eng1_narr_strength == "Strong" and displayNarrBias == -1) : false
 bool longScorePdPenalty = longHardSignalGate ? (not na(tradeLongEntry) and eng1CtxRangeReady and not na(eng1CtxEquilibrium) and tradeLongEntry > eng1CtxEquilibrium) : false
@@ -3491,7 +3485,7 @@ bool strictShortKillzonePass = not strictModeEnabled or strictKillzoneActive
 bool shortPoiRetestPass = shortPriceInZone or shortPriceNearZone or sTch
 bool shortEvidencePass = exe_short_mss_signal or exe_short_displacement_signal
 bool shortHardSignalGate = strictModeEnabled ? (not na(tradeShortEntry) and strictShortBiasPass and strictShortContextTfPass and strictShortPdPass and strictShortOtePass and strictShortDolPass and strictShortKillzonePass and not shortPoiInvalidatedLatched) : (not na(tradeShortEntry) and normalShortBiasPass and normalShortContextPass and normalShortTargetPass and shortPoiRetestPass and shortEvidencePass and not shortPoiInvalidatedLatched)
-bool shortScoreTargetClear = shortHardSignalGate ? f_eng3_target_liquidity_clear(activeShortTarget, eng1_exe_liq_low, eng1_exe_eql_active ? eng1_exe_eql : na, eng1CtxRangeLow, shortUsesExternalDolTarget) : false
+bool shortScoreTargetClear = shortHardSignalGate ? f_eng3_target_liquidity_clear(activeShortTarget, eng1_exe_liq_low, eng1_exe_eql_active ? eng1_exe_liq_low : na, eng1CtxRangeLow, shortUsesExternalDolTarget) : false
 bool shortScoreHtfPenalty = shortHardSignalGate ? (eng1_narr_strength == "Strong" and displayNarrBias == 1) : false
 bool shortScorePdPenalty = shortHardSignalGate ? (not na(tradeShortEntry) and eng1CtxRangeReady and not na(eng1CtxEquilibrium) and tradeShortEntry < eng1CtxEquilibrium) : false
 bool shortScoreFvgPenalty = shortHardSignalGate ? (sFvg and (shortPoiMitigatedLatched or shortChased)) : false
