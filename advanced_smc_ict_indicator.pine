@@ -1852,8 +1852,6 @@ var int eng1_m1_last_swing_low_bar = na
 var float eng1_m1_eqh = na
 var float eng1_m1_eql = na
 var int eng1_m1_trend_bias = 0
-var bool eng1_m1_eqh_active = false
-var bool eng1_m1_eql_active = false
 var bool eng1_m1_bull_sweep = false
 var bool eng1_m1_bear_sweep = false
 var bool eng1_m1_bull_mss = false
@@ -2193,9 +2191,7 @@ f_eng1_select_execution_snapshot(string tf) =>
     bool exeBearMss = false
     bool exeBullDisplacement = false
     bool exeBearDisplacement = false
-    int exeTrendBias = 0
     if tf == ENG1_TF_M1
-        exeTrendBias := eng1_m1_trend_bias
         exeBullSweep := eng1_m1_bull_sweep
         exeBearSweep := eng1_m1_bear_sweep
         exeBullMss := eng1_m1_bull_mss
@@ -2203,7 +2199,6 @@ f_eng1_select_execution_snapshot(string tf) =>
         exeBullDisplacement := eng1_m1_bull_displacement
         exeBearDisplacement := eng1_m1_bear_displacement
     else if tf == ENG1_TF_M5
-        exeTrendBias := eng1_m5_trend_bias
         exeBullSweep := eng1_m5_bull_sweep
         exeBearSweep := eng1_m5_bear_sweep
         exeBullMss := eng1_m5_bull_mss
@@ -2211,7 +2206,6 @@ f_eng1_select_execution_snapshot(string tf) =>
         exeBullDisplacement := eng1_m5_bull_displacement
         exeBearDisplacement := eng1_m5_bear_displacement
     else if tf == ENG1_TF_M15
-        exeTrendBias := eng1_m15_trend_bias
         exeBullSweep := eng1_m15_bull_sweep
         exeBearSweep := eng1_m15_bear_sweep
         exeBullMss := eng1_m15_bull_mss
@@ -2219,7 +2213,6 @@ f_eng1_select_execution_snapshot(string tf) =>
         exeBullDisplacement := eng1_m15_bull_displacement
         exeBearDisplacement := eng1_m15_bear_displacement
     else if tf == ENG1_TF_M30
-        exeTrendBias := eng1_m30_trend_bias
         exeBullSweep := eng1_m30_bull_sweep
         exeBearSweep := eng1_m30_bear_sweep
         exeBullMss := eng1_m30_bull_mss
@@ -2227,14 +2220,13 @@ f_eng1_select_execution_snapshot(string tf) =>
         exeBullDisplacement := eng1_m30_bull_displacement
         exeBearDisplacement := eng1_m30_bear_displacement
     else if tf == ENG1_TF_H1
-        exeTrendBias := eng1_h1_trend_bias
         exeBullSweep := eng1_h1_bull_sweep
         exeBearSweep := eng1_h1_bear_sweep
         exeBullMss := eng1_h1_bull_mss
         exeBearMss := eng1_h1_bear_mss
         exeBullDisplacement := eng1_h1_bull_displacement
         exeBearDisplacement := eng1_h1_bear_displacement
-    [exeBullSweep, exeBearSweep, exeBullMss, exeBearMss, exeBullDisplacement, exeBearDisplacement, exeTrendBias]
+    [exeBullSweep, exeBearSweep, exeBullMss, exeBearMss, exeBullDisplacement, exeBearDisplacement]
 
 f_eng1_select_execution_snapshot_levels(string tf) =>
     float exeEqh = na
@@ -2319,8 +2311,6 @@ if eng1_any_new_closed_bar or barstate.isfirst
         eng1_m1_trend_bias := eng1_m1_trend_bias_tmp
         eng1_m1_eqh := eng1_m1_eqh_tmp
         eng1_m1_eql := eng1_m1_eql_tmp
-        eng1_m1_eqh_active := not na(eng1_m1_eqh_tmp)
-        eng1_m1_eql_active := not na(eng1_m1_eql_tmp)
 
     if recalc_m5
         [eng1_m5_last_swing_high_tmp, eng1_m5_last_swing_high_bar_tmp, eng1_m5_last_swing_low_tmp, eng1_m5_last_swing_low_bar_tmp, eng1_m5_trend_bias_tmp, eng1_m5_eqh_tmp, eng1_m5_eqh_bar_tmp, eng1_m5_eql_tmp, eng1_m5_eql_bar_tmp] = f_eng1_build_structure_liquidity(eng1_buf_m5_time, eng1_buf_m5_high, eng1_buf_m5_low, eng1_buf_m5_close, ENG1_SWING_LEN)
@@ -2839,7 +2829,7 @@ else if eng1_ctx_tf == ENG1_TF_D1
     eng1_ctx_bear_breakout := eng1_d1_bear_bos
     eng1_ctx_bull_choch := eng1_d1_bull_choch
     eng1_ctx_bear_choch := eng1_d1_bear_choch
-[eng1_exe_bull_sweep_tmp, eng1_exe_bear_sweep_tmp, eng1_exe_bull_mss_tmp, eng1_exe_bear_mss_tmp, eng1_exe_bull_displacement_tmp, eng1_exe_bear_displacement_tmp, eng1_exe_trend_bias_tmp] = f_eng1_select_execution_snapshot(eng1_exec_tf)
+[eng1_exe_bull_sweep_tmp, eng1_exe_bear_sweep_tmp, eng1_exe_bull_mss_tmp, eng1_exe_bear_mss_tmp, eng1_exe_bull_displacement_tmp, eng1_exe_bear_displacement_tmp] = f_eng1_select_execution_snapshot(eng1_exec_tf)
 [eng1_exe_eqh_tmp, eng1_exe_eql_tmp, eng1_exe_swing_high_tmp, eng1_exe_swing_low_tmp] = f_eng1_select_execution_snapshot_levels(eng1_exec_tf)
 
 eng1_exe_bull_bos := false
@@ -2847,33 +2837,37 @@ eng1_exe_bear_bos := false
 eng1_exe_bull_choch := false
 eng1_exe_bear_choch := false
 if eng1_exec_tf == ENG1_TF_M1
+    eng1_exe_trend_bias := eng1_m1_trend_bias
     eng1_exe_bull_bos := eng1_m1_bull_bos
     eng1_exe_bear_bos := eng1_m1_bear_bos
     eng1_exe_bull_choch := eng1_m1_bull_choch
     eng1_exe_bear_choch := eng1_m1_bear_choch
 else if eng1_exec_tf == ENG1_TF_M5
+    eng1_exe_trend_bias := eng1_m5_trend_bias
     eng1_exe_bull_bos := eng1_m5_bull_bos
     eng1_exe_bear_bos := eng1_m5_bear_bos
     eng1_exe_bull_choch := eng1_m5_bull_choch
     eng1_exe_bear_choch := eng1_m5_bear_choch
 else if eng1_exec_tf == ENG1_TF_M15
+    eng1_exe_trend_bias := eng1_m15_trend_bias
     eng1_exe_bull_bos := eng1_m15_bull_bos
     eng1_exe_bear_bos := eng1_m15_bear_bos
     eng1_exe_bull_choch := eng1_m15_bull_choch
     eng1_exe_bear_choch := eng1_m15_bear_choch
 else if eng1_exec_tf == ENG1_TF_M30
+    eng1_exe_trend_bias := eng1_m30_trend_bias
     eng1_exe_bull_bos := eng1_m30_bull_bos
     eng1_exe_bear_bos := eng1_m30_bear_bos
     eng1_exe_bull_choch := eng1_m30_bull_choch
     eng1_exe_bear_choch := eng1_m30_bear_choch
 else if eng1_exec_tf == ENG1_TF_H1
+    eng1_exe_trend_bias := eng1_h1_trend_bias
     eng1_exe_bull_bos := eng1_h1_bull_bos
     eng1_exe_bear_bos := eng1_h1_bear_bos
     eng1_exe_bull_choch := eng1_h1_bull_choch
     eng1_exe_bear_choch := eng1_h1_bear_choch
 
 if eng1_exec_valid
-    eng1_exe_trend_bias := eng1_exe_trend_bias_tmp
     eng1_exe_bull_sweep := eng1_exe_bull_sweep_tmp
     eng1_exe_bear_sweep := eng1_exe_bear_sweep_tmp
     eng1_exe_bull_mss := eng1_exe_bull_mss_tmp
