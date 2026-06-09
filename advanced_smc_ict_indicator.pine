@@ -1153,9 +1153,6 @@ f_eng3_poi_invalidated(bool isBull, float poiTop, float poiBottom, float signalC
 f_eng3_poi_lifecycle(bool poiValid, string poiType, bool poiTouched, bool mitigated, bool invalidated) =>
     not poiValid ? "No POI" : invalidated ? "Invalid" : mitigated ? "Mitigated" : poiType == "Breaker" ? "Breaker" : poiTouched ? "Tapped" : "Fresh"
 
-f_eng3_poi_actionable(string poiLifecycle) =>
-    poiLifecycle == "Fresh" or poiLifecycle == "Tapped" or poiLifecycle == "Breaker"
-
 f_eng3_poi_identity(string sideText, string poiType, int poiBar, float poiTop, float poiBottom) =>
     poiType != "" and not na(poiBar) and not na(poiTop) and not na(poiBottom) ? sideText + "|" + poiType + "|" + str.tostring(poiBar) + "|" + str.tostring(poiTop) + "|" + str.tostring(poiBottom) : ""
 
@@ -3521,8 +3518,8 @@ if eng3ShortActivePoiIdentity != "" and (shortPoiInvalidatedLatched or shortLife
     eng3ShortConsumedPoiIdentity := eng3ShortActivePoiIdentity
 string longPoiLifecycle = f_eng3_poi_lifecycle(poi_long_contract_valid, poi_long_type, longPoiTappedLatched, longPoiMitigatedLatched, longPoiInvalidatedLatched)
 string shortPoiLifecycle = f_eng3_poi_lifecycle(poi_short_contract_valid, poi_short_type, shortPoiTappedLatched, shortPoiMitigatedLatched, shortPoiInvalidatedLatched)
-bool longPoiActionable = f_eng3_poi_actionable(longPoiLifecycle)
-bool shortPoiActionable = f_eng3_poi_actionable(shortPoiLifecycle)
+bool longPoiActionable = longPoiLifecycle == "Fresh" or longPoiLifecycle == "Tapped" or longPoiLifecycle == "Breaker"
+bool shortPoiActionable = shortPoiLifecycle == "Fresh" or shortPoiLifecycle == "Tapped" or shortPoiLifecycle == "Breaker"
 bool longPoiMitigated = longPoiLifecycle == "Mitigated"
 bool shortPoiMitigated = shortPoiLifecycle == "Mitigated"
 bool longPoiEventReached = longPoiTappedLatched or longPoiMitigatedLatched
