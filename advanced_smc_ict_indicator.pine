@@ -1103,15 +1103,6 @@ f_e2_thin_if(line h, float lvl, color col, string sty, bool on) =>
 f_e2_risk_if(line h, float lvl, color col, int w, bool on) =>
     on or not na(h) ? f_eng2_syncBoundedHLine(h, lvl, col, w, line.style_solid, on) : h
 
-f_eng2_signal_event_cap() =>
-    int tfSeconds = timeframe.in_seconds()
-    int cap = 10
-    if freeSafeMode
-        cap := draw_full ? (tfSeconds <= 60 ? 3 : tfSeconds <= 300 ? 4 : 5) : 5
-    else if draw_full
-        cap := tfSeconds <= 60 ? 6 : tfSeconds <= 300 ? 8 : 10
-    cap
-
 f_eng2_emitSignalEvent(int eventTime, float level, string eventText, color eventColor, bool labelAbove, float lanePrefix) =>
     if not na(level) and eventText != ""
         // Signal events are secondary to market structure in Full audit mode.
@@ -3684,7 +3675,8 @@ bool eng2FullLabelBudgetTight = freeSafeMode and draw_full
 bool eng2RawEventLabelsAllowed = eng1_exec_valid and eng2SignalEventsStateReady and not anySetupZoneVisible and not eng2FullLabelBudgetTight
 bool eng2KeepSweepLabels = displaySweepMarkers and eng2RawEventLabelsAllowed
 bool eng2KeepSetupLabels = eng2LongSetupEventAllowed or eng2ShortSetupEventAllowed
-int eng2EventKeepCap = eng2KeepSweepLabels or eng2KeepSetupLabels ? f_eng2_signal_event_cap() : 0
+int eng2EventTfSeconds = timeframe.in_seconds()
+int eng2EventKeepCap = eng2KeepSweepLabels or eng2KeepSetupLabels ? (freeSafeMode ? (draw_full ? (eng2EventTfSeconds <= 60 ? 3 : eng2EventTfSeconds <= 300 ? 4 : 5) : 5) : draw_full ? (eng2EventTfSeconds <= 60 ? 6 : eng2EventTfSeconds <= 300 ? 8 : 10) : 10) : 0
 f_eng2_trim_label_history(eng2SignalEventLabelHistory, eng2EventKeepCap)
 if not eng2LongSetupEventAllowed and (eng2LongTappedEventTag != "" or eng2LongMitigatedEventTag != "")
     eng2LongTappedEventTag := ""
