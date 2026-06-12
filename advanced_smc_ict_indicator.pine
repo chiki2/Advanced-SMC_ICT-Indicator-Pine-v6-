@@ -1476,9 +1476,6 @@ f_eng1_segment_bounds(array<float> h, array<float> l, int startIdx, int endIdx) 
 f_eng1_ob_bounds(float candleOpen, float candleClose) =>
     [math.max(candleOpen, candleClose), math.min(candleOpen, candleClose)]
 
-f_eng1_ob_entry_from_meta(float zoneTop, float zoneBottom) =>
-    (zoneTop + zoneBottom) * 0.5
-
 f_eng1_build_fvg(array<int> arrT, array<float> arrO, array<float> arrH, array<float> arrL, array<float> arrC) =>
     float bullTop = na
     float bullBottom = na
@@ -2722,8 +2719,8 @@ else if eng1_ctx_tf == ENG1_TF_D1
     eng1_ctx_liq_low := eng1_d1_eql_active ? eng1_d1_eql : eng1_d1_last_swing_low
     eng1_ctx_liq_high_bar := eng1_d1_eqh_active ? eng1_d1_eqh_bar : eng1_d1_last_swing_high_bar
     eng1_ctx_liq_low_bar := eng1_d1_eql_active ? eng1_d1_eql_bar : eng1_d1_last_swing_low_bar
-eng1_ctx_bull_ob_entry := not na(eng1_ctx_bull_ob_top) and not na(eng1_ctx_bull_ob_bottom) ? f_eng1_ob_entry_from_meta(eng1_ctx_bull_ob_top, eng1_ctx_bull_ob_bottom) : na
-eng1_ctx_bear_ob_entry := not na(eng1_ctx_bear_ob_top) and not na(eng1_ctx_bear_ob_bottom) ? f_eng1_ob_entry_from_meta(eng1_ctx_bear_ob_top, eng1_ctx_bear_ob_bottom) : na
+eng1_ctx_bull_ob_entry := not na(eng1_ctx_bull_ob_top) and not na(eng1_ctx_bull_ob_bottom) ? (eng1_ctx_bull_ob_top + eng1_ctx_bull_ob_bottom) * 0.5 : na
+eng1_ctx_bear_ob_entry := not na(eng1_ctx_bear_ob_top) and not na(eng1_ctx_bear_ob_bottom) ? (eng1_ctx_bear_ob_top + eng1_ctx_bear_ob_bottom) * 0.5 : na
 eng1_ctx_bull_breakout := false
 eng1_ctx_bear_breakout := false
 eng1_ctx_bull_choch := false
