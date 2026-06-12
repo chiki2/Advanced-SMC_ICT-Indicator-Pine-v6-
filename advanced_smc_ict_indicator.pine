@@ -780,12 +780,6 @@ f_eng2_matches_history_zone(bool historyVisible, bool historyTypeMatches, float 
     bool sameAnchor = not na(zoneBar) and not na(historyLeftBar) and math.abs(zoneBar - historyLeftBar) <= 1
     historyVisible and historyTypeMatches and (sameAnchor or sameLevels)
 
-f_sessionBorderColor(string sessionName) =>
-    sessionName == "Asia" ? asiaSessionBorderColor : sessionName == "London" ? londonSessionBorderColor : newYorkSessionBorderColor
-
-f_sessionLineColor(string sessionName, bool isHigh) =>
-    color.new(f_sessionBorderColor(sessionName), isHigh ? 18 : 30)
-
 f_setCell(table targetTable, int col, int row, string cellText, color textClr, color bgClr) =>
     table.cell(targetTable, col, row, cellText, text_color=textClr, bgcolor=bgClr, text_size=compactDashboardMode ? size.tiny : size.small)
 
@@ -897,11 +891,11 @@ f_eng2_syncSessLane(bool en, bool inSess, bool newSess, bool ended, box b, label
             int safeLeftBar = f_safeBarIndexX(nextStartBar)
             int midBar = int(math.floor((safeLeftBar + bar_index) * 0.5))
             color fillColor = name == "Asia" ? asiaSessionFillColor : name == "London" ? londonSessionFillColor : newYorkSessionFillColor
-            color borderColor = f_sessionBorderColor(name)
+            color borderColor = name == "Asia" ? asiaSessionBorderColor : name == "London" ? londonSessionBorderColor : newYorkSessionBorderColor
             nextBox := box.new(left=safeLeftBar, top=hi, right=bar_index, bottom=lo, xloc=xloc.bar_index, bgcolor=fillColor, border_color=borderColor, border_width=2)
             nextLabel := label.new(x=midBar, y=f_zoneMid(hi, lo), xloc=xloc.bar_index, text=name, style=label.style_label_center, color=color.new(color.black, 86), textcolor=color.new(borderColor, 8), size=size.small)
-            nextHighLine := line.new(x1=safeLeftBar, y1=hi, x2=bar_index, y2=hi, xloc=xloc.bar_index, color=f_sessionLineColor(name, true), width=2, style=line.style_solid)
-            nextLowLine := line.new(x1=safeLeftBar, y1=lo, x2=bar_index, y2=lo, xloc=xloc.bar_index, color=f_sessionLineColor(name, false), width=2, style=line.style_solid)
+            nextHighLine := line.new(x1=safeLeftBar, y1=hi, x2=bar_index, y2=hi, xloc=xloc.bar_index, color=color.new(borderColor, 18), width=2, style=line.style_solid)
+            nextLowLine := line.new(x1=safeLeftBar, y1=lo, x2=bar_index, y2=lo, xloc=xloc.bar_index, color=color.new(borderColor, 30), width=2, style=line.style_solid)
         if inSess
             int safeSessLeftBar = f_safeBarIndexX(na(nextStartBar) ? bar_index : nextStartBar)
             if not na(nextBox) and not na(hi) and not na(lo)
