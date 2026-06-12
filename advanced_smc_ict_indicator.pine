@@ -356,9 +356,6 @@ f_selectBelow(float base, float best, float candidate) =>
             result := candidate
     result
 
-f_rangeLiquidityLabel(bool highSide) =>
-    highSide ? "ERL BSL" : "ERL SSL"
-
 f_zoneQualityTier(bool hasSetup, int responseScore, int displacementScore, int atrExpansionScore) =>
     if not hasSetup
         "-"
@@ -3965,9 +3962,9 @@ if lastBar
     bool sslLblOn = showSslLbl or showExeSsl
     bool dealLblOn = rLbl and showDealingRangeVisual
     if bslLblOn or not na(eqHighLabel)
-        eqHighLabel := f_eng2_syncRightLevelLabel(eqHighLabel, bslLbl, showDealingRangeVisual ? f_rangeLiquidityLabel(true) : eng1_exe_eqh_active ? "EQH" : "BSL", color.new(liqHighColor, 12), bslLblOn)
+        eqHighLabel := f_eng2_syncRightLevelLabel(eqHighLabel, bslLbl, showDealingRangeVisual ? "ERL BSL" : eng1_exe_eqh_active ? "EQH" : "BSL", color.new(liqHighColor, 12), bslLblOn)
     if sslLblOn or not na(eqLowLabel)
-        eqLowLabel := f_eng2_syncRightLevelLabel(eqLowLabel, sslLbl, showDealingRangeVisual ? f_rangeLiquidityLabel(false) : eng1_exe_eql_active ? "EQL" : "SSL", color.new(liqLowColor, 12), sslLblOn)
+        eqLowLabel := f_eng2_syncRightLevelLabel(eqLowLabel, sslLbl, showDealingRangeVisual ? "ERL SSL" : eng1_exe_eql_active ? "EQL" : "SSL", color.new(liqLowColor, 12), sslLblOn)
     if dealLblOn or not na(eng2DealEqLabel)
         eng2DealEqLabel := f_eng2_syncRightLevelLabel(eng2DealEqLabel, dealingRangeEqLevel, "EQ", color.new(decisionEqColor, 0), dealLblOn)
     if (rLbl and showPdhVisual) or not na(pdhLabel)
