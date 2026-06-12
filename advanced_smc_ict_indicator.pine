@@ -3981,11 +3981,9 @@ bgcolor(chartBackdrop)
 f_eng4_render_dashboard() =>
     bool showFull = lastBar and showDashboard and not compactDashboardMode
     bool showCompact = lastBar and showDashboard and compactDashboardMode
-    bool clearDash = lastBar and not showDashboard
     if showFull or showCompact
         bool cBoth = preferredDirection == "Balanced"
         bool cWait = preferredDirection == "Wait"
-        bool cNeut = cBoth or cWait
         bool sMode = strictModeEnabled
         bool longRetired = longCompleted or longInvalidated or (not longAmbiguous and longLifecycleRetired)
         bool shortRetired = shortCompleted or shortInvalidated or (not shortAmbiguous and shortLifecycleRetired)
@@ -4014,7 +4012,7 @@ f_eng4_render_dashboard() =>
         float tpLvl = dLong ? activeLongTarget : activeShortTarget
         bool dolTgt = dLong ? longUsesExternalDolTarget : shortUsesExternalDolTarget
         bool retired = dLong ? longRetired : shortRetired
-        color aCol = cNeut ? color.new(neutralColor, 12) : dLong ? color.new(bullColor, 12) : color.new(bearColor, 12)
+        color aCol = cBoth or cWait ? color.new(neutralColor, 12) : dLong ? color.new(bullColor, 12) : color.new(bearColor, 12)
         bool pValid = pLong ? poi_long_contract_valid : poi_short_contract_valid
         string pType = pLong ? poi_long_type : poi_short_type
         float pEntry = pLong ? poi_long_entry : poi_short_entry
@@ -4116,7 +4114,7 @@ f_eng4_render_dashboard() =>
             f_setCell(dashboard, 1, 8, liquiditySessionSummary + " | " + timezoneSummary + " | " + slAtrTxt + " | " + (sMode ? (sKzOk ? "Strict " + ipdaWindowSummary : "Need KZ") : "Normal"), color.white, sMode ? (sKzOk ? color.new(color.teal, 15) : panelCellBg) : color.new(neutralColor, 15))
             f_setCell(dashboard, 0, 9, "Next", color.white, panelCellBg)
             f_setCell(dashboard, 1, 9, nextText, color.white, dNext)
-    else if clearDash
+    else if lastBar and not showDashboard
         f_clearDashboardTable(dashboardCompact, 6)
         f_clearDashboardTable(dashboard, 10)
     true
