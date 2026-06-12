@@ -4006,14 +4006,12 @@ f_eng4_render_dashboard() =>
         bool dLong = cWait ? pLong : compactUseLong
         string eState = dLong ? longExecutionState : shortExecutionState
         float eLvl = dLong ? tradeLongEntry : tradeShortEntry
-        float slLvl = dLong ? tradeLongStop : tradeShortStop
         float tpLvl = dLong ? activeLongTarget : activeShortTarget
         bool dolTgt = dLong ? longUsesExternalDolTarget : shortUsesExternalDolTarget
         bool retired = dLong ? longRetired : shortRetired
         color aCol = cBoth or cWait ? color.new(neutralColor, 12) : dLong ? color.new(bullColor, 12) : color.new(bearColor, 12)
         bool pValid = pLong ? poi_long_contract_valid : poi_short_contract_valid
         string pType = pLong ? poi_long_type : poi_short_type
-        float pEntry = pLong ? poi_long_entry : poi_short_entry
         string pLife = pLong ? longPoiLifecycle : shortPoiLifecycle
         bool poiCtxOk = pLong ? eng1BullContextAllowed : eng1BearContextAllowed
         bool poiZoneOk = pLong ? (hasBullOb or hasBullFvg) : (hasBearOb or hasBearFvg)
@@ -4065,11 +4063,11 @@ f_eng4_render_dashboard() =>
         setupTxt := ordGate ? (cBoth ? "Focus " + sideFull : sideFull) + "Gate " + stepTxt + " " + f_formatLevel(eLvl) : setupTxt
         setupMini := ordGate ? sideMini + "Gate " + stepTxt : setupMini
         bool riskOk = planOk and f_executionRiskVisible(eState) and ordOk
-        string ordText = waitLeg ? "Need Leg" : not planOk ? "No order" : (ordGate ? "Gate " + stepTxt + " | Plan E " : riskOk ? "E " : "Plan E ") + f_formatLevel(eLvl) + " | SL " + f_formatLevel(slLvl) + " | TP " + f_formatLevel(tpLvl)
+        string ordText = waitLeg ? "Need Leg" : not planOk ? "No order" : (ordGate ? "Gate " + stepTxt + " | Plan E " : riskOk ? "E " : "Plan E ") + f_formatLevel(eLvl) + " | SL " + f_formatLevel(dLong ? tradeLongStop : tradeShortStop) + " | TP " + f_formatLevel(tpLvl)
         ordText := cBoth ? "Focus " + sideFull + "| " + ordText : ordText
         string trigText = idleNoLivePoi ? pSide + "Wait POI" : not pValid ? pSide + pWhy : showRetiredPoi ? pSide + (pRetWhy == "" ? "Retired" : pRetWhy) : pSide + (sMode ? stepTxt : not sweepOk ? "Need Sweep" : not mssOk ? "Need MSS" : not dispOk ? "Need Disp" : "Ready")
         bool pGate = sMode and pActive and not (sweepOk and mssOk and dispOk and strictOk)
-        string pText = idleNoLivePoi ? idlePoiText : not pValid ? pSide + pWhy : showRetiredPoi ? pSide + (pRetWhy == "" ? "Retired" : "Retired: " + pRetWhy) : pSide + (pType == "Breaker" ? "BRK" : pType == "OB" ? "bOB" : pType) + " " + f_formatLevel(pEntry) + " | " + (pType == "FVG" and pLife == "Mitigated" ? "CE Hit" : pLife)
+        string pText = idleNoLivePoi ? idlePoiText : not pValid ? pSide + pWhy : showRetiredPoi ? pSide + (pRetWhy == "" ? "Retired" : "Retired: " + pRetWhy) : pSide + (pType == "Breaker" ? "BRK" : pType == "OB" ? "bOB" : pType) + " " + f_formatLevel(pLong ? poi_long_entry : poi_short_entry) + " | " + (pType == "FVG" and pLife == "Mitigated" ? "CE Hit" : pLife)
         pText := pGate ? pText + " | " + stepTxt : pText
         bool triggerReady = pActive and sweepOk and mssOk and dispOk and (not sMode or strictOk)
         color dNeu = color.new(neutralColor, 18)
