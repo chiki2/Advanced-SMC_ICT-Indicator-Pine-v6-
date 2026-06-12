@@ -3979,9 +3979,7 @@ chartBackdrop = showTrendBackground and not compactMode ? color.new(backdropColo
 bgcolor(chartBackdrop)
 
 f_eng4_render_dashboard() =>
-    bool showFull = lastBar and showDashboard and not compactDashboardMode
-    bool showCompact = lastBar and showDashboard and compactDashboardMode
-    if showFull or showCompact
+    if lastBar and showDashboard
         bool cBoth = preferredDirection == "Balanced"
         bool cWait = preferredDirection == "Wait"
         bool sMode = strictModeEnabled
@@ -4080,7 +4078,7 @@ f_eng4_render_dashboard() =>
         color dPoi = pActive and not pGate ? aCol : panelCellBg
         color dOrder = riskOk ? aCol : panelCellBg
         color dNext = waitLeg ? panelCellBg : cWait ? dNeu : sMode ? (triggerReady ? aCol : panelCellBg) : aCol
-        if showCompact
+        if compactDashboardMode
             f_prepareDashboardTable(dashboardCompact, 6, dashboard, 10)
             f_setCell(dashboardCompact, 0, 1, "TRADE", color.white, panelHeaderBg)
             f_setCell(dashboardCompact, 1, 1, pxText, color.white, aCol)
