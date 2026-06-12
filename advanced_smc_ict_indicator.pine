@@ -957,9 +957,6 @@ f_eng2_syncSessLane(bool en, bool inSess, bool newSess, bool ended, box b, label
 f_executionStateBadge(string s, bool c) =>
     s == "Active" ? (c ? "ACT" : "Active") : s == "Armed" ? (c ? "ARM" : "Armed") : s == "Managed" ? (c ? "MNG" : "Managed") : s == "Ambiguous" ? (c ? "AMB" : "Ambiguous") : s == "Completed" ? (c ? "CMP" : "Completed") : ""
 
-f_eng4_next_text(bool w, string wt, string s, bool strict, bool p, bool r, string step) =>
-    w ? "Watch " + wt : s == "Active" ? "Trigger" : s == "Armed" ? "Retest" : s == "Confirming" ? (strict ? step : "Confirm") : s == "Managed" ? "Manage" : s == "Ambiguous" ? "Review" : s == "Completed" ? "Next" : s == "Expired" or s == "Invalidated" ? "Wait" : strict and p and not r ? step : "Wait"
-
 f_executionSelectedFillAlpha(string s) =>
     s == "Active" ? 78 : s == "Armed" ? 82 : s == "Managed" ? 88 : s == "Completed" ? 92 : 86
 
@@ -4083,7 +4080,7 @@ f_eng4_render_dashboard() =>
         string sGate = not sBiasOk ? "Need Bias" : not sCtxOk ? "Need Ctx" : not sPdOk ? "Need PD" : not sOteOk ? "Need OTE" : not sDolOk ? "Need DOL" : not sKzOk ? "Need KZ" : "Strict OK"
         string stepTxt = not sweepOk ? "Need Sweep" : not mssOk ? "Need MSS" : not dispOk ? "Need Disp" : sGate
         bool waitLeg = not pRetired and not pValid and poiZoneOk and poiMapOk and (not poiLegOk or not pStrictOk)
-        string nextText = waitLeg ? "Need Leg" : f_eng4_next_text(cWait, waitTxt, eState, sMode, pValid, pRetired, stepTxt)
+        string nextText = waitLeg ? "Need Leg" : cWait ? "Watch " + waitTxt : eState == "Active" ? "Trigger" : eState == "Armed" ? "Retest" : eState == "Confirming" ? (sMode ? stepTxt : "Confirm") : eState == "Managed" ? "Manage" : eState == "Ambiguous" ? "Review" : eState == "Completed" ? "Next" : eState == "Expired" or eState == "Invalidated" ? "Wait" : sMode and pValid and not pRetired ? stepTxt : "Wait"
         string pxText = syminfo.ticker + " " + timeframe.period + " | Px " + f_formatLevel(dPx)
         string sideFull = dLong ? "Long " : "Short "
         string sideMini = dLong ? "L " : "S "
