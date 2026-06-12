@@ -3321,7 +3321,6 @@ bool normalLongTargetPass = not na(activeLongTarget)
 bool strictLongBiasPass = not strictModeEnabled or (displayNarrBias == 1 and ipdaLongDolAvailable)
 bool strictLongDirectionalPass = not strictModeEnabled or displayExecBias == 1 or (displayExecBias == 0 and (strictLongMssMemoryPass or strictLongDisplacementMemoryPass))
 bool strictLongContextTfPass = not strictModeEnabled or ((displayCtxBias == 1 or eng1_ctx_bull_ob_breaker or eng1_ctx_bull_breakout or (displayCtxBias == 0 and strictLongDirectionalPass)) and (lOb or lFvg))
-bool exe_long_sweep_signal = strictModeEnabled ? strictLongSweepMemoryPass : (eng1_exe_bull_sweep or longPriceInZone or longPriceNearZone or lTch)
 bool exe_long_mss_signal = strictModeEnabled ? strictLongMssMemoryPass : effectiveLongMssSeen
 bool exe_long_displacement_signal = strictModeEnabled ? strictLongDisplacementMemoryPass : effectiveLongDisplacementSeen
 bool strictLongSweepPass = not strictModeEnabled or strictLongSweepMemoryPass
@@ -3396,7 +3395,6 @@ bool normalShortTargetPass = not na(activeShortTarget)
 bool strictShortBiasPass = not strictModeEnabled or (displayNarrBias == -1 and ipdaShortDolAvailable)
 bool strictShortDirectionalPass = not strictModeEnabled or displayExecBias == -1 or (displayExecBias == 0 and (strictShortMssMemoryPass or strictShortDisplacementMemoryPass))
 bool strictShortContextTfPass = not strictModeEnabled or ((displayCtxBias == -1 or eng1_ctx_bear_ob_breaker or eng1_ctx_bear_breakout or (displayCtxBias == 0 and strictShortDirectionalPass)) and (sOb or sFvg))
-bool exe_short_sweep_signal = strictModeEnabled ? strictShortSweepMemoryPass : (eng1_exe_bear_sweep or shortPriceInZone or shortPriceNearZone or sTch)
 bool exe_short_mss_signal = strictModeEnabled ? strictShortMssMemoryPass : effectiveShortMssSeen
 bool exe_short_displacement_signal = strictModeEnabled ? strictShortDisplacementMemoryPass : effectiveShortDisplacementSeen
 bool strictShortSweepPass = not strictModeEnabled or strictShortSweepMemoryPass
