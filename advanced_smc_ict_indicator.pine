@@ -318,9 +318,6 @@ if barstate.isnew
 //------------------------------------------------------------------------------
 // Functions
 //------------------------------------------------------------------------------
-f_sessionCode(string sessionLabel) =>
-    sessionLabel == "Asia" ? "AS" : sessionLabel == "London" ? "LDN" : sessionLabel == "New York" ? "NY" : sessionLabel == "Inter-session" ? "INT" : sessionLabel
-
 f_zoneMid(float zoneTop, float zoneBottom) =>
     (zoneTop + zoneBottom) * 0.5
 
@@ -3074,7 +3071,7 @@ bool ipdaNewYorkKillzoneActive = f_inIpdaWindow(ipdaNewYorkKillzoneSession)
 bool strictKillzoneActive = ipdaAsiaKillzoneActive or ipdaLondonKillzoneActive or ipdaNewYorkKillzoneActive
 bool ipdaMainKillzoneActive = ipdaLondonKillzoneActive or ipdaNewYorkKillzoneActive
 string ipdaWindowSummary = ipdaNewYorkKillzoneActive ? "NY KZ" : ipdaLondonKillzoneActive ? "LDN KZ" : ipdaAsiaKillzoneActive ? "AS KZ" : strictModeEnabled and f_inIpdaWindow(ipdaObservationSession) ? "Observe" : "Off"
-liquiditySessionSummary = "Sess " + f_sessionCode(vNyOn ? "New York" : vLdOn ? "London" : vAsOn ? "Asia" : "Inter-session") + ">" + f_sessionCode(vNyOn ? "Asia" : vLdOn ? "New York" : vAsOn ? "London" : "Asia")
+liquiditySessionSummary = "Sess " + (vNyOn ? "NY" : vLdOn ? "LDN" : vAsOn ? "AS" : "INT") + ">" + (vNyOn ? "AS" : vLdOn ? "NY" : vAsOn ? "LDN" : "AS")
 timezoneSummary = "UTC"
 float effectiveOteLongTop = eng1CtxRangeReady and displayNarrBias != -1 and (displayCtxBias == 1 or eng1_ctx_bull_ob_breaker) ? eng1CtxOteLongTop : na
 float effectiveOteLongBottom = eng1CtxRangeReady and displayNarrBias != -1 and (displayCtxBias == 1 or eng1_ctx_bull_ob_breaker) ? eng1CtxOteLongBottom : na
