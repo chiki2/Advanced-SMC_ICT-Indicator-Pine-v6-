@@ -330,9 +330,6 @@ f_obLabelText(bool isBull, bool isBreaker) =>
 f_formatLevel(float price) =>
     na(price) ? "-" : str.tostring(price, format.mintick)
 
-f_poiLifecycleDisplayText(string poiLifecycle, string poiType) =>
-    poiType == "FVG" and poiLifecycle == "Mitigated" ? "CE Hit" : poiLifecycle
-
 f_levelMatches(float referenceLevel, float candidate) =>
     not na(referenceLevel) and not na(candidate) and math.abs(referenceLevel - candidate) <= levelMatchTolerance
 
@@ -388,7 +385,7 @@ f_eng3_dynamic_signal_score(bool sweepPass, bool displacementPass, bool mssPass,
     math.max(score, 0)
 
 f_eng2_zone_label_text(string baseLabel, string poiLifecycle, string poiType, string badge, string qualityTier) =>
-    string lifeText = f_poiLifecycleDisplayText(poiLifecycle, poiType)
+    string lifeText = poiType == "FVG" and poiLifecycle == "Mitigated" ? "CE Hit" : poiLifecycle
     string coreText = badge != "" ? baseLabel + " | " + lifeText + " | " + badge : baseLabel + " | " + lifeText
     baseLabel == "" ? "" : coreText + (qualityTier == "-" ? "" : " | " + qualityTier)
 
@@ -4087,7 +4084,7 @@ f_eng4_render_dashboard() =>
         ordText := cBoth ? "Focus " + sideFull + "| " + ordText : ordText
         string trigText = idleNoLivePoi ? pSide + "Wait POI" : not pValid ? pSide + pWhy : showRetiredPoi ? pSide + (pRetWhy == "" ? "Retired" : pRetWhy) : pSide + (sMode ? stepTxt : not sweepOk ? "Need Sweep" : not mssOk ? "Need MSS" : not dispOk ? "Need Disp" : "Ready")
         bool pGate = sMode and pActive and not (sweepOk and mssOk and dispOk and strictOk)
-        string pText = idleNoLivePoi ? idlePoiText : not pValid ? pSide + pWhy : showRetiredPoi ? pSide + (pRetWhy == "" ? "Retired" : "Retired: " + pRetWhy) : pSide + (pType == "Breaker" ? "BRK" : pType == "OB" ? "bOB" : pType) + " " + f_formatLevel(pEntry) + " | " + f_poiLifecycleDisplayText(pLife, pType)
+        string pText = idleNoLivePoi ? idlePoiText : not pValid ? pSide + pWhy : showRetiredPoi ? pSide + (pRetWhy == "" ? "Retired" : "Retired: " + pRetWhy) : pSide + (pType == "Breaker" ? "BRK" : pType == "OB" ? "bOB" : pType) + " " + f_formatLevel(pEntry) + " | " + (pType == "FVG" and pLife == "Mitigated" ? "CE Hit" : pLife)
         pText := pGate ? pText + " | " + stepTxt : pText
         bool triggerReady = pActive and sweepOk and mssOk and dispOk and (not sMode or strictOk)
         color dNeu = color.new(neutralColor, 18)
