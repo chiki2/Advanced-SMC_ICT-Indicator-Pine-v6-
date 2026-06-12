@@ -389,9 +389,6 @@ f_eng2_zone_label_text(string baseLabel, string poiLifecycle, string poiType, st
 f_zoneQualityBorderAlpha(string qualityTier, string executionState) =>
     executionState == "Managed" ? 18 : qualityTier == "Q3" ? 0 : qualityTier == "Q2" ? 10 : qualityTier == "Q1" ? 26 : 12
 
-f_zoneQualityBorderWidth(string qualityTier) =>
-    qualityTier == "Q3" ? 3 : 2
-
 f_createdBarFallback(int createdBar) =>
     not na(createdBar) ? createdBar : nz(eng1_chart_first_bar_index, 0)
 
@@ -3591,8 +3588,8 @@ string lzBase = longDrawSel ? (lOb ? f_obLabelText(true, eng1_ctx_bull_ob_breake
 string szBase = shortDrawSel ? (sOb ? f_obLabelText(false, eng1_ctx_bear_ob_breaker) : sFvg ? "FVG" : "") : ""
 string lzText = f_eng2_zone_label_text(lzBase, longPoiLifecycle, poi_long_type, lzBad, longZoneQualityText)
 string szText = f_eng2_zone_label_text(szBase, shortPoiLifecycle, poi_short_type, szBad, shortZoneQualityText)
-int lzBw = longPoiMitigated ? 1 : math.max(f_zoneQualityBorderWidth(longZoneQualityText), longExecutionActive ? 3 : 2)
-int szBw = shortPoiMitigated ? 1 : math.max(f_zoneQualityBorderWidth(shortZoneQualityText), shortExecutionActive ? 3 : 2)
+int lzBw = longPoiMitigated ? 1 : math.max(longZoneQualityText == "Q3" ? 3 : 2, longExecutionActive ? 3 : 2)
+int szBw = shortPoiMitigated ? 1 : math.max(shortZoneQualityText == "Q3" ? 3 : 2, shortExecutionActive ? 3 : 2)
 color lzBrd = color.new(bullColor, longPoiMitigated ? 70 : f_zoneQualityBorderAlpha(longZoneQualityText, longExecutionState))
 color szBrd = color.new(bearColor, shortPoiMitigated ? 70 : f_zoneQualityBorderAlpha(shortZoneQualityText, shortExecutionState))
 color lzFill = color.new(bullColor, longPoiMitigated ? 92 : f_executionSelectedFillAlpha(longExecutionState))
