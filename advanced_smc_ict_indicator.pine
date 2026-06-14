@@ -90,9 +90,8 @@ profileCompact = usagePreset == "Compact"
 strictModeEnabled = usagePreset == "Strict Confirm"
 compactMode = profileCompact
 compactDashboardMode = profileCompact or compactDashboardInput
-// Auto budget keeps every display mode, including Full audit, inside tighter
-// visual/history caps on intraday charts. It does not change Engine 1/3 rules.
-bool freeSafeMode = profileCompact or timeframe.isintraday or zoneDisplayMode != "Full"
+// Auto budget is profile/TF driven only; visual mode must not alter engine data.
+bool freeSafeMode = profileCompact or timeframe.isintraday
 int ENG2_SESSION_HISTORY_CAP = compactMode ? 1 : 15
 effectiveZoneDisplayMode = profileCompact ? "Minimal" : zoneDisplayMode
 // Engine 2 draw-state contract (MAIN_CONTRACT): keep centralized mode toggles
@@ -2888,7 +2887,7 @@ vNyOn = inNewYorkSession
 vNyNew = vNyOn and not vNyOn[1]
 vNyEnd = not vNyOn and vNyOn[1]
 
-bool sessionRangeTrackingNeeded = timeframe.isintraday and (strictModeEnabled or (showSessionVisuals and draw_full))
+bool sessionRangeTrackingNeeded = timeframe.isintraday
 if sessionRangeTrackingNeeded
     [asiaSessionHighNext, asiaSessionLowNext] = f_updateSessionRange(inAsiaSession, newAsiaSession, asiaSessionHigh, asiaSessionLow)
     [londonSessionHighNext, londonSessionLowNext] = f_updateSessionRange(inLondonSession, newLondonSession, londonSessionHigh, londonSessionLow)
