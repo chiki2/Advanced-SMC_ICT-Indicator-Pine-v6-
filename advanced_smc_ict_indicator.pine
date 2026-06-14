@@ -3841,12 +3841,8 @@ float dealingBuyOteTop = dealingRangeValid ? eng2DealHigh - dealingRangeSize * 0
 float dealingBuyOteBottom = dealingRangeValid ? eng2DealHigh - dealingRangeSize * 0.79 : na
 float dealingSellOteTop = dealingRangeValid ? eng2DealLow + dealingRangeSize * 0.79 : na
 float dealingSellOteBottom = dealingRangeValid ? eng2DealLow + dealingRangeSize * 0.62 : na
-riskLongEntryLevel = showLongRiskVisual ? tradeLongEntry : na
-riskShortEntryLevel = showShortRiskVisual ? tradeShortEntry : na
 riskBullStopLevel = showLongRiskVisual ? bullStop : na
 riskBearStopLevel = showShortRiskVisual ? bearStop : na
-riskLongTargetLevel = showLongRiskVisual ? activeLongTarget : na
-riskShortTargetLevel = showShortRiskVisual ? activeShortTarget : na
 oteLongTopLevel = showOteVisual and dealingRangeValid ? dealingBuyOteTop : na
 oteLongBottomLevel = showOteVisual and dealingRangeValid ? dealingBuyOteBottom : na
 oteShortTopLevel = showOteVisual and dealingRangeValid ? dealingSellOteTop : na
@@ -3924,12 +3920,12 @@ if lastBar
 
     bool riskSync = showLongRiskVisual or showShortRiskVisual or not na(eng2RiskLongEntryLine) or not na(eng2RiskShortEntryLine) or not na(eng2RiskLongStopLine) or not na(eng2RiskShortStopLine) or not na(eng2RiskLongTargetLine) or not na(eng2RiskShortTargetLine)
     if riskSync
-        eng2RiskLongEntryLine := f_e2_risk_if(eng2RiskLongEntryLine, riskLongEntryLevel, color.new(bullColor, 0), 2, showLongRiskVisual)
-        eng2RiskShortEntryLine := f_e2_risk_if(eng2RiskShortEntryLine, riskShortEntryLevel, color.new(bearColor, 0), 2, showShortRiskVisual)
+        eng2RiskLongEntryLine := f_e2_risk_if(eng2RiskLongEntryLine, tradeLongEntry, color.new(bullColor, 0), 2, showLongRiskVisual)
+        eng2RiskShortEntryLine := f_e2_risk_if(eng2RiskShortEntryLine, tradeShortEntry, color.new(bearColor, 0), 2, showShortRiskVisual)
         eng2RiskLongStopLine := f_e2_risk_if(eng2RiskLongStopLine, riskBullStopLevel, color.new(bearColor, 0), 1, showLongRiskVisual)
         eng2RiskShortStopLine := f_e2_risk_if(eng2RiskShortStopLine, riskBearStopLevel, color.new(bullColor, 0), 1, showShortRiskVisual)
-        eng2RiskLongTargetLine := f_e2_risk_if(eng2RiskLongTargetLine, riskLongTargetLevel, color.new(liqHighColor, 0), 1, showLongRiskVisual)
-        eng2RiskShortTargetLine := f_e2_risk_if(eng2RiskShortTargetLine, riskShortTargetLevel, color.new(liqLowColor, 0), 1, showShortRiskVisual)
+        eng2RiskLongTargetLine := f_e2_risk_if(eng2RiskLongTargetLine, activeLongTarget, color.new(liqHighColor, 0), 1, showLongRiskVisual)
+        eng2RiskShortTargetLine := f_e2_risk_if(eng2RiskShortTargetLine, activeShortTarget, color.new(liqLowColor, 0), 1, showShortRiskVisual)
 
     // Right-edge labels
     float bslLbl = showDealingRangeVisual ? dealingRangeHighLevel : eqHighLevel
