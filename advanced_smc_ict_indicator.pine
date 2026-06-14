@@ -103,7 +103,6 @@ bool draw_show_structure = showMarketStructure and draw_full and not compactMode
 bool draw_show_setup_events = showMarketStructure and (draw_full or draw_focused) and not compactMode and (showOb or showFvg)
 bool draw_show_htf = showHtf
 bool draw_show_right_labels = showLiquidityRightLabels
-displayInternalRange = showInternalRange and not compactMode
 displaySweepMarkers = showLiquidity and showSweeps and draw_full and not compactMode
 bool lastBar = barstate.islast
 
@@ -2887,8 +2886,7 @@ vNyOn = inNewYorkSession
 vNyNew = vNyOn and not vNyOn[1]
 vNyEnd = not vNyOn and vNyOn[1]
 
-bool sessionRangeTrackingNeeded = timeframe.isintraday
-if sessionRangeTrackingNeeded
+if timeframe.isintraday
     [asiaSessionHighNext, asiaSessionLowNext] = f_updateSessionRange(inAsiaSession, newAsiaSession, asiaSessionHigh, asiaSessionLow)
     [londonSessionHighNext, londonSessionLowNext] = f_updateSessionRange(inLondonSession, newLondonSession, londonSessionHigh, londonSessionLow)
     [newYorkSessionHighNext, newYorkSessionLowNext] = f_updateSessionRange(inNewYorkSession, newNewYorkSession, newYorkSessionHigh, newYorkSessionLow)
@@ -3815,7 +3813,7 @@ bool draw_eq_high_primary = f_preferredLevelMatch(eng1_exe_liq_high, preferredDi
 bool draw_eq_low_primary = f_preferredLevelMatch(eng1_exe_liq_low, preferredDirection == "Balanced", compactUseLong, activeLongTarget, activeShortTarget)
 showEqHighVisual = showLiquidity and not compactMode and f_draw_level_visible(draw_mode, draw_eq_high_primary, true, preferredDirection)
 showEqLowVisual = showLiquidity and not compactMode and f_draw_level_visible(draw_mode, draw_eq_low_primary, false, preferredDirection)
-showRangeVisual = showLiquidity and displayInternalRange and draw_mode != "Minimal"
+showRangeVisual = showLiquidity and showInternalRange and not compactMode and draw_mode != "Minimal"
 showOteVisual = strictShowOte and (draw_full or draw_focused) and draw_mode != "Minimal"
 showCalendarLiquidityVisual = calendarLiquidityRequestEnabled
 showLongRiskVisual = showRisk and not compactMode and f_executionVisualByMode(draw_mode, longRiskVisible, preferredDirection, true, compactUseLong)
