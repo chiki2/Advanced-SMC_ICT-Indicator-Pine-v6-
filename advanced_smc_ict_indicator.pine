@@ -3805,11 +3805,8 @@ if sessRefresh
 // Liquidity labels are semantic: EQH/EQL are equal-high/low pools, BSL/SSL are
 // execution swing pools, ERL marks dealing-range extremes, and PD/PW/PM levels
 // mark previous period liquidity; internal engine aliases stay off the chart.
-bool draw_eq_high_primary = f_preferredLevelMatch(eng1_exe_liq_high, preferredDirection == "Balanced", compactUseLong, activeLongTarget, activeShortTarget)
-bool draw_eq_low_primary = f_preferredLevelMatch(eng1_exe_liq_low, preferredDirection == "Balanced", compactUseLong, activeLongTarget, activeShortTarget)
-showEqHighVisual = showLiquidity and not compactMode and f_draw_level_visible(draw_mode, draw_eq_high_primary, true, preferredDirection)
-showEqLowVisual = showLiquidity and not compactMode and f_draw_level_visible(draw_mode, draw_eq_low_primary, false, preferredDirection)
-showRangeVisual = showLiquidity and showInternalRange and not compactMode and draw_mode != "Minimal"
+showEqHighVisual = showLiquidity and not compactMode and f_draw_level_visible(draw_mode, f_preferredLevelMatch(eng1_exe_liq_high, preferredDirection == "Balanced", compactUseLong, activeLongTarget, activeShortTarget), true, preferredDirection)
+showEqLowVisual = showLiquidity and not compactMode and f_draw_level_visible(draw_mode, f_preferredLevelMatch(eng1_exe_liq_low, preferredDirection == "Balanced", compactUseLong, activeLongTarget, activeShortTarget), false, preferredDirection)
 showOteVisual = strictShowOte and (draw_full or draw_focused) and draw_mode != "Minimal"
 showCalendarLiquidityVisual = calendarLiquidityRequestEnabled
 showLongRiskVisual = showRisk and not compactMode and f_executionVisualByMode(draw_mode, longRiskVisible, preferredDirection, true, compactUseLong)
@@ -3826,7 +3823,7 @@ if not draw_full
 eqHighLevel = showEqHighVisual ? eng1_exe_liq_high : na
 eqLowLevel = showEqLowVisual ? eng1_exe_liq_low : na
 bool dealingRangeValid = not na(eng2DealHigh) and not na(eng2DealLow) and not na(eng2DealLeftBar) and eng2DealHigh > eng2DealLow
-bool showDealingRangeVisual = showRangeVisual and dealingRangeValid and not eng2DealBroken
+bool showDealingRangeVisual = showLiquidity and showInternalRange and not compactMode and draw_mode != "Minimal" and dealingRangeValid and not eng2DealBroken
 float dealingRangeHighLevel = showDealingRangeVisual ? eng2DealHigh : na
 float dealingRangeLowLevel = showDealingRangeVisual ? eng2DealLow : na
 float dealingRangeEqLevel = showDealingRangeVisual ? (eng2DealHigh + eng2DealLow) * 0.5 : na
