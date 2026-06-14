@@ -4043,8 +4043,6 @@ f_eng4_render_dashboard() =>
         bool bAlign = nBias != 0 and nBias == cBias and cBias == eBias
         bool bNarr = nBias != 0 and cBias != 0 and eBias != 0 and cBias == eBias and nBias != eBias
         bool bMixed = (nBias != 0 and cBias != 0 and nBias != cBias) or (nBias != 0 and eBias != 0 and nBias != eBias) or (cBias != 0 and eBias != 0 and cBias != eBias)
-        string liqTxt = (eng1_exe_eqh_active ? "EQH " : "BSL ") + f_formatLevel(eng1_exe_liq_high) + " | " + (eng1_exe_eql_active ? "EQL " : "SSL ") + f_formatLevel(eng1_exe_liq_low)
-        liqTxt := (dLong ? longUsesExternalDolTarget : shortUsesExternalDolTarget) and not na(tpLvl) ? "DOL " + f_formatLevel(tpLvl) + " | " + liqTxt : liqTxt
         string sGate = not sBiasOk ? "Need Bias" : not sCtxOk ? "Need Ctx" : not sPdOk ? "Need PD" : not sOteOk ? "Need OTE" : not sDolOk ? "Need DOL" : not sKzOk ? "Need KZ" : "Strict OK"
         string stepTxt = not sweepOk ? "Need Sweep" : not mssOk ? "Need MSS" : not dispOk ? "Need Disp" : sGate
         bool waitLeg = not pRetired and not pValid and poiZoneOk and poiMapOk and (not poiLegOk or not pStrictOk)
@@ -4095,7 +4093,7 @@ f_eng4_render_dashboard() =>
             f_setCell(dashboard, 0, 3, "Bias", color.white, panelCellBg)
             f_setCell(dashboard, 1, 3, (bAlign ? "Aligned " + (eBias == 1 ? "Bullish" : "Bearish") : bNarr ? "Narr Conflict" : bMixed ? "Mixed" : "Building") + " | TF " + eng1_exec_tf + ">" + eng1_ctx_tf + "/" + eng1_narr_tf, color.white, dBias)
             f_setCell(dashboard, 0, 4, "Liquidity", color.white, panelCellBg)
-            f_setCell(dashboard, 1, 4, liqTxt, color.white, panelCellBg)
+            f_setCell(dashboard, 1, 4, ((dLong ? longUsesExternalDolTarget : shortUsesExternalDolTarget) and not na(tpLvl) ? "DOL " + f_formatLevel(tpLvl) + " | " : "") + (eng1_exe_eqh_active ? "EQH " : "BSL ") + f_formatLevel(eng1_exe_liq_high) + " | " + (eng1_exe_eql_active ? "EQL " : "SSL ") + f_formatLevel(eng1_exe_liq_low), color.white, panelCellBg)
             f_setCell(dashboard, 0, 5, "POI", color.white, panelCellBg)
             f_setCell(dashboard, 1, 5, pText, color.white, dPoi)
             f_setCell(dashboard, 0, 6, "Order", color.white, panelCellBg)
