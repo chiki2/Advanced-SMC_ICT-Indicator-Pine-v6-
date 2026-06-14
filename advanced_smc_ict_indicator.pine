@@ -3756,13 +3756,7 @@ bool sessClear = not sessOn and (array.size(sessionRangeBoxes) > 0 or array.size
 if sessClear
     f_trimSessionVisuals(0)
 
-bool aHas = f_sessLaneHasHandles(activeAsiaSessionBox, activeAsiaSessionLabel, activeAsiaSessionHighLine, activeAsiaSessionLowLine, activeAsiaSessionStartBar)
-bool lHas = f_sessLaneHasHandles(activeLondonSessionBox, activeLondonSessionLabel, activeLondonSessionHighLine, activeLondonSessionLowLine, activeLondonSessionStartBar)
-bool nHas = f_sessLaneHasHandles(activeNewYorkSessionBox, activeNewYorkSessionLabel, activeNewYorkSessionHighLine, activeNewYorkSessionLowLine, activeNewYorkSessionStartBar)
-bool aSync = aHas or (sessOn and (vAsOn or vAsNew or vAsEnd))
-bool lSync = lHas or (sessOn and (vLdOn or vLdNew or vLdEnd))
-bool nSync = nHas or (sessOn and (vNyOn or vNyNew or vNyEnd))
-if aSync
+if f_sessLaneHasHandles(activeAsiaSessionBox, activeAsiaSessionLabel, activeAsiaSessionHighLine, activeAsiaSessionLowLine, activeAsiaSessionStartBar) or (sessOn and (vAsOn or vAsNew or vAsEnd))
     [aBox, aLab, aHi, aLo, aSt] = f_eng2_syncSessLane(sessOn, vAsOn, vAsNew, vAsEnd, activeAsiaSessionBox, activeAsiaSessionLabel, activeAsiaSessionHighLine, activeAsiaSessionLowLine, activeAsiaSessionStartBar, "Asia", vAsHi, vAsLo)
     activeAsiaSessionBox := aBox
     activeAsiaSessionLabel := aLab
@@ -3770,7 +3764,7 @@ if aSync
     activeAsiaSessionLowLine := aLo
     activeAsiaSessionStartBar := aSt
 
-if lSync
+if f_sessLaneHasHandles(activeLondonSessionBox, activeLondonSessionLabel, activeLondonSessionHighLine, activeLondonSessionLowLine, activeLondonSessionStartBar) or (sessOn and (vLdOn or vLdNew or vLdEnd))
     [lBox, lLab, lHi, lLo, lSt] = f_eng2_syncSessLane(sessOn, vLdOn, vLdNew, vLdEnd, activeLondonSessionBox, activeLondonSessionLabel, activeLondonSessionHighLine, activeLondonSessionLowLine, activeLondonSessionStartBar, "London", vLdHi, vLdLo)
     activeLondonSessionBox := lBox
     activeLondonSessionLabel := lLab
@@ -3778,7 +3772,7 @@ if lSync
     activeLondonSessionLowLine := lLo
     activeLondonSessionStartBar := lSt
 
-if nSync
+if f_sessLaneHasHandles(activeNewYorkSessionBox, activeNewYorkSessionLabel, activeNewYorkSessionHighLine, activeNewYorkSessionLowLine, activeNewYorkSessionStartBar) or (sessOn and (vNyOn or vNyNew or vNyEnd))
     [nBox, nLab, nHi, nLo, nSt] = f_eng2_syncSessLane(sessOn, vNyOn, vNyNew, vNyEnd, activeNewYorkSessionBox, activeNewYorkSessionLabel, activeNewYorkSessionHighLine, activeNewYorkSessionLowLine, activeNewYorkSessionStartBar, "New York", vNyHi, vNyLo)
     activeNewYorkSessionBox := nBox
     activeNewYorkSessionLabel := nLab
