@@ -3544,15 +3544,14 @@ if shortTerminalSnapshot
 
 bool histOn = eng1_exec_valid and draw_full and (showOb or showFvg) and not compactMode
 // Full audit can show raw context OB/FVG, but Engine 3 remains the sole POI owner.
-bool ctxOn = histOn
 bool lLiveBO = showLongLiveZone and lOb and f_eng2_same_zone_visual(eng1_ctx_bull_ob_top, eng1_ctx_bull_ob_bottom, eng1BullObCreatedBar, longZoneTop, longZoneBot, tradeLongCreatedBar)
 bool lLiveBF = showLongLiveZone and lFvg and f_eng2_same_zone_visual(eng1_ctx_bull_fvg_top, eng1_ctx_bull_fvg_bottom, eng1BullFvgCreatedBar, longZoneTop, longZoneBot, tradeLongCreatedBar)
 bool sLiveBO = showShortLiveZone and sOb and f_eng2_same_zone_visual(eng1_ctx_bear_ob_top, eng1_ctx_bear_ob_bottom, eng1BearObCreatedBar, shortZoneTop, shortZoneBot, tradeShortCreatedBar)
 bool sLiveBF = showShortLiveZone and sFvg and f_eng2_same_zone_visual(eng1_ctx_bear_fvg_top, eng1_ctx_bear_fvg_bottom, eng1BearFvgCreatedBar, shortZoneTop, shortZoneBot, tradeShortCreatedBar)
-bool lCtxBO = ctxOn and showOb and not na(eng1_ctx_bull_ob_top) and not na(eng1_ctx_bull_ob_bottom) and not lLiveBO
-bool lCtxBF = ctxOn and showFvg and not na(eng1_ctx_bull_fvg_top) and not na(eng1_ctx_bull_fvg_bottom) and not lLiveBF
-bool sCtxBO = ctxOn and showOb and not na(eng1_ctx_bear_ob_top) and not na(eng1_ctx_bear_ob_bottom) and not sLiveBO
-bool sCtxBF = ctxOn and showFvg and not na(eng1_ctx_bear_fvg_top) and not na(eng1_ctx_bear_fvg_bottom) and not sLiveBF
+bool lCtxBO = histOn and showOb and not na(eng1_ctx_bull_ob_top) and not na(eng1_ctx_bull_ob_bottom) and not lLiveBO
+bool lCtxBF = histOn and showFvg and not na(eng1_ctx_bull_fvg_top) and not na(eng1_ctx_bull_fvg_bottom) and not lLiveBF
+bool sCtxBO = histOn and showOb and not na(eng1_ctx_bear_ob_top) and not na(eng1_ctx_bear_ob_bottom) and not sLiveBO
+bool sCtxBF = histOn and showFvg and not na(eng1_ctx_bear_fvg_top) and not na(eng1_ctx_bear_fvg_bottom) and not sLiveBF
 // Active/current context owns the right edge. If the same OB/FVG is still live
 // in Engine 1, hide the stale terminal snapshot so the active zone can continue
 // to the current bar instead of looking visually cut off.
@@ -3798,9 +3797,6 @@ if sessRefresh
         if not na(sessionLowLine)
             line.set_x2(sessionLowLine, bar_index)
 
-float bullStop = tradeLongStop
-float bearStop = tradeShortStop
-
 //------------------------------------------------------------------------------
 // Zone visual policy
 // Live OB/FVG zones are selected by Engine 3. Engine 2 only renders the selected
@@ -3837,8 +3833,8 @@ float dealingRangeEqLevel = showDealingRangeVisual ? (eng2DealHigh + eng2DealLow
 float dealingRangeSize = dealingRangeValid ? eng2DealHigh - eng2DealLow : na
 float dealingRangeQ25 = showDealingRangeVisual ? eng2DealLow + dealingRangeSize * 0.25 : na
 float dealingRangeQ75 = showDealingRangeVisual ? eng2DealLow + dealingRangeSize * 0.75 : na
-riskBullStopLevel = showLongRiskVisual ? bullStop : na
-riskBearStopLevel = showShortRiskVisual ? bearStop : na
+riskBullStopLevel = showLongRiskVisual ? tradeLongStop : na
+riskBearStopLevel = showShortRiskVisual ? tradeShortStop : na
 oteLongTopLevel = showOteVisual and dealingRangeValid ? eng2DealHigh - dealingRangeSize * 0.62 : na
 oteLongBottomLevel = showOteVisual and dealingRangeValid ? eng2DealHigh - dealingRangeSize * 0.79 : na
 oteShortTopLevel = showOteVisual and dealingRangeValid ? eng2DealLow + dealingRangeSize * 0.79 : na
