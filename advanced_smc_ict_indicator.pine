@@ -4007,8 +4007,6 @@ f_eng4_render_dashboard() =>
         string eState = dLong ? longExecutionState : shortExecutionState
         float eLvl = dLong ? tradeLongEntry : tradeShortEntry
         float tpLvl = dLong ? activeLongTarget : activeShortTarget
-        bool dolTgt = dLong ? longUsesExternalDolTarget : shortUsesExternalDolTarget
-        bool retired = dLong ? longRetired : shortRetired
         color aCol = cBoth or cWait ? color.new(neutralColor, 12) : dLong ? color.new(bullColor, 12) : color.new(bearColor, 12)
         bool pValid = pLong ? poi_long_contract_valid : poi_short_contract_valid
         string pType = pLong ? poi_long_type : poi_short_type
@@ -4046,7 +4044,7 @@ f_eng4_render_dashboard() =>
         bool bNarr = nBias != 0 and cBias != 0 and eBias != 0 and cBias == eBias and nBias != eBias
         bool bMixed = (nBias != 0 and cBias != 0 and nBias != cBias) or (nBias != 0 and eBias != 0 and nBias != eBias) or (cBias != 0 and eBias != 0 and cBias != eBias)
         string liqTxt = (eng1_exe_eqh_active ? "EQH " : "BSL ") + f_formatLevel(eng1_exe_liq_high) + " | " + (eng1_exe_eql_active ? "EQL " : "SSL ") + f_formatLevel(eng1_exe_liq_low)
-        liqTxt := dolTgt and not na(tpLvl) ? "DOL " + f_formatLevel(tpLvl) + " | " + liqTxt : liqTxt
+        liqTxt := (dLong ? longUsesExternalDolTarget : shortUsesExternalDolTarget) and not na(tpLvl) ? "DOL " + f_formatLevel(tpLvl) + " | " + liqTxt : liqTxt
         string slAtrTxt = not na(sessRefAtr) and sessRefCode != "" ? "ATR " + sessRefCode + " " + f_formatLevel(sessRefAtr) : "ATR -"
         string sGate = not sBiasOk ? "Need Bias" : not sCtxOk ? "Need Ctx" : not sPdOk ? "Need PD" : not sOteOk ? "Need OTE" : not sDolOk ? "Need DOL" : not sKzOk ? "Need KZ" : "Strict OK"
         string stepTxt = not sweepOk ? "Need Sweep" : not mssOk ? "Need MSS" : not dispOk ? "Need Disp" : sGate
@@ -4057,7 +4055,7 @@ f_eng4_render_dashboard() =>
         string sideMini = dLong ? "L " : "S "
         string setupTxt = cWait ? "Idle " + waitTxt : cBoth ? "Both POI L " + f_formatLevel(tradeLongEntry) + " / S " + f_formatLevel(tradeShortEntry) : sideFull + eState + " " + f_formatLevel(eLvl)
         string setupMini = cWait ? waitTxt : cBoth ? "Both POI" : sideMini + eState
-        bool planOk = not retired and not na(eLvl)
+        bool planOk = (dLong ? not longRetired : not shortRetired) and not na(eLvl)
         bool ordOk = not sMode or (sweepOk and mssOk and dispOk and strictOk)
         bool ordGate = sMode and planOk and not ordOk
         setupTxt := ordGate ? (cBoth ? "Focus " + sideFull : sideFull) + "Gate " + stepTxt + " " + f_formatLevel(eLvl) : setupTxt
