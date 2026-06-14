@@ -4045,7 +4045,6 @@ f_eng4_render_dashboard() =>
         bool bMixed = (nBias != 0 and cBias != 0 and nBias != cBias) or (nBias != 0 and eBias != 0 and nBias != eBias) or (cBias != 0 and eBias != 0 and cBias != eBias)
         string liqTxt = (eng1_exe_eqh_active ? "EQH " : "BSL ") + f_formatLevel(eng1_exe_liq_high) + " | " + (eng1_exe_eql_active ? "EQL " : "SSL ") + f_formatLevel(eng1_exe_liq_low)
         liqTxt := (dLong ? longUsesExternalDolTarget : shortUsesExternalDolTarget) and not na(tpLvl) ? "DOL " + f_formatLevel(tpLvl) + " | " + liqTxt : liqTxt
-        string slAtrTxt = not na(sessRefAtr) and sessRefCode != "" ? "ATR " + sessRefCode + " " + f_formatLevel(sessRefAtr) : "ATR -"
         string sGate = not sBiasOk ? "Need Bias" : not sCtxOk ? "Need Ctx" : not sPdOk ? "Need PD" : not sOteOk ? "Need OTE" : not sDolOk ? "Need DOL" : not sKzOk ? "Need KZ" : "Strict OK"
         string stepTxt = not sweepOk ? "Need Sweep" : not mssOk ? "Need MSS" : not dispOk ? "Need Disp" : sGate
         bool waitLeg = not pRetired and not pValid and poiZoneOk and poiMapOk and (not poiLegOk or not pStrictOk)
@@ -4063,7 +4062,6 @@ f_eng4_render_dashboard() =>
         bool riskOk = planOk and f_executionRiskVisible(eState) and ordOk
         string ordText = waitLeg ? "Need Leg" : not planOk ? "No order" : (ordGate ? "Gate " + stepTxt + " | Plan E " : riskOk ? "E " : "Plan E ") + f_formatLevel(eLvl) + " | SL " + f_formatLevel(dLong ? tradeLongStop : tradeShortStop) + " | TP " + f_formatLevel(tpLvl)
         ordText := cBoth ? "Focus " + sideFull + "| " + ordText : ordText
-        string trigText = idleNoLivePoi ? pSide + "Wait POI" : not pValid ? pSide + pWhy : showRetiredPoi ? pSide + (pRetWhy == "" ? "Retired" : pRetWhy) : pSide + (sMode ? stepTxt : not sweepOk ? "Need Sweep" : not mssOk ? "Need MSS" : not dispOk ? "Need Disp" : "Ready")
         bool pGate = sMode and pActive and not (sweepOk and mssOk and dispOk and strictOk)
         string pText = idleNoLivePoi ? idlePoiText : not pValid ? pSide + pWhy : showRetiredPoi ? pSide + (pRetWhy == "" ? "Retired" : "Retired: " + pRetWhy) : pSide + (pType == "Breaker" ? "BRK" : pType == "OB" ? "bOB" : pType) + " " + f_formatLevel(pLong ? poi_long_entry : poi_short_entry) + " | " + (pType == "FVG" and pLife == "Mitigated" ? "CE Hit" : pLife)
         pText := pGate ? pText + " | " + stepTxt : pText
@@ -4103,9 +4101,9 @@ f_eng4_render_dashboard() =>
             f_setCell(dashboard, 0, 6, "Order", color.white, panelCellBg)
             f_setCell(dashboard, 1, 6, ordText, color.white, dOrder)
             f_setCell(dashboard, 0, 7, "Trigger", color.white, panelCellBg)
-            f_setCell(dashboard, 1, 7, trigText, color.white, triggerReady ? aCol : panelCellBg)
+            f_setCell(dashboard, 1, 7, idleNoLivePoi ? pSide + "Wait POI" : not pValid ? pSide + pWhy : showRetiredPoi ? pSide + (pRetWhy == "" ? "Retired" : pRetWhy) : pSide + (sMode ? stepTxt : not sweepOk ? "Need Sweep" : not mssOk ? "Need MSS" : not dispOk ? "Need Disp" : "Ready"), color.white, triggerReady ? aCol : panelCellBg)
             f_setCell(dashboard, 0, 8, "Timing", color.white, panelCellBg)
-            f_setCell(dashboard, 1, 8, liquiditySessionSummary + " | " + timezoneSummary + " | " + slAtrTxt + " | " + (sMode ? (sKzOk ? "Strict " + ipdaWindowSummary : "Need KZ") : "Normal"), color.white, sMode ? (sKzOk ? color.new(color.teal, 15) : panelCellBg) : color.new(neutralColor, 15))
+            f_setCell(dashboard, 1, 8, liquiditySessionSummary + " | " + timezoneSummary + " | " + (not na(sessRefAtr) and sessRefCode != "" ? "ATR " + sessRefCode + " " + f_formatLevel(sessRefAtr) : "ATR -") + " | " + (sMode ? (sKzOk ? "Strict " + ipdaWindowSummary : "Need KZ") : "Normal"), color.white, sMode ? (sKzOk ? color.new(color.teal, 15) : panelCellBg) : color.new(neutralColor, 15))
             f_setCell(dashboard, 0, 9, "Next", color.white, panelCellBg)
             f_setCell(dashboard, 1, 9, nextText, color.white, dNext)
     else if lastBar and not showDashboard
