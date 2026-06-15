@@ -3598,10 +3598,7 @@ bool showCtxBF = lCtxBF and not lHistBlkBF and not f_eng3_poi_invalidated(true, 
 bool showCtxSO = sCtxBO and not sHistBlkBO and not f_eng3_poi_invalidated(false, eng1_ctx_bear_ob_top, eng1_ctx_bear_ob_bottom, eng3SignalClose)
 bool showCtxSF = sCtxBF and not sHistBlkBF and not f_eng3_poi_invalidated(false, eng1_ctx_bear_fvg_top, eng1_ctx_bear_fvg_bottom, eng3SignalClose)
 // Empty passive context paths skip sync work; existing handles still clear here.
-bool anyCtxVis = showCtxBO or showCtxBF or showCtxSO or showCtxSF
-bool ctxHasObj = not na(eng2CtxBullObBox) or not na(eng2CtxBullObLabel) or not na(eng2CtxBullFvgBox) or not na(eng2CtxBullFvgLabel) or not na(eng2CtxBearObBox) or not na(eng2CtxBearObLabel) or not na(eng2CtxBearFvgBox) or not na(eng2CtxBearFvgLabel)
-bool ctxNeedSync = anyCtxVis or ctxHasObj
-if lastBar and ctxNeedSync
+if lastBar and (showCtxBO or showCtxBF or showCtxSO or showCtxSF or not na(eng2CtxBullObBox) or not na(eng2CtxBullObLabel) or not na(eng2CtxBullFvgBox) or not na(eng2CtxBullFvgLabel) or not na(eng2CtxBearObBox) or not na(eng2CtxBearObLabel) or not na(eng2CtxBearFvgBox) or not na(eng2CtxBearFvgLabel))
     [cboB, cboL] = f_eng2_syncCtxZone(eng2CtxBullObBox, eng2CtxBullObLabel, showCtxBO, eng1BullObCreatedBar, eng1_ctx_bull_ob_top, eng1_ctx_bull_ob_bottom, "AUD " + f_obLabelText(true, eng1_ctx_bull_ob_breaker), color.new(bullColor, 72), color.new(bullColor, 97))
     [cbfB, cbfL] = f_eng2_syncCtxZone(eng2CtxBullFvgBox, eng2CtxBullFvgLabel, showCtxBF, eng1BullFvgCreatedBar, eng1_ctx_bull_fvg_top, eng1_ctx_bull_fvg_bottom, "AUD FVG+", color.new(bullColor, 82), color.new(bullColor, 98))
     [csoB, csoL] = f_eng2_syncCtxZone(eng2CtxBearObBox, eng2CtxBearObLabel, showCtxSO, eng1BearObCreatedBar, eng1_ctx_bear_ob_top, eng1_ctx_bear_ob_bottom, "AUD " + f_obLabelText(false, eng1_ctx_bear_ob_breaker), color.new(bearColor, 72), color.new(bearColor, 97))
@@ -3616,14 +3613,12 @@ if lastBar and ctxNeedSync
     eng2CtxBearFvgLabel := csfL
 
 // Empty live setup paths skip sync work; existing objects still clear here.
-bool lLiveSync = showLongLiveZone or not na(eng2LongZoneBox) or not na(eng2LongZoneLine) or not na(eng2LongZoneLabel)
-bool sLiveSync = showShortLiveZone or not na(eng2ShortZoneBox) or not na(eng2ShortZoneLine) or not na(eng2ShortZoneLabel)
-if lastBar and lLiveSync
+if lastBar and (showLongLiveZone or not na(eng2LongZoneBox) or not na(eng2LongZoneLine) or not na(eng2LongZoneLabel))
     [lzb, lzl, lzlab] = f_eng2_syncLiveZone(eng2LongZoneBox, eng2LongZoneLine, eng2LongZoneLabel, showLongLiveZone, tradeLongCreatedBar, longZoneTop, longZoneBot, tradeLongEntry, lzText, lOb ? label.style_label_right : label.style_label_left, lzBrd, lzFill, lzBw, lOb or lFvg, longExecutionState)
     eng2LongZoneBox := lzb
     eng2LongZoneLine := lzl
     eng2LongZoneLabel := lzlab
-if lastBar and sLiveSync
+if lastBar and (showShortLiveZone or not na(eng2ShortZoneBox) or not na(eng2ShortZoneLine) or not na(eng2ShortZoneLabel))
     [szb, szl, szlab] = f_eng2_syncLiveZone(eng2ShortZoneBox, eng2ShortZoneLine, eng2ShortZoneLabel, showShortLiveZone, tradeShortCreatedBar, shortZoneTop, shortZoneBot, tradeShortEntry, szText, sOb ? label.style_label_right : label.style_label_left, szBrd, szFill, szBw, sOb or sFvg, shortExecutionState)
     eng2ShortZoneBox := szb
     eng2ShortZoneLine := szl
@@ -3631,11 +3626,9 @@ if lastBar and sLiveSync
 
 // History boxes should stay visible, but feel lighter than the live / selected zone.
 // Empty history paths skip sync work; existing boxes still clear here.
-bool lHistSync = showLHistZone or not na(eng2LongHistoryBox)
-bool sHistSync = showSHistZone or not na(eng2ShortHistoryBox)
-if lastBar and lHistSync
+if lastBar and (showLHistZone or not na(eng2LongHistoryBox))
     eng2LongHistoryBox := f_eng2_syncHistBox(eng2LongHistoryBox, showLHistZone, lHBar, eng2LongHistoryRightBar, lHTop, lHBot, color.new(bullColor, 80), color.new(bullColor, 98), 1)
-if lastBar and sHistSync
+if lastBar and (showSHistZone or not na(eng2ShortHistoryBox))
     eng2ShortHistoryBox := f_eng2_syncHistBox(eng2ShortHistoryBox, showSHistZone, sHBar, eng2ShortHistoryRightBar, sHTop, sHBot, color.new(bearColor, 80), color.new(bearColor, 98), 1)
 
 bool anySetupZoneVisible = showLongLiveZone or showShortLiveZone
@@ -3851,8 +3844,7 @@ if lastBar
     // Lines (single instance per level)
     bool showExecEqHighLine = showEqHighVisual and not showDealingRangeVisual and not eqHighOverlapsCalendar
     bool showExecEqLowLine = showEqLowVisual and not showDealingRangeVisual and not eqLowOverlapsCalendar
-    bool thinSync = showExecEqHighLine or showExecEqLowLine or showPdhVisual or showPdlVisual or showPwhVisual or showPwlVisual or showPmhVisual or showPmlVisual or not na(eng2BslLine) or not na(eng2SslLine) or not na(eng2PdhLine) or not na(eng2PdlLine) or not na(eng2PwhLine) or not na(eng2PwlLine) or not na(eng2PmhLine) or not na(eng2PmlLine)
-    if thinSync
+    if showExecEqHighLine or showExecEqLowLine or showPdhVisual or showPdlVisual or showPwhVisual or showPwlVisual or showPmhVisual or showPmlVisual or not na(eng2BslLine) or not na(eng2SslLine) or not na(eng2PdhLine) or not na(eng2PdlLine) or not na(eng2PwhLine) or not na(eng2PwlLine) or not na(eng2PmhLine) or not na(eng2PmlLine)
         eng2BslLine := f_e2_thin_if(eng2BslLine, eqHighLevel, color.new(liqHighColor, 12), line.style_solid, showExecEqHighLine)
         eng2SslLine := f_e2_thin_if(eng2SslLine, eqLowLevel, color.new(liqLowColor, 12), line.style_solid, showExecEqLowLine)
         eng2PdhLine := f_e2_thin_if(eng2PdhLine, pdhLevel, color.new(liqHighColor, 28), line.style_dashed, showPdhVisual)
@@ -3864,9 +3856,7 @@ if lastBar
 
     bool showDealingOte = showOteVisual and dealingRangeValid
     int dealingLeftBar = showDealingRangeVisual or showDealingOte ? eng2DealLeftBar : na
-    bool eng2DealingRangeCoreHasHandles = not na(eng2RangeHighLine) or not na(eng2RangeLowLine) or not na(eng2RangeEqLine) or not na(eng2RangeQ25Line) or not na(eng2RangeQ75Line) or not na(eng2RangePremiumFill) or not na(eng2RangeDiscountFill)
-    bool eng2DealingRangeCoreNeedsSync = showDealingRangeVisual or eng2DealingRangeCoreHasHandles
-    if eng2DealingRangeCoreNeedsSync
+    if showDealingRangeVisual or not na(eng2RangeHighLine) or not na(eng2RangeLowLine) or not na(eng2RangeEqLine) or not na(eng2RangeQ25Line) or not na(eng2RangeQ75Line) or not na(eng2RangePremiumFill) or not na(eng2RangeDiscountFill)
         color rangeBoundaryColor = eng2DealBroken ? color.new(color.silver, 78) : color.new(color.silver, 35)
         color rangeQuarterColor = color.new(color.silver, eng2DealBroken ? 86 : 78)
         string rangeBoundaryStyle = eng2DealBroken ? line.style_dotted : line.style_solid
@@ -3878,9 +3868,7 @@ if lastBar
         eng2RangePremiumFill := f_eng2_syncLineFill(eng2RangePremiumFill, eng2RangeHighLine, eng2RangeEqLine, eng2DealBroken ? color.new(color.silver, 94) : decisionPremiumFillColor, showDealingRangeVisual)
         eng2RangeDiscountFill := f_eng2_syncLineFill(eng2RangeDiscountFill, eng2RangeEqLine, eng2RangeLowLine, eng2DealBroken ? color.new(color.silver, 94) : decisionDiscountFillColor, showDealingRangeVisual)
 
-    bool eng2DealingOteCoreHasHandles = not na(eng2OteLongTopLine) or not na(eng2OteLongBottomLine) or not na(eng2OteLongFill) or not na(eng2OteShortTopLine) or not na(eng2OteShortBottomLine) or not na(eng2OteShortFill)
-    bool eng2DealingOteCoreNeedsSync = showDealingOte or eng2DealingOteCoreHasHandles
-    if eng2DealingOteCoreNeedsSync
+    if showDealingOte or not na(eng2OteLongTopLine) or not na(eng2OteLongBottomLine) or not na(eng2OteLongFill) or not na(eng2OteShortTopLine) or not na(eng2OteShortBottomLine) or not na(eng2OteShortFill)
         color oteBullLineColor = color.new(bullColor, eng2DealBroken ? 45 : 18)
         color oteBearLineColor = color.new(bearColor, eng2DealBroken ? 45 : 18)
         string oteBandStyle = eng2DealBroken ? line.style_dotted : line.style_solid
@@ -3891,8 +3879,7 @@ if lastBar
         eng2OteShortBottomLine := f_eng2_syncSegmentHLine(eng2OteShortBottomLine, dealingLeftBar, bar_index, oteShortBottomLevel, oteBearLineColor, 2, oteBandStyle, showDealingOte)
         eng2OteShortFill := f_eng2_syncLineFill(eng2OteShortFill, eng2OteShortTopLine, eng2OteShortBottomLine, color.new(bearColor, eng2DealBroken ? 90 : 86), showDealingOte)
 
-    bool riskSync = showLongRiskVisual or showShortRiskVisual or not na(eng2RiskLongEntryLine) or not na(eng2RiskShortEntryLine) or not na(eng2RiskLongStopLine) or not na(eng2RiskShortStopLine) or not na(eng2RiskLongTargetLine) or not na(eng2RiskShortTargetLine)
-    if riskSync
+    if showLongRiskVisual or showShortRiskVisual or not na(eng2RiskLongEntryLine) or not na(eng2RiskShortEntryLine) or not na(eng2RiskLongStopLine) or not na(eng2RiskShortStopLine) or not na(eng2RiskLongTargetLine) or not na(eng2RiskShortTargetLine)
         eng2RiskLongEntryLine := f_e2_risk_if(eng2RiskLongEntryLine, tradeLongEntry, color.new(bullColor, 0), 2, showLongRiskVisual)
         eng2RiskShortEntryLine := f_e2_risk_if(eng2RiskShortEntryLine, tradeShortEntry, color.new(bearColor, 0), 2, showShortRiskVisual)
         eng2RiskLongStopLine := f_e2_risk_if(eng2RiskLongStopLine, riskBullStopLevel, color.new(bearColor, 0), 1, showLongRiskVisual)
