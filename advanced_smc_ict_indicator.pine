@@ -3576,12 +3576,10 @@ bool sHistBF = f_eng2_matches_history_zone(sCtxBF and eng2ShortHistoryIsFvg, tru
 bool sHistHide = sHistLive or sHistBO or sHistBF
 bool showSHistZone = sHistCand and not sHistHide
 // Keep terminal history snapshots frozen so old zones do not read as live POI.
-string lzBad = f_executionStateBadge(longExecutionState, compactMode)
-string szBad = f_executionStateBadge(shortExecutionState, compactMode)
 string lzBase = longDrawSel ? (lOb ? f_obLabelText(true, eng1_ctx_bull_ob_breaker) : lFvg ? "FVG" : "") : ""
 string szBase = shortDrawSel ? (sOb ? f_obLabelText(false, eng1_ctx_bear_ob_breaker) : sFvg ? "FVG" : "") : ""
-string lzText = f_eng2_zone_label_text(lzBase, longPoiLifecycle, poi_long_type, lzBad, longZoneQualityText)
-string szText = f_eng2_zone_label_text(szBase, shortPoiLifecycle, poi_short_type, szBad, shortZoneQualityText)
+string lzText = f_eng2_zone_label_text(lzBase, longPoiLifecycle, poi_long_type, f_executionStateBadge(longExecutionState, compactMode), longZoneQualityText)
+string szText = f_eng2_zone_label_text(szBase, shortPoiLifecycle, poi_short_type, f_executionStateBadge(shortExecutionState, compactMode), shortZoneQualityText)
 int lzBw = longPoiMitigated ? 1 : math.max(longZoneQualityText == "Q3" ? 3 : 2, longExecutionActive ? 3 : 2)
 int szBw = shortPoiMitigated ? 1 : math.max(shortZoneQualityText == "Q3" ? 3 : 2, shortExecutionActive ? 3 : 2)
 color lzBrd = color.new(bullColor, longPoiMitigated ? 70 : f_zoneQualityBorderAlpha(longZoneQualityText, longExecutionState))
@@ -3707,14 +3705,10 @@ if eng2RawEventCreateReady or eng2LongSetupEventStateReady or eng2ShortSetupEven
         if showOb and eng2SetupExtraLabelsAllowed and (eng2LongSetupEventStateReady or eng2ShortSetupEventStateReady)
             int eng2BullBreakerLabelTime = nz(eng1_ctx_bull_ob_breaker_time, eng1_ctx_bull_ob_bar)
             int eng2BearBreakerLabelTime = nz(eng1_ctx_bear_ob_breaker_time, eng1_ctx_bear_ob_bar)
-            int eng2BullBreakerPrevLabelTime = nz(eng1_ctx_bull_ob_breaker_time[1], eng1_ctx_bull_ob_bar[1])
-            int eng2BearBreakerPrevLabelTime = nz(eng1_ctx_bear_ob_breaker_time[1], eng1_ctx_bear_ob_bar[1])
-            if eng2LongSetupEventStateReady and eng1_ctx_bull_ob_breaker and not na(eng2BullBreakerLabelTime) and eng2BullBreakerLabelTime != nz(eng2BullBreakerPrevLabelTime, -1)
-                float eng2BullBreakerLevel = not na(eng1_ctx_bull_ob_top) and not na(eng1_ctx_bull_ob_bottom) ? f_zoneMid(eng1_ctx_bull_ob_top, eng1_ctx_bull_ob_bottom) : eng2EventLow
-                f_eng2_emitSignalEvent(nz(eng2BullBreakerLabelTime, time), eng2BullBreakerLevel, "BRK+", color.new(bullColor, 0), false, 2.42)
-            if eng2ShortSetupEventStateReady and eng1_ctx_bear_ob_breaker and not na(eng2BearBreakerLabelTime) and eng2BearBreakerLabelTime != nz(eng2BearBreakerPrevLabelTime, -1)
-                float eng2BearBreakerLevel = not na(eng1_ctx_bear_ob_top) and not na(eng1_ctx_bear_ob_bottom) ? f_zoneMid(eng1_ctx_bear_ob_top, eng1_ctx_bear_ob_bottom) : eng2EventHigh
-                f_eng2_emitSignalEvent(nz(eng2BearBreakerLabelTime, time), eng2BearBreakerLevel, "BRK-", color.new(bearColor, 0), true, 2.42)
+            if eng2LongSetupEventStateReady and eng1_ctx_bull_ob_breaker and not na(eng2BullBreakerLabelTime) and eng2BullBreakerLabelTime != nz(eng1_ctx_bull_ob_breaker_time[1], eng1_ctx_bull_ob_bar[1])
+                f_eng2_emitSignalEvent(nz(eng2BullBreakerLabelTime, time), not na(eng1_ctx_bull_ob_top) and not na(eng1_ctx_bull_ob_bottom) ? f_zoneMid(eng1_ctx_bull_ob_top, eng1_ctx_bull_ob_bottom) : eng2EventLow, "BRK+", color.new(bullColor, 0), false, 2.42)
+            if eng2ShortSetupEventStateReady and eng1_ctx_bear_ob_breaker and not na(eng2BearBreakerLabelTime) and eng2BearBreakerLabelTime != nz(eng1_ctx_bear_ob_breaker_time[1], eng1_ctx_bear_ob_bar[1])
+                f_eng2_emitSignalEvent(nz(eng2BearBreakerLabelTime, time), not na(eng1_ctx_bear_ob_top) and not na(eng1_ctx_bear_ob_bottom) ? f_zoneMid(eng1_ctx_bear_ob_top, eng1_ctx_bear_ob_bottom) : eng2EventHigh, "BRK-", color.new(bearColor, 0), true, 2.42)
     f_eng2_trim_label_history(eng2SignalEventLabelHistory, eng2EventKeepCap)
 
 //------------------------------------------------------------------------------
