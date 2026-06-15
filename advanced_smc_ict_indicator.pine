@@ -1024,6 +1024,9 @@ f_eng2_syncRightLevelLabel(label currentLabel, float level, string labelText, co
         updatedLabel := na
     updatedLabel
 
+f_e2_lbl_if(label h, float lvl, string txt, color col, bool on) =>
+    on or not na(h) ? f_eng2_syncRightLevelLabel(h, lvl, txt, col, on) : h
+
 f_e2_thin_if(line h, float lvl, color col, string sty, bool on) =>
     on or not na(h) ? f_eng2_syncBoundedHLine(h, lvl, col, 1, sty, on) : h
 
@@ -3794,28 +3797,17 @@ if lastBar
     bool rLbl = draw_show_right_labels
     bool bslLblOn = (rLbl and showDealingRangeVisual and not (f_levelsClose(bslLbl, pdhLevel, rightEdgeLabelTolerance) or f_levelsClose(bslLbl, pwhLevel, rightEdgeLabelTolerance) or f_levelsClose(bslLbl, pmhLevel, rightEdgeLabelTolerance))) or (showEqHighRightLabel and not showDealingRangeVisual)
     bool sslLblOn = (rLbl and showDealingRangeVisual and not (f_levelsClose(sslLbl, pdlLevel, rightEdgeLabelTolerance) or f_levelsClose(sslLbl, pwlLevel, rightEdgeLabelTolerance) or f_levelsClose(sslLbl, pmlLevel, rightEdgeLabelTolerance))) or (showEqLowRightLabel and not showDealingRangeVisual)
-    if bslLblOn or not na(eqHighLabel)
-        eqHighLabel := f_eng2_syncRightLevelLabel(eqHighLabel, bslLbl, showDealingRangeVisual ? "ERL BSL" : eng1_exe_eqh_active ? "EQH" : "BSL", color.new(liqHighColor, 12), bslLblOn)
-    if sslLblOn or not na(eqLowLabel)
-        eqLowLabel := f_eng2_syncRightLevelLabel(eqLowLabel, sslLbl, showDealingRangeVisual ? "ERL SSL" : eng1_exe_eql_active ? "EQL" : "SSL", color.new(liqLowColor, 12), sslLblOn)
-    if (rLbl and showDealingRangeVisual) or not na(eng2DealEqLabel)
-        eng2DealEqLabel := f_eng2_syncRightLevelLabel(eng2DealEqLabel, dealingRangeEqLevel, "EQ", color.new(decisionEqColor, 0), rLbl and showDealingRangeVisual)
-    if (rLbl and showPdhVisual) or not na(pdhLabel)
-        pdhLabel := f_eng2_syncRightLevelLabel(pdhLabel, pdhLevel, "PDH", color.new(liqHighColor, 10), rLbl and showPdhVisual)
-    if (rLbl and showPdlVisual) or not na(pdlLabel)
-        pdlLabel := f_eng2_syncRightLevelLabel(pdlLabel, pdlLevel, "PDL", color.new(liqLowColor, 10), rLbl and showPdlVisual)
-    if (rLbl and showPwhVisual) or not na(pwhLabel)
-        pwhLabel := f_eng2_syncRightLevelLabel(pwhLabel, pwhLevel, "PWH", color.new(color.fuchsia, 15), rLbl and showPwhVisual)
-    if (rLbl and showPwlVisual) or not na(pwlLabel)
-        pwlLabel := f_eng2_syncRightLevelLabel(pwlLabel, pwlLevel, "PWL", color.new(color.fuchsia, 15), rLbl and showPwlVisual)
-    if (rLbl and showPmhVisual) or not na(pmhLabel)
-        pmhLabel := f_eng2_syncRightLevelLabel(pmhLabel, pmhLevel, "PMH", color.new(color.silver, 35), rLbl and showPmhVisual)
-    if (rLbl and showPmlVisual) or not na(pmlLabel)
-        pmlLabel := f_eng2_syncRightLevelLabel(pmlLabel, pmlLevel, "PML", color.new(color.silver, 35), rLbl and showPmlVisual)
-    if showLongStopRightLabel or not na(longStopLabel)
-        longStopLabel := f_eng2_syncRightLevelLabel(longStopLabel, riskBullStopLevel, "SL L", color.new(bearColor, 0), showLongStopRightLabel)
-    if showShortStopRightLabel or not na(shortStopLabel)
-        shortStopLabel := f_eng2_syncRightLevelLabel(shortStopLabel, riskBearStopLevel, "SL S", color.new(bullColor, 0), showShortStopRightLabel)
+    eqHighLabel := f_e2_lbl_if(eqHighLabel, bslLbl, showDealingRangeVisual ? "ERL BSL" : eng1_exe_eqh_active ? "EQH" : "BSL", color.new(liqHighColor, 12), bslLblOn)
+    eqLowLabel := f_e2_lbl_if(eqLowLabel, sslLbl, showDealingRangeVisual ? "ERL SSL" : eng1_exe_eql_active ? "EQL" : "SSL", color.new(liqLowColor, 12), sslLblOn)
+    eng2DealEqLabel := f_e2_lbl_if(eng2DealEqLabel, dealingRangeEqLevel, "EQ", color.new(decisionEqColor, 0), rLbl and showDealingRangeVisual)
+    pdhLabel := f_e2_lbl_if(pdhLabel, pdhLevel, "PDH", color.new(liqHighColor, 10), rLbl and showPdhVisual)
+    pdlLabel := f_e2_lbl_if(pdlLabel, pdlLevel, "PDL", color.new(liqLowColor, 10), rLbl and showPdlVisual)
+    pwhLabel := f_e2_lbl_if(pwhLabel, pwhLevel, "PWH", color.new(color.fuchsia, 15), rLbl and showPwhVisual)
+    pwlLabel := f_e2_lbl_if(pwlLabel, pwlLevel, "PWL", color.new(color.fuchsia, 15), rLbl and showPwlVisual)
+    pmhLabel := f_e2_lbl_if(pmhLabel, pmhLevel, "PMH", color.new(color.silver, 35), rLbl and showPmhVisual)
+    pmlLabel := f_e2_lbl_if(pmlLabel, pmlLevel, "PML", color.new(color.silver, 35), rLbl and showPmlVisual)
+    longStopLabel := f_e2_lbl_if(longStopLabel, riskBullStopLevel, "SL L", color.new(bearColor, 0), showLongStopRightLabel)
+    shortStopLabel := f_e2_lbl_if(shortStopLabel, riskBearStopLevel, "SL S", color.new(bullColor, 0), showShortStopRightLabel)
 
 // Bias tint should follow the MTF narrative chain: Narrative -> Context -> Execution.
 int backdropBias = displayNarrBias != 0 ? displayNarrBias : (eng1CtxRangeReady and displayCtxBias != 0 ? displayCtxBias : displayExecBias)
