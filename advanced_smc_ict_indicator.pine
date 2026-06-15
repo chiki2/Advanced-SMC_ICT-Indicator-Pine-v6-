@@ -3802,7 +3802,6 @@ if sessRefresh
 showEqHighVisual = showLiquidity and not compactMode and f_draw_level_visible(draw_mode, f_preferredLevelMatch(eng1_exe_liq_high, preferredDirection == "Balanced", compactUseLong, activeLongTarget, activeShortTarget), true, preferredDirection)
 showEqLowVisual = showLiquidity and not compactMode and f_draw_level_visible(draw_mode, f_preferredLevelMatch(eng1_exe_liq_low, preferredDirection == "Balanced", compactUseLong, activeLongTarget, activeShortTarget), false, preferredDirection)
 showOteVisual = strictShowOte and (draw_full or draw_focused) and draw_mode != "Minimal"
-showCalendarLiquidityVisual = calendarLiquidityRequestEnabled
 showLongRiskVisual = showRisk and not compactMode and f_executionVisualByMode(draw_mode, longRiskVisible, preferredDirection, true, compactUseLong)
 showShortRiskVisual = showRisk and not compactMode and f_executionVisualByMode(draw_mode, shortRiskVisible, preferredDirection, false, compactUseLong)
 
@@ -3831,20 +3830,20 @@ oteLongBottomLevel = showOteVisual and dealingRangeValid ? eng2DealHigh - dealin
 oteShortTopLevel = showOteVisual and dealingRangeValid ? eng2DealLow + dealingRangeSize * 0.79 : na
 oteShortBottomLevel = showOteVisual and dealingRangeValid ? eng2DealLow + dealingRangeSize * 0.62 : na
 rightEdgeLabelTolerance = atrSafe * 0.25
-pdhLevel = showCalendarLiquidityVisual ? prevDayHigh : na
-pdlLevel = showCalendarLiquidityVisual ? prevDayLow : na
-pwhLevel = showCalendarLiquidityVisual and not f_levelsClose(prevWeekHigh, pdhLevel, rightEdgeLabelTolerance) ? prevWeekHigh : na
-pwlLevel = showCalendarLiquidityVisual and not f_levelsClose(prevWeekLow, pdlLevel, rightEdgeLabelTolerance) ? prevWeekLow : na
-pmhLevel = showCalendarLiquidityVisual and not f_levelsClose(prevMonthHigh, pdhLevel, rightEdgeLabelTolerance) and not f_levelsClose(prevMonthHigh, pwhLevel, rightEdgeLabelTolerance) ? prevMonthHigh : na
-pmlLevel = showCalendarLiquidityVisual and not f_levelsClose(prevMonthLow, pdlLevel, rightEdgeLabelTolerance) and not f_levelsClose(prevMonthLow, pwlLevel, rightEdgeLabelTolerance) ? prevMonthLow : na
+pdhLevel = calendarLiquidityRequestEnabled ? prevDayHigh : na
+pdlLevel = calendarLiquidityRequestEnabled ? prevDayLow : na
+pwhLevel = calendarLiquidityRequestEnabled and not f_levelsClose(prevWeekHigh, pdhLevel, rightEdgeLabelTolerance) ? prevWeekHigh : na
+pwlLevel = calendarLiquidityRequestEnabled and not f_levelsClose(prevWeekLow, pdlLevel, rightEdgeLabelTolerance) ? prevWeekLow : na
+pmhLevel = calendarLiquidityRequestEnabled and not f_levelsClose(prevMonthHigh, pdhLevel, rightEdgeLabelTolerance) and not f_levelsClose(prevMonthHigh, pwhLevel, rightEdgeLabelTolerance) ? prevMonthHigh : na
+pmlLevel = calendarLiquidityRequestEnabled and not f_levelsClose(prevMonthLow, pdlLevel, rightEdgeLabelTolerance) and not f_levelsClose(prevMonthLow, pwlLevel, rightEdgeLabelTolerance) ? prevMonthLow : na
 showPdhVisual = not na(pdhLevel)
 showPdlVisual = not na(pdlLevel)
 showPwhVisual = not na(pwhLevel)
 showPwlVisual = not na(pwlLevel)
 showPmhVisual = not na(pmhLevel)
 showPmlVisual = not na(pmlLevel)
-bool eqHighOverlapsCalendar = showCalendarLiquidityVisual and (f_levelsClose(eqHighLevel, pdhLevel, rightEdgeLabelTolerance) or f_levelsClose(eqHighLevel, pwhLevel, rightEdgeLabelTolerance) or f_levelsClose(eqHighLevel, pmhLevel, rightEdgeLabelTolerance))
-bool eqLowOverlapsCalendar = showCalendarLiquidityVisual and (f_levelsClose(eqLowLevel, pdlLevel, rightEdgeLabelTolerance) or f_levelsClose(eqLowLevel, pwlLevel, rightEdgeLabelTolerance) or f_levelsClose(eqLowLevel, pmlLevel, rightEdgeLabelTolerance))
+bool eqHighOverlapsCalendar = calendarLiquidityRequestEnabled and (f_levelsClose(eqHighLevel, pdhLevel, rightEdgeLabelTolerance) or f_levelsClose(eqHighLevel, pwhLevel, rightEdgeLabelTolerance) or f_levelsClose(eqHighLevel, pmhLevel, rightEdgeLabelTolerance))
+bool eqLowOverlapsCalendar = calendarLiquidityRequestEnabled and (f_levelsClose(eqLowLevel, pdlLevel, rightEdgeLabelTolerance) or f_levelsClose(eqLowLevel, pwlLevel, rightEdgeLabelTolerance) or f_levelsClose(eqLowLevel, pmlLevel, rightEdgeLabelTolerance))
 showShortStopRightLabel = draw_show_right_labels and showShortRiskVisual and not na(riskBearStopLevel)
 showLongStopRightLabel = draw_show_right_labels and showLongRiskVisual and not na(riskBullStopLevel)
 showEqHighRightLabel = draw_show_right_labels and showEqHighVisual and not eqHighOverlapsCalendar and not f_levelsClose(eqHighLevel, riskBearStopLevel, rightEdgeLabelTolerance)
@@ -3867,7 +3866,6 @@ if lastBar
 
     bool showDealingOte = showOteVisual and dealingRangeValid
     int dealingLeftBar = showDealingRangeVisual or showDealingOte ? eng2DealLeftBar : na
-    int dealingRightBar = bar_index
     bool eng2DealingRangeCoreHasHandles = not na(eng2RangeHighLine) or not na(eng2RangeLowLine) or not na(eng2RangeEqLine) or not na(eng2RangeQ25Line) or not na(eng2RangeQ75Line) or not na(eng2RangePremiumFill) or not na(eng2RangeDiscountFill)
     bool eng2DealingRangeCoreNeedsSync = showDealingRangeVisual or eng2DealingRangeCoreHasHandles
     if eng2DealingRangeCoreNeedsSync
@@ -3878,11 +3876,11 @@ if lastBar
         string rangeEqStyle = eng2DealBroken ? line.style_dotted : line.style_dashed
         color rangePremiumColor = eng2DealBroken ? color.new(color.silver, 94) : decisionPremiumFillColor
         color rangeDiscountColor = eng2DealBroken ? color.new(color.silver, 94) : decisionDiscountFillColor
-        eng2RangeHighLine := f_eng2_syncSegmentHLine(eng2RangeHighLine, dealingLeftBar, dealingRightBar, dealingRangeHighLevel, rangeBoundaryColor, 1, rangeBoundaryStyle, showDealingRangeVisual)
-        eng2RangeLowLine := f_eng2_syncSegmentHLine(eng2RangeLowLine, dealingLeftBar, dealingRightBar, dealingRangeLowLevel, rangeBoundaryColor, 1, rangeBoundaryStyle, showDealingRangeVisual)
-        eng2RangeEqLine := f_eng2_syncSegmentHLine(eng2RangeEqLine, dealingLeftBar, dealingRightBar, dealingRangeEqLevel, rangeEqColor, 2, rangeEqStyle, showDealingRangeVisual)
-        eng2RangeQ25Line := f_eng2_syncSegmentHLine(eng2RangeQ25Line, dealingLeftBar, dealingRightBar, dealingRangeQ25, rangeQuarterColor, 1, line.style_dotted, showDealingRangeVisual)
-        eng2RangeQ75Line := f_eng2_syncSegmentHLine(eng2RangeQ75Line, dealingLeftBar, dealingRightBar, dealingRangeQ75, rangeQuarterColor, 1, line.style_dotted, showDealingRangeVisual)
+        eng2RangeHighLine := f_eng2_syncSegmentHLine(eng2RangeHighLine, dealingLeftBar, bar_index, dealingRangeHighLevel, rangeBoundaryColor, 1, rangeBoundaryStyle, showDealingRangeVisual)
+        eng2RangeLowLine := f_eng2_syncSegmentHLine(eng2RangeLowLine, dealingLeftBar, bar_index, dealingRangeLowLevel, rangeBoundaryColor, 1, rangeBoundaryStyle, showDealingRangeVisual)
+        eng2RangeEqLine := f_eng2_syncSegmentHLine(eng2RangeEqLine, dealingLeftBar, bar_index, dealingRangeEqLevel, rangeEqColor, 2, rangeEqStyle, showDealingRangeVisual)
+        eng2RangeQ25Line := f_eng2_syncSegmentHLine(eng2RangeQ25Line, dealingLeftBar, bar_index, dealingRangeQ25, rangeQuarterColor, 1, line.style_dotted, showDealingRangeVisual)
+        eng2RangeQ75Line := f_eng2_syncSegmentHLine(eng2RangeQ75Line, dealingLeftBar, bar_index, dealingRangeQ75, rangeQuarterColor, 1, line.style_dotted, showDealingRangeVisual)
         eng2RangePremiumFill := f_eng2_syncLineFill(eng2RangePremiumFill, eng2RangeHighLine, eng2RangeEqLine, rangePremiumColor, showDealingRangeVisual)
         eng2RangeDiscountFill := f_eng2_syncLineFill(eng2RangeDiscountFill, eng2RangeEqLine, eng2RangeLowLine, rangeDiscountColor, showDealingRangeVisual)
 
@@ -3894,11 +3892,11 @@ if lastBar
         color oteBullFillColor = color.new(bullColor, eng2DealBroken ? 90 : 86)
         color oteBearFillColor = color.new(bearColor, eng2DealBroken ? 90 : 86)
         string oteBandStyle = eng2DealBroken ? line.style_dotted : line.style_solid
-        eng2OteLongTopLine := f_eng2_syncSegmentHLine(eng2OteLongTopLine, dealingLeftBar, dealingRightBar, oteLongTopLevel, oteBullLineColor, 2, oteBandStyle, showDealingOte)
-        eng2OteLongBottomLine := f_eng2_syncSegmentHLine(eng2OteLongBottomLine, dealingLeftBar, dealingRightBar, oteLongBottomLevel, oteBullLineColor, 2, oteBandStyle, showDealingOte)
+        eng2OteLongTopLine := f_eng2_syncSegmentHLine(eng2OteLongTopLine, dealingLeftBar, bar_index, oteLongTopLevel, oteBullLineColor, 2, oteBandStyle, showDealingOte)
+        eng2OteLongBottomLine := f_eng2_syncSegmentHLine(eng2OteLongBottomLine, dealingLeftBar, bar_index, oteLongBottomLevel, oteBullLineColor, 2, oteBandStyle, showDealingOte)
         eng2OteLongFill := f_eng2_syncLineFill(eng2OteLongFill, eng2OteLongTopLine, eng2OteLongBottomLine, oteBullFillColor, showDealingOte)
-        eng2OteShortTopLine := f_eng2_syncSegmentHLine(eng2OteShortTopLine, dealingLeftBar, dealingRightBar, oteShortTopLevel, oteBearLineColor, 2, oteBandStyle, showDealingOte)
-        eng2OteShortBottomLine := f_eng2_syncSegmentHLine(eng2OteShortBottomLine, dealingLeftBar, dealingRightBar, oteShortBottomLevel, oteBearLineColor, 2, oteBandStyle, showDealingOte)
+        eng2OteShortTopLine := f_eng2_syncSegmentHLine(eng2OteShortTopLine, dealingLeftBar, bar_index, oteShortTopLevel, oteBearLineColor, 2, oteBandStyle, showDealingOte)
+        eng2OteShortBottomLine := f_eng2_syncSegmentHLine(eng2OteShortBottomLine, dealingLeftBar, bar_index, oteShortBottomLevel, oteBearLineColor, 2, oteBandStyle, showDealingOte)
         eng2OteShortFill := f_eng2_syncLineFill(eng2OteShortFill, eng2OteShortTopLine, eng2OteShortBottomLine, oteBearFillColor, showDealingOte)
 
     bool riskSync = showLongRiskVisual or showShortRiskVisual or not na(eng2RiskLongEntryLine) or not na(eng2RiskShortEntryLine) or not na(eng2RiskLongStopLine) or not na(eng2RiskShortStopLine) or not na(eng2RiskLongTargetLine) or not na(eng2RiskShortTargetLine)
