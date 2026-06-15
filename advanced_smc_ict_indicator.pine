@@ -498,8 +498,7 @@ f_eng1_sync_invalid_tf_label(label currentLabel, bool validTf, string chartTfTex
         if na(updatedLabel)
             updatedLabel := label.new(x=x, y=y, xloc=xloc.bar_index, yloc=yloc.price, text=msg, style=label.style_label_left, color=color.new(color.black, 0), textcolor=color.white, size=size.small)
         else
-            label.set_x(updatedLabel, x)
-            label.set_y(updatedLabel, y)
+            label.set_xy(updatedLabel, x, y)
             label.set_text(updatedLabel, msg)
             label.set_style(updatedLabel, label.style_label_left)
             label.set_color(updatedLabel, color.new(color.black, 0))
@@ -875,10 +874,8 @@ f_eng2_syncSessLane(bool en, bool inSess, bool newSess, bool ended, box b, label
         if inSess
             int safeSessLeftBar = f_safeBarIndexX(na(nextStartBar) ? bar_index : nextStartBar)
             if not na(nextBox) and not na(hi) and not na(lo)
-                box.set_left(nextBox, safeSessLeftBar)
-                box.set_right(nextBox, bar_index)
-                box.set_top(nextBox, hi)
-                box.set_bottom(nextBox, lo)
+                box.set_lefttop(nextBox, safeSessLeftBar, hi)
+                box.set_rightbottom(nextBox, bar_index, lo)
             if not na(nextHighLine) and not na(hi)
                 line.set_xy1(nextHighLine, safeSessLeftBar, hi)
                 line.set_xy2(nextHighLine, bar_index, hi)
@@ -886,8 +883,7 @@ f_eng2_syncSessLane(bool en, bool inSess, bool newSess, bool ended, box b, label
                 line.set_xy1(nextLowLine, safeSessLeftBar, lo)
                 line.set_xy2(nextLowLine, bar_index, lo)
             if not na(nextLabel) and not na(hi) and not na(lo)
-                label.set_x(nextLabel, int(math.floor((safeSessLeftBar + bar_index) * 0.5)))
-                label.set_y(nextLabel, f_zoneMid(hi, lo))
+                label.set_xy(nextLabel, int(math.floor((safeSessLeftBar + bar_index) * 0.5)), f_zoneMid(hi, lo))
         else if ended
             if not na(nextBox)
                 if not na(nextHighLine)
