@@ -3561,25 +3561,19 @@ float sHTop = eng2ShortHistoryTop
 float sHBot = eng2ShortHistoryBottom
 int lHBar = eng2LongHistoryLeftBar
 int sHBar = eng2ShortHistoryLeftBar
-bool lHistType = (eng2LongHistoryIsOb and showOb) or (eng2LongHistoryIsFvg and showFvg)
-bool sHistType = (eng2ShortHistoryIsOb and showOb) or (eng2ShortHistoryIsFvg and showFvg)
-bool lHistCand = histOn and eng2LongHistoryTag != "" and not na(lHTop) and not na(lHBot) and lHistType and not f_eng3_poi_invalidated(true, lHTop, lHBot, eng3SignalClose)
+bool lHistCand = histOn and eng2LongHistoryTag != "" and not na(lHTop) and not na(lHBot) and ((eng2LongHistoryIsOb and showOb) or (eng2LongHistoryIsFvg and showFvg)) and not f_eng3_poi_invalidated(true, lHTop, lHBot, eng3SignalClose)
 bool lHistLive = f_eng2_matches_history_zone(showLongLiveZone, (eng2LongHistoryIsOb and lOb) or (eng2LongHistoryIsFvg and lFvg), longZoneTop, longZoneBot, tradeLongCreatedBar, lHTop, lHBot, lHBar)
 bool lHistBO = f_eng2_matches_history_zone(lCtxBO and eng2LongHistoryIsOb, true, eng1_ctx_bull_ob_top, eng1_ctx_bull_ob_bottom, eng1BullObCreatedBar, lHTop, lHBot, lHBar)
 bool lHistBF = f_eng2_matches_history_zone(lCtxBF and eng2LongHistoryIsFvg, true, eng1_ctx_bull_fvg_top, eng1_ctx_bull_fvg_bottom, eng1BullFvgCreatedBar, lHTop, lHBot, lHBar)
-bool lHistHide = lHistLive or lHistBO or lHistBF
-bool showLHistZone = lHistCand and not lHistHide
-bool sHistCand = histOn and eng2ShortHistoryTag != "" and not na(sHTop) and not na(sHBot) and sHistType and not f_eng3_poi_invalidated(false, sHTop, sHBot, eng3SignalClose)
+bool showLHistZone = lHistCand and not (lHistLive or lHistBO or lHistBF)
+bool sHistCand = histOn and eng2ShortHistoryTag != "" and not na(sHTop) and not na(sHBot) and ((eng2ShortHistoryIsOb and showOb) or (eng2ShortHistoryIsFvg and showFvg)) and not f_eng3_poi_invalidated(false, sHTop, sHBot, eng3SignalClose)
 bool sHistLive = f_eng2_matches_history_zone(showShortLiveZone, (eng2ShortHistoryIsOb and sOb) or (eng2ShortHistoryIsFvg and sFvg), shortZoneTop, shortZoneBot, tradeShortCreatedBar, sHTop, sHBot, sHBar)
 bool sHistBO = f_eng2_matches_history_zone(sCtxBO and eng2ShortHistoryIsOb, true, eng1_ctx_bear_ob_top, eng1_ctx_bear_ob_bottom, eng1BearObCreatedBar, sHTop, sHBot, sHBar)
 bool sHistBF = f_eng2_matches_history_zone(sCtxBF and eng2ShortHistoryIsFvg, true, eng1_ctx_bear_fvg_top, eng1_ctx_bear_fvg_bottom, eng1BearFvgCreatedBar, sHTop, sHBot, sHBar)
-bool sHistHide = sHistLive or sHistBO or sHistBF
-bool showSHistZone = sHistCand and not sHistHide
+bool showSHistZone = sHistCand and not (sHistLive or sHistBO or sHistBF)
 // Keep terminal history snapshots frozen so old zones do not read as live POI.
-string lzBase = longDrawSel ? (lOb ? f_obLabelText(true, eng1_ctx_bull_ob_breaker) : lFvg ? "FVG" : "") : ""
-string szBase = shortDrawSel ? (sOb ? f_obLabelText(false, eng1_ctx_bear_ob_breaker) : sFvg ? "FVG" : "") : ""
-string lzText = f_eng2_zone_label_text(lzBase, longPoiLifecycle, poi_long_type, f_executionStateBadge(longExecutionState, compactMode), longZoneQualityText)
-string szText = f_eng2_zone_label_text(szBase, shortPoiLifecycle, poi_short_type, f_executionStateBadge(shortExecutionState, compactMode), shortZoneQualityText)
+string lzText = f_eng2_zone_label_text(longDrawSel ? (lOb ? f_obLabelText(true, eng1_ctx_bull_ob_breaker) : lFvg ? "FVG" : "") : "", longPoiLifecycle, poi_long_type, f_executionStateBadge(longExecutionState, compactMode), longZoneQualityText)
+string szText = f_eng2_zone_label_text(shortDrawSel ? (sOb ? f_obLabelText(false, eng1_ctx_bear_ob_breaker) : sFvg ? "FVG" : "") : "", shortPoiLifecycle, poi_short_type, f_executionStateBadge(shortExecutionState, compactMode), shortZoneQualityText)
 int lzBw = longPoiMitigated ? 1 : math.max(longZoneQualityText == "Q3" ? 3 : 2, longExecutionActive ? 3 : 2)
 int szBw = shortPoiMitigated ? 1 : math.max(shortZoneQualityText == "Q3" ? 3 : 2, shortExecutionActive ? 3 : 2)
 color lzBrd = color.new(bullColor, longPoiMitigated ? 70 : f_zoneQualityBorderAlpha(longZoneQualityText, longExecutionState))
