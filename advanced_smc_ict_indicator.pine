@@ -749,22 +749,12 @@ f_levelsClose(float levelA, float levelB, float tolerance) =>
     not na(levelA) and not na(levelB) and not na(tolerance) and math.abs(levelA - levelB) <= tolerance
 
 f_eng2_same_zone_visual(float topA, float bottomA, int barA, float topB, float bottomB, int barB) =>
-    bool levelsReady = not na(topA) and not na(bottomA) and not na(topB) and not na(bottomB)
-    float aTop = levelsReady ? math.max(topA, bottomA) : na
-    float aBottom = levelsReady ? math.min(topA, bottomA) : na
-    float bTop = levelsReady ? math.max(topB, bottomB) : na
-    float bBottom = levelsReady ? math.min(topB, bottomB) : na
-    bool sameLevels = levelsReady and f_levelsClose(aTop, bTop, atrTolerance) and f_levelsClose(aBottom, bBottom, atrTolerance)
-    bool bothAnchorsMissing = na(barA) and na(barB)
-    bool anchorsClose = not na(barA) and not na(barB) and math.abs(barA - barB) <= 1
-    bool sameAnchor = sameLevels and (bothAnchorsMissing or anchorsClose)
-    sameLevels and sameAnchor
+    bool sameLevels = f_levelsClose(math.max(topA, bottomA), math.max(topB, bottomB), atrTolerance) and f_levelsClose(math.min(topA, bottomA), math.min(topB, bottomB), atrTolerance)
+    sameLevels and ((na(barA) and na(barB)) or (not na(barA) and not na(barB) and math.abs(barA - barB) <= 1))
 
 f_eng2_matches_history_zone(bool historyVisible, bool historyTypeMatches, float zoneTop, float zoneBottom, int zoneBar, float historyTop, float historyBottom, int historyLeftBar) =>
-    bool levelsReady = not na(zoneTop) and not na(zoneBottom) and not na(historyTop) and not na(historyBottom)
-    bool sameLevels = levelsReady and f_levelsClose(math.max(zoneTop, zoneBottom), math.max(historyTop, historyBottom), atrTolerance) and f_levelsClose(math.min(zoneTop, zoneBottom), math.min(historyTop, historyBottom), atrTolerance)
-    bool sameAnchor = not na(zoneBar) and not na(historyLeftBar) and math.abs(zoneBar - historyLeftBar) <= 1
-    historyVisible and historyTypeMatches and (sameAnchor or sameLevels)
+    bool sameLevels = f_levelsClose(math.max(zoneTop, zoneBottom), math.max(historyTop, historyBottom), atrTolerance) and f_levelsClose(math.min(zoneTop, zoneBottom), math.min(historyTop, historyBottom), atrTolerance)
+    historyVisible and historyTypeMatches and ((not na(zoneBar) and not na(historyLeftBar) and math.abs(zoneBar - historyLeftBar) <= 1) or sameLevels)
 
 f_setCell(table targetTable, int col, int row, string cellText, color textClr, color bgClr) =>
     table.cell(targetTable, col, row, cellText, text_color=textClr, bgcolor=bgClr, text_size=compactDashboardMode ? size.tiny : size.small)
