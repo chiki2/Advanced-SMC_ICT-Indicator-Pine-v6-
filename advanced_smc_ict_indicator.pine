@@ -3949,8 +3949,7 @@ int backdropBias = displayNarrBias != 0 ? displayNarrBias : (eng1CtxRangeReady a
 color backdropColor = backdropBias == 1 ? bullColor : backdropBias == -1 ? bearColor : neutralColor
 // Keep bias tint subtle so it doesn't overpower zones/candles.
 int backdropAlpha = backdropBias == 0 ? 95 : 92
-chartBackdrop = showTrendBackground and not compactMode ? color.new(backdropColor, backdropAlpha) : na
-bgcolor(chartBackdrop)
+bgcolor(showTrendBackground and not compactMode ? color.new(backdropColor, backdropAlpha) : na)
 
 f_eng4_render_dashboard() =>
     if lastBar and showDashboard
