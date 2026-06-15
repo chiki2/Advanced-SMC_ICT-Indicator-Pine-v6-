@@ -768,34 +768,13 @@ f_prepareDashboardTable(table activeTable, int activeLastRow, table inactiveTabl
     table.cell(activeTable, 1, 0, "", text_color=color.new(color.white, 100), bgcolor=color.new(color.black, 100), text_size=size.tiny)
 
 f_draw_zone_visible(string mode, bool isSelected, bool isBull, string preferredDirection) =>
-    if mode == "Full"
-        true
-    else if mode == "Focused"
-        isSelected
-    else
-        preferredDirection == "Long" ? (isBull and isSelected) : preferredDirection == "Short" ? (not isBull and isSelected) : isSelected
+    mode == "Full" ? true : mode == "Focused" ? isSelected : preferredDirection == "Long" ? (isBull and isSelected) : preferredDirection == "Short" ? (not isBull and isSelected) : isSelected
 
 f_draw_level_visible(string mode, bool isPrimary, bool isBull, string preferredDirection) =>
-    if mode == "Full"
-        true
-    else if mode == "Focused"
-        isPrimary
-    else
-        preferredDirection == "Long" ? (isBull and isPrimary) : preferredDirection == "Short" ? (not isBull and isPrimary) : isPrimary
+    mode == "Full" ? true : mode == "Focused" ? isPrimary : preferredDirection == "Long" ? (isBull and isPrimary) : preferredDirection == "Short" ? (not isBull and isPrimary) : isPrimary
 
 f_executionVisualByMode(string mode, bool riskVisible, string preferredDirection, bool isLong, bool useLongPreference) =>
-    if not riskVisible
-        false
-    else if mode == "Full"
-        true
-    else if preferredDirection == "Balanced"
-        useLongPreference ? isLong : not isLong
-    else if preferredDirection == "Long"
-        isLong
-    else if preferredDirection == "Short"
-        not isLong
-    else
-        false
+    not riskVisible ? false : mode == "Full" ? true : preferredDirection == "Balanced" ? (useLongPreference ? isLong : not isLong) : preferredDirection == "Long" ? isLong : preferredDirection == "Short" ? not isLong : false
 
 f_setupExecutionState(bool hasSetup, bool ambiguous, bool invalidated, bool expired, bool chased, bool completed, bool managed, bool baseContextPass, bool confirmationPass, bool mssFresh, bool displacementSeen, bool priceInZone, bool priceNearZone) =>
     not hasSetup ? "Waiting" : ambiguous ? "Ambiguous" : completed ? "Completed" : invalidated ? "Invalidated" : managed ? "Managed" : expired or chased ? "Expired" : not baseContextPass ? "Waiting" : not confirmationPass ? "Confirming" : mssFresh and displacementSeen ? (priceInZone or priceNearZone ? "Active" : "Armed") : "Waiting"
