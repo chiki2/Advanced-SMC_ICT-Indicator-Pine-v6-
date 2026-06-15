@@ -546,21 +546,17 @@ f_eng2_resolve_label_y(int targetTime, float level, bool placeAbove, float laneM
     resolvedY
 
 f_eng2_trim_label_history(label[] labelsArr, int cap) =>
-    int n = array.size(labelsArr) - cap
-    while n > 0
+    while array.size(labelsArr) > cap
         label oldLabel = array.shift(labelsArr)
         if not na(oldLabel)
             label.delete(oldLabel)
-        n := n - 1
     true
 
 f_eng2_trim_line_history(line[] linesArr, int cap) =>
-    int n = array.size(linesArr) - cap
-    while n > 0
+    while array.size(linesArr) > cap
         line oldLine = array.shift(linesArr)
         if not na(oldLine)
             line.delete(oldLine)
-        n := n - 1
     true
 
 f_eng2_pushStructureNodeTime(label[] labelsArr, int sourceTime, float level, string labelText, color textColor, bool placeAbove, int cap, string labelSize, string lanePrefix) =>
