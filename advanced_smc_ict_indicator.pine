@@ -3870,34 +3870,28 @@ if lastBar
     bool eng2DealingRangeCoreNeedsSync = showDealingRangeVisual or eng2DealingRangeCoreHasHandles
     if eng2DealingRangeCoreNeedsSync
         color rangeBoundaryColor = eng2DealBroken ? color.new(color.silver, 78) : color.new(color.silver, 35)
-        color rangeEqColor = eng2DealBroken ? color.new(color.silver, 78) : decisionEqColor
         color rangeQuarterColor = color.new(color.silver, eng2DealBroken ? 86 : 78)
         string rangeBoundaryStyle = eng2DealBroken ? line.style_dotted : line.style_solid
-        string rangeEqStyle = eng2DealBroken ? line.style_dotted : line.style_dashed
-        color rangePremiumColor = eng2DealBroken ? color.new(color.silver, 94) : decisionPremiumFillColor
-        color rangeDiscountColor = eng2DealBroken ? color.new(color.silver, 94) : decisionDiscountFillColor
         eng2RangeHighLine := f_eng2_syncSegmentHLine(eng2RangeHighLine, dealingLeftBar, bar_index, dealingRangeHighLevel, rangeBoundaryColor, 1, rangeBoundaryStyle, showDealingRangeVisual)
         eng2RangeLowLine := f_eng2_syncSegmentHLine(eng2RangeLowLine, dealingLeftBar, bar_index, dealingRangeLowLevel, rangeBoundaryColor, 1, rangeBoundaryStyle, showDealingRangeVisual)
-        eng2RangeEqLine := f_eng2_syncSegmentHLine(eng2RangeEqLine, dealingLeftBar, bar_index, dealingRangeEqLevel, rangeEqColor, 2, rangeEqStyle, showDealingRangeVisual)
+        eng2RangeEqLine := f_eng2_syncSegmentHLine(eng2RangeEqLine, dealingLeftBar, bar_index, dealingRangeEqLevel, eng2DealBroken ? color.new(color.silver, 78) : decisionEqColor, 2, eng2DealBroken ? line.style_dotted : line.style_dashed, showDealingRangeVisual)
         eng2RangeQ25Line := f_eng2_syncSegmentHLine(eng2RangeQ25Line, dealingLeftBar, bar_index, dealingRangeQ25, rangeQuarterColor, 1, line.style_dotted, showDealingRangeVisual)
         eng2RangeQ75Line := f_eng2_syncSegmentHLine(eng2RangeQ75Line, dealingLeftBar, bar_index, dealingRangeQ75, rangeQuarterColor, 1, line.style_dotted, showDealingRangeVisual)
-        eng2RangePremiumFill := f_eng2_syncLineFill(eng2RangePremiumFill, eng2RangeHighLine, eng2RangeEqLine, rangePremiumColor, showDealingRangeVisual)
-        eng2RangeDiscountFill := f_eng2_syncLineFill(eng2RangeDiscountFill, eng2RangeEqLine, eng2RangeLowLine, rangeDiscountColor, showDealingRangeVisual)
+        eng2RangePremiumFill := f_eng2_syncLineFill(eng2RangePremiumFill, eng2RangeHighLine, eng2RangeEqLine, eng2DealBroken ? color.new(color.silver, 94) : decisionPremiumFillColor, showDealingRangeVisual)
+        eng2RangeDiscountFill := f_eng2_syncLineFill(eng2RangeDiscountFill, eng2RangeEqLine, eng2RangeLowLine, eng2DealBroken ? color.new(color.silver, 94) : decisionDiscountFillColor, showDealingRangeVisual)
 
     bool eng2DealingOteCoreHasHandles = not na(eng2OteLongTopLine) or not na(eng2OteLongBottomLine) or not na(eng2OteLongFill) or not na(eng2OteShortTopLine) or not na(eng2OteShortBottomLine) or not na(eng2OteShortFill)
     bool eng2DealingOteCoreNeedsSync = showDealingOte or eng2DealingOteCoreHasHandles
     if eng2DealingOteCoreNeedsSync
         color oteBullLineColor = color.new(bullColor, eng2DealBroken ? 45 : 18)
         color oteBearLineColor = color.new(bearColor, eng2DealBroken ? 45 : 18)
-        color oteBullFillColor = color.new(bullColor, eng2DealBroken ? 90 : 86)
-        color oteBearFillColor = color.new(bearColor, eng2DealBroken ? 90 : 86)
         string oteBandStyle = eng2DealBroken ? line.style_dotted : line.style_solid
         eng2OteLongTopLine := f_eng2_syncSegmentHLine(eng2OteLongTopLine, dealingLeftBar, bar_index, oteLongTopLevel, oteBullLineColor, 2, oteBandStyle, showDealingOte)
         eng2OteLongBottomLine := f_eng2_syncSegmentHLine(eng2OteLongBottomLine, dealingLeftBar, bar_index, oteLongBottomLevel, oteBullLineColor, 2, oteBandStyle, showDealingOte)
-        eng2OteLongFill := f_eng2_syncLineFill(eng2OteLongFill, eng2OteLongTopLine, eng2OteLongBottomLine, oteBullFillColor, showDealingOte)
+        eng2OteLongFill := f_eng2_syncLineFill(eng2OteLongFill, eng2OteLongTopLine, eng2OteLongBottomLine, color.new(bullColor, eng2DealBroken ? 90 : 86), showDealingOte)
         eng2OteShortTopLine := f_eng2_syncSegmentHLine(eng2OteShortTopLine, dealingLeftBar, bar_index, oteShortTopLevel, oteBearLineColor, 2, oteBandStyle, showDealingOte)
         eng2OteShortBottomLine := f_eng2_syncSegmentHLine(eng2OteShortBottomLine, dealingLeftBar, bar_index, oteShortBottomLevel, oteBearLineColor, 2, oteBandStyle, showDealingOte)
-        eng2OteShortFill := f_eng2_syncLineFill(eng2OteShortFill, eng2OteShortTopLine, eng2OteShortBottomLine, oteBearFillColor, showDealingOte)
+        eng2OteShortFill := f_eng2_syncLineFill(eng2OteShortFill, eng2OteShortTopLine, eng2OteShortBottomLine, color.new(bearColor, eng2DealBroken ? 90 : 86), showDealingOte)
 
     bool riskSync = showLongRiskVisual or showShortRiskVisual or not na(eng2RiskLongEntryLine) or not na(eng2RiskShortEntryLine) or not na(eng2RiskLongStopLine) or not na(eng2RiskShortStopLine) or not na(eng2RiskLongTargetLine) or not na(eng2RiskShortTargetLine)
     if riskSync
