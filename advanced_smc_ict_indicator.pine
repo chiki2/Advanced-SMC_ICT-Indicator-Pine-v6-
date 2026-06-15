@@ -3777,8 +3777,6 @@ float dealingRangeHighLevel = showDealingRangeVisual ? eng2DealHigh : na
 float dealingRangeLowLevel = showDealingRangeVisual ? eng2DealLow : na
 float dealingRangeEqLevel = showDealingRangeVisual ? (eng2DealHigh + eng2DealLow) * 0.5 : na
 float dealingRangeSize = dealingRangeValid ? eng2DealHigh - eng2DealLow : na
-float dealingRangeQ25 = showDealingRangeVisual ? eng2DealLow + dealingRangeSize * 0.25 : na
-float dealingRangeQ75 = showDealingRangeVisual ? eng2DealLow + dealingRangeSize * 0.75 : na
 riskBullStopLevel = showLongRiskVisual ? tradeLongStop : na
 riskBearStopLevel = showShortRiskVisual ? tradeShortStop : na
 oteLongTopLevel = showOteVisual and dealingRangeValid ? eng2DealHigh - dealingRangeSize * 0.62 : na
@@ -3828,8 +3826,8 @@ if lastBar
         eng2RangeHighLine := f_eng2_syncSegmentHLine(eng2RangeHighLine, dealingLeftBar, bar_index, dealingRangeHighLevel, rangeBoundaryColor, 1, rangeBoundaryStyle, showDealingRangeVisual)
         eng2RangeLowLine := f_eng2_syncSegmentHLine(eng2RangeLowLine, dealingLeftBar, bar_index, dealingRangeLowLevel, rangeBoundaryColor, 1, rangeBoundaryStyle, showDealingRangeVisual)
         eng2RangeEqLine := f_eng2_syncSegmentHLine(eng2RangeEqLine, dealingLeftBar, bar_index, dealingRangeEqLevel, eng2DealBroken ? color.new(color.silver, 78) : decisionEqColor, 2, eng2DealBroken ? line.style_dotted : line.style_dashed, showDealingRangeVisual)
-        eng2RangeQ25Line := f_eng2_syncSegmentHLine(eng2RangeQ25Line, dealingLeftBar, bar_index, dealingRangeQ25, rangeQuarterColor, 1, line.style_dotted, showDealingRangeVisual)
-        eng2RangeQ75Line := f_eng2_syncSegmentHLine(eng2RangeQ75Line, dealingLeftBar, bar_index, dealingRangeQ75, rangeQuarterColor, 1, line.style_dotted, showDealingRangeVisual)
+        eng2RangeQ25Line := f_eng2_syncSegmentHLine(eng2RangeQ25Line, dealingLeftBar, bar_index, showDealingRangeVisual ? eng2DealLow + dealingRangeSize * 0.25 : na, rangeQuarterColor, 1, line.style_dotted, showDealingRangeVisual)
+        eng2RangeQ75Line := f_eng2_syncSegmentHLine(eng2RangeQ75Line, dealingLeftBar, bar_index, showDealingRangeVisual ? eng2DealLow + dealingRangeSize * 0.75 : na, rangeQuarterColor, 1, line.style_dotted, showDealingRangeVisual)
         eng2RangePremiumFill := f_eng2_syncLineFill(eng2RangePremiumFill, eng2RangeHighLine, eng2RangeEqLine, eng2DealBroken ? color.new(color.silver, 94) : decisionPremiumFillColor, showDealingRangeVisual)
         eng2RangeDiscountFill := f_eng2_syncLineFill(eng2RangeDiscountFill, eng2RangeEqLine, eng2RangeLowLine, eng2DealBroken ? color.new(color.silver, 94) : decisionDiscountFillColor, showDealingRangeVisual)
 
@@ -3858,13 +3856,12 @@ if lastBar
     bool rLbl = draw_show_right_labels
     bool bslLblOn = (rLbl and showDealingRangeVisual and not (f_levelsClose(bslLbl, pdhLevel, rightEdgeLabelTolerance) or f_levelsClose(bslLbl, pwhLevel, rightEdgeLabelTolerance) or f_levelsClose(bslLbl, pmhLevel, rightEdgeLabelTolerance))) or (showEqHighRightLabel and not showDealingRangeVisual)
     bool sslLblOn = (rLbl and showDealingRangeVisual and not (f_levelsClose(sslLbl, pdlLevel, rightEdgeLabelTolerance) or f_levelsClose(sslLbl, pwlLevel, rightEdgeLabelTolerance) or f_levelsClose(sslLbl, pmlLevel, rightEdgeLabelTolerance))) or (showEqLowRightLabel and not showDealingRangeVisual)
-    bool dealLblOn = rLbl and showDealingRangeVisual
     if bslLblOn or not na(eqHighLabel)
         eqHighLabel := f_eng2_syncRightLevelLabel(eqHighLabel, bslLbl, showDealingRangeVisual ? "ERL BSL" : eng1_exe_eqh_active ? "EQH" : "BSL", color.new(liqHighColor, 12), bslLblOn)
     if sslLblOn or not na(eqLowLabel)
         eqLowLabel := f_eng2_syncRightLevelLabel(eqLowLabel, sslLbl, showDealingRangeVisual ? "ERL SSL" : eng1_exe_eql_active ? "EQL" : "SSL", color.new(liqLowColor, 12), sslLblOn)
-    if dealLblOn or not na(eng2DealEqLabel)
-        eng2DealEqLabel := f_eng2_syncRightLevelLabel(eng2DealEqLabel, dealingRangeEqLevel, "EQ", color.new(decisionEqColor, 0), dealLblOn)
+    if (rLbl and showDealingRangeVisual) or not na(eng2DealEqLabel)
+        eng2DealEqLabel := f_eng2_syncRightLevelLabel(eng2DealEqLabel, dealingRangeEqLevel, "EQ", color.new(decisionEqColor, 0), rLbl and showDealingRangeVisual)
     if (rLbl and showPdhVisual) or not na(pdhLabel)
         pdhLabel := f_eng2_syncRightLevelLabel(pdhLabel, pdhLevel, "PDH", color.new(liqHighColor, 10), rLbl and showPdhVisual)
     if (rLbl and showPdlVisual) or not na(pdlLabel)
