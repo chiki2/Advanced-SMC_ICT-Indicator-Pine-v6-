@@ -3906,14 +3906,8 @@ if lastBar
     float bslLbl = showDealingRangeVisual ? dealingRangeHighLevel : eqHighLevel
     float sslLbl = showDealingRangeVisual ? dealingRangeLowLevel : eqLowLevel
     bool rLbl = draw_show_right_labels
-    bool bslCal = rLbl and showDealingRangeVisual and (f_levelsClose(bslLbl, pdhLevel, rightEdgeLabelTolerance) or f_levelsClose(bslLbl, pwhLevel, rightEdgeLabelTolerance) or f_levelsClose(bslLbl, pmhLevel, rightEdgeLabelTolerance))
-    bool sslCal = rLbl and showDealingRangeVisual and (f_levelsClose(sslLbl, pdlLevel, rightEdgeLabelTolerance) or f_levelsClose(sslLbl, pwlLevel, rightEdgeLabelTolerance) or f_levelsClose(sslLbl, pmlLevel, rightEdgeLabelTolerance))
-    bool showBslLbl = rLbl and showDealingRangeVisual and not bslCal
-    bool showSslLbl = rLbl and showDealingRangeVisual and not sslCal
-    bool showExeBsl = showEqHighRightLabel and not showDealingRangeVisual
-    bool showExeSsl = showEqLowRightLabel and not showDealingRangeVisual
-    bool bslLblOn = showBslLbl or showExeBsl
-    bool sslLblOn = showSslLbl or showExeSsl
+    bool bslLblOn = (rLbl and showDealingRangeVisual and not (f_levelsClose(bslLbl, pdhLevel, rightEdgeLabelTolerance) or f_levelsClose(bslLbl, pwhLevel, rightEdgeLabelTolerance) or f_levelsClose(bslLbl, pmhLevel, rightEdgeLabelTolerance))) or (showEqHighRightLabel and not showDealingRangeVisual)
+    bool sslLblOn = (rLbl and showDealingRangeVisual and not (f_levelsClose(sslLbl, pdlLevel, rightEdgeLabelTolerance) or f_levelsClose(sslLbl, pwlLevel, rightEdgeLabelTolerance) or f_levelsClose(sslLbl, pmlLevel, rightEdgeLabelTolerance))) or (showEqLowRightLabel and not showDealingRangeVisual)
     bool dealLblOn = rLbl and showDealingRangeVisual
     if bslLblOn or not na(eqHighLabel)
         eqHighLabel := f_eng2_syncRightLevelLabel(eqHighLabel, bslLbl, showDealingRangeVisual ? "ERL BSL" : eng1_exe_eqh_active ? "EQH" : "BSL", color.new(liqHighColor, 12), bslLblOn)
