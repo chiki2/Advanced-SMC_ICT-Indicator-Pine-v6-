@@ -3581,14 +3581,10 @@ color szBrd = color.new(bearColor, shortPoiMitigated ? 70 : f_zoneQualityBorderA
 color lzFill = color.new(bullColor, longPoiMitigated ? 92 : f_executionSelectedFillAlpha(longExecutionState))
 color szFill = color.new(bearColor, shortPoiMitigated ? 92 : f_executionSelectedFillAlpha(shortExecutionState))
 
-bool lHistBlkBO = f_eng2_matches_history_zone(showLHistZone, eng2LongHistoryIsOb, eng1_ctx_bull_ob_top, eng1_ctx_bull_ob_bottom, eng1BullObCreatedBar, lHTop, lHBot, lHBar)
-bool lHistBlkBF = f_eng2_matches_history_zone(showLHistZone, eng2LongHistoryIsFvg, eng1_ctx_bull_fvg_top, eng1_ctx_bull_fvg_bottom, eng1BullFvgCreatedBar, lHTop, lHBot, lHBar)
-bool sHistBlkBO = f_eng2_matches_history_zone(showSHistZone, eng2ShortHistoryIsOb, eng1_ctx_bear_ob_top, eng1_ctx_bear_ob_bottom, eng1BearObCreatedBar, sHTop, sHBot, sHBar)
-bool sHistBlkBF = f_eng2_matches_history_zone(showSHistZone, eng2ShortHistoryIsFvg, eng1_ctx_bear_fvg_top, eng1_ctx_bear_fvg_bottom, eng1BearFvgCreatedBar, sHTop, sHBot, sHBar)
-bool showCtxBO = lCtxBO and not lHistBlkBO and not f_eng3_poi_invalidated(true, eng1_ctx_bull_ob_top, eng1_ctx_bull_ob_bottom, eng3SignalClose)
-bool showCtxBF = lCtxBF and not lHistBlkBF and not f_eng3_poi_invalidated(true, eng1_ctx_bull_fvg_top, eng1_ctx_bull_fvg_bottom, eng3SignalClose)
-bool showCtxSO = sCtxBO and not sHistBlkBO and not f_eng3_poi_invalidated(false, eng1_ctx_bear_ob_top, eng1_ctx_bear_ob_bottom, eng3SignalClose)
-bool showCtxSF = sCtxBF and not sHistBlkBF and not f_eng3_poi_invalidated(false, eng1_ctx_bear_fvg_top, eng1_ctx_bear_fvg_bottom, eng3SignalClose)
+bool showCtxBO = lCtxBO and not f_eng2_matches_history_zone(showLHistZone, eng2LongHistoryIsOb, eng1_ctx_bull_ob_top, eng1_ctx_bull_ob_bottom, eng1BullObCreatedBar, lHTop, lHBot, lHBar) and not f_eng3_poi_invalidated(true, eng1_ctx_bull_ob_top, eng1_ctx_bull_ob_bottom, eng3SignalClose)
+bool showCtxBF = lCtxBF and not f_eng2_matches_history_zone(showLHistZone, eng2LongHistoryIsFvg, eng1_ctx_bull_fvg_top, eng1_ctx_bull_fvg_bottom, eng1BullFvgCreatedBar, lHTop, lHBot, lHBar) and not f_eng3_poi_invalidated(true, eng1_ctx_bull_fvg_top, eng1_ctx_bull_fvg_bottom, eng3SignalClose)
+bool showCtxSO = sCtxBO and not f_eng2_matches_history_zone(showSHistZone, eng2ShortHistoryIsOb, eng1_ctx_bear_ob_top, eng1_ctx_bear_ob_bottom, eng1BearObCreatedBar, sHTop, sHBot, sHBar) and not f_eng3_poi_invalidated(false, eng1_ctx_bear_ob_top, eng1_ctx_bear_ob_bottom, eng3SignalClose)
+bool showCtxSF = sCtxBF and not f_eng2_matches_history_zone(showSHistZone, eng2ShortHistoryIsFvg, eng1_ctx_bear_fvg_top, eng1_ctx_bear_fvg_bottom, eng1BearFvgCreatedBar, sHTop, sHBot, sHBar) and not f_eng3_poi_invalidated(false, eng1_ctx_bear_fvg_top, eng1_ctx_bear_fvg_bottom, eng3SignalClose)
 // Empty passive context paths skip sync work; existing handles still clear here.
 if lastBar and (showCtxBO or showCtxBF or showCtxSO or showCtxSF or not na(eng2CtxBullObBox) or not na(eng2CtxBullObLabel) or not na(eng2CtxBullFvgBox) or not na(eng2CtxBullFvgLabel) or not na(eng2CtxBearObBox) or not na(eng2CtxBearObLabel) or not na(eng2CtxBearFvgBox) or not na(eng2CtxBearFvgLabel))
     [cboB, cboL] = f_eng2_syncCtxZone(eng2CtxBullObBox, eng2CtxBullObLabel, showCtxBO, eng1BullObCreatedBar, eng1_ctx_bull_ob_top, eng1_ctx_bull_ob_bottom, "AUD " + f_obLabelText(true, eng1_ctx_bull_ob_breaker), color.new(bullColor, 72), color.new(bullColor, 97))
