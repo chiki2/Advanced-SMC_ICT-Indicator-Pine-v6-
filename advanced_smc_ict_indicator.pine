@@ -621,10 +621,8 @@ f_eng2_backfill_structure_node(bool internalLayer, int nodeTime, float nodeLevel
     string layerPrefix = internalLayer ? "i" : "s"
     string labelSize = internalLayer ? size.tiny : size.small
     color nodeColor = nodeText == "HH" or nodeText == "HL" ? color.new(bullColor, 0) : nodeText == "LH" or nodeText == "LL" ? color.new(bearColor, 0) : color.new(neutralColor, 0)
-    if internalLayer
-        f_eng2_pushStructureNodeTime(eng2InternalStructureNodeHistory, nodeTime, nodeLevel, layerPrefix + nodeText, nodeColor, isHigh, cap, labelSize, layerPrefix)
-    else
-        f_eng2_pushStructureNodeTime(eng2SwingStructureNodeHistory, nodeTime, nodeLevel, layerPrefix + nodeText, nodeColor, isHigh, cap, labelSize, layerPrefix)
+    label[] nodeHistory = internalLayer ? eng2InternalStructureNodeHistory : eng2SwingStructureNodeHistory
+    f_eng2_pushStructureNodeTime(nodeHistory, nodeTime, nodeLevel, layerPrefix + nodeText, nodeColor, isHigh, cap, labelSize, layerPrefix)
     true
 
 f_eng2_backfill_structure_event(bool internalLayer, int leftTime, int rightTime, float level, string eventText, int eventBias, int cap) =>
@@ -633,10 +631,9 @@ f_eng2_backfill_structure_event(bool internalLayer, int leftTime, int rightTime,
     string eventStyle = internalLayer ? line.style_dotted : line.style_solid
     int eventWidth = internalLayer ? 1 : 2
     color eventColor = eventBias == 1 ? color.new(bullColor, 0) : color.new(bearColor, 0)
-    if internalLayer
-        f_eng2_pushStructureEventTime(eng2InternalStructureEventHistory, eng2InternalStructureEventLineHistory, leftTime, rightTime, level, layerPrefix + eventText, eventColor, eventStyle, eventWidth, eventBias == 1, cap, labelSize, layerPrefix)
-    else
-        f_eng2_pushStructureEventTime(eng2SwingStructureEventHistory, eng2SwingStructureEventLineHistory, leftTime, rightTime, level, layerPrefix + eventText, eventColor, eventStyle, eventWidth, eventBias == 1, cap, labelSize, layerPrefix)
+    label[] eventHistory = internalLayer ? eng2InternalStructureEventHistory : eng2SwingStructureEventHistory
+    line[] eventLines = internalLayer ? eng2InternalStructureEventLineHistory : eng2SwingStructureEventLineHistory
+    f_eng2_pushStructureEventTime(eventHistory, eventLines, leftTime, rightTime, level, layerPrefix + eventText, eventColor, eventStyle, eventWidth, eventBias == 1, cap, labelSize, layerPrefix)
     true
 
 f_eng2_backfill_structure_from_buffer(bool internalLayer, array<int> arrT, array<float> arrH, array<float> arrL, array<float> arrC, int swingLen, int scanCap, int nodeCap, int eventCap) =>
