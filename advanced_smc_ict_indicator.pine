@@ -3946,10 +3946,8 @@ if lastBar
 
 // Bias tint should follow the MTF narrative chain: Narrative -> Context -> Execution.
 int backdropBias = displayNarrBias != 0 ? displayNarrBias : (eng1CtxRangeReady and displayCtxBias != 0 ? displayCtxBias : displayExecBias)
-color backdropColor = backdropBias == 1 ? bullColor : backdropBias == -1 ? bearColor : neutralColor
 // Keep bias tint subtle so it doesn't overpower zones/candles.
-int backdropAlpha = backdropBias == 0 ? 95 : 92
-bgcolor(showTrendBackground and not compactMode ? color.new(backdropColor, backdropAlpha) : na)
+bgcolor(showTrendBackground and not compactMode ? color.new(backdropBias == 1 ? bullColor : backdropBias == -1 ? bearColor : neutralColor, backdropBias == 0 ? 95 : 92) : na)
 
 f_eng4_render_dashboard() =>
     if lastBar and showDashboard
