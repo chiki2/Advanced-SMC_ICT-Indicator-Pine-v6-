@@ -3631,15 +3631,13 @@ if lastBar and (showLHistZone or not na(eng2LongHistoryBox))
 if lastBar and (showSHistZone or not na(eng2ShortHistoryBox))
     eng2ShortHistoryBox := f_eng2_syncHistBox(eng2ShortHistoryBox, showSHistZone, sHBar, eng2ShortHistoryRightBar, sHTop, sHBot, color.new(bearColor, 80), color.new(bearColor, 98), 1)
 
-bool anySetupZoneVisible = showLongLiveZone or showShortLiveZone
 bool eng2LongSetupEventAllowed = draw_show_setup_events and eng2SignalEventsStateReady and showLongLiveZone
 bool eng2ShortSetupEventAllowed = draw_show_setup_events and eng2SignalEventsStateReady and showShortLiveZone
 bool eng2FullLabelBudgetTight = freeSafeMode and draw_full
-bool eng2RawEventLabelsAllowed = eng1_exec_valid and eng2SignalEventsStateReady and not anySetupZoneVisible and not eng2FullLabelBudgetTight
+bool eng2RawEventLabelsAllowed = eng1_exec_valid and eng2SignalEventsStateReady and not (showLongLiveZone or showShortLiveZone) and not eng2FullLabelBudgetTight
 bool eng2KeepSweepLabels = displaySweepMarkers and eng2RawEventLabelsAllowed
-bool eng2KeepSetupLabels = eng2LongSetupEventAllowed or eng2ShortSetupEventAllowed
 int eng2EventTfSeconds = timeframe.in_seconds()
-int eng2EventKeepCap = eng2KeepSweepLabels or eng2KeepSetupLabels ? (freeSafeMode ? (draw_full ? (eng2EventTfSeconds <= 60 ? 3 : eng2EventTfSeconds <= 300 ? 4 : 5) : 5) : draw_full ? (eng2EventTfSeconds <= 60 ? 6 : eng2EventTfSeconds <= 300 ? 8 : 10) : 10) : 0
+int eng2EventKeepCap = eng2KeepSweepLabels or eng2LongSetupEventAllowed or eng2ShortSetupEventAllowed ? (freeSafeMode ? (draw_full ? (eng2EventTfSeconds <= 60 ? 3 : eng2EventTfSeconds <= 300 ? 4 : 5) : 5) : draw_full ? (eng2EventTfSeconds <= 60 ? 6 : eng2EventTfSeconds <= 300 ? 8 : 10) : 10) : 0
 f_eng2_trim_label_history(eng2SignalEventLabelHistory, eng2EventKeepCap)
 if not eng2LongSetupEventAllowed and (eng2LongTappedEventTag != "" or eng2LongMitigatedEventTag != "")
     eng2LongTappedEventTag := ""
@@ -3673,12 +3671,10 @@ if eng2RawEventCreateReady or eng2LongSetupEventStateReady or eng2ShortSetupEven
                 eng2LastShortSweepLabelBar := bar_index
                 f_eng2_emitSignalEvent(eng2EventTime, eng2EventHigh, eng1_exe_eqh_active ? "EQH Sweep" : "BSL Sweep", color.new(bearColor, 12), true, 0.98)
         if eng2StructureEventStateReady
-            bool eng2BullDispEvent = eng1_exe_bull_displacement and not eng1_exe_bull_displacement[1] or longDispFallback and not longDispFallback[1]
-            bool eng2BearDispEvent = eng1_exe_bear_displacement and not eng1_exe_bear_displacement[1] or shortDispFallback and not shortDispFallback[1]
-            if (na(eng2LastBullDispLabelBar) or bar_index - eng2LastBullDispLabelBar >= eng2RawEventCooldownBars) and eng2BullDispEvent
+            if (na(eng2LastBullDispLabelBar) or bar_index - eng2LastBullDispLabelBar >= eng2RawEventCooldownBars) and ((eng1_exe_bull_displacement and not eng1_exe_bull_displacement[1]) or (longDispFallback and not longDispFallback[1]))
                 eng2LastBullDispLabelBar := bar_index
                 f_eng2_emitSignalEvent(eng2EventTime, eng2EventLow, "Disp+", color.new(bullColor, 15), false, 1.26)
-            if (na(eng2LastBearDispLabelBar) or bar_index - eng2LastBearDispLabelBar >= eng2RawEventCooldownBars) and eng2BearDispEvent
+            if (na(eng2LastBearDispLabelBar) or bar_index - eng2LastBearDispLabelBar >= eng2RawEventCooldownBars) and ((eng1_exe_bear_displacement and not eng1_exe_bear_displacement[1]) or (shortDispFallback and not shortDispFallback[1]))
                 eng2LastBearDispLabelBar := bar_index
                 f_eng2_emitSignalEvent(eng2EventTime, eng2EventHigh, "Disp-", color.new(bearColor, 15), true, 1.26)
     if eng2LongSetupEventStateReady or eng2ShortSetupEventStateReady
@@ -3700,29 +3696,23 @@ if eng2RawEventCreateReady or eng2LongSetupEventStateReady or eng2ShortSetupEven
         bool eng2LongContReady = eng2SetupExtraLabelsAllowed and eng2LongSetupEventStateReady and not longExecutionTerminal and not na(tradeLongEntry) and longPoiEventReached
         bool eng2ShortContReady = eng2SetupExtraLabelsAllowed and eng2ShortSetupEventStateReady and not shortExecutionTerminal and not na(tradeShortEntry) and shortPoiEventReached
         if eng2LongContReady or eng2ShortContReady
-            bool eng2BullInternalContinuationEvent = eng1_exe_bull_bos and not eng1_exe_bull_bos[1] or eng1_exe_bull_mss and not eng1_exe_bull_mss[1] or eng1_exe_bull_choch and not eng1_exe_bull_choch[1]
-            bool eng2BearInternalContinuationEvent = eng1_exe_bear_bos and not eng1_exe_bear_bos[1] or eng1_exe_bear_mss and not eng1_exe_bear_mss[1] or eng1_exe_bear_choch and not eng1_exe_bear_choch[1]
-            bool eng2BullSwingContinuationEvent = eng1_ctx_bull_breakout and not eng1_ctx_bull_breakout[1] or eng1_ctx_bull_choch and not eng1_ctx_bull_choch[1]
-            bool eng2BearSwingContinuationEvent = eng1_ctx_bear_breakout and not eng1_ctx_bear_breakout[1] or eng1_ctx_bear_choch and not eng1_ctx_bear_choch[1]
-            if eng2LongContReady and eng2BullInternalContinuationEvent
+            if eng2LongContReady and ((eng1_exe_bull_bos and not eng1_exe_bull_bos[1]) or (eng1_exe_bull_mss and not eng1_exe_bull_mss[1]) or (eng1_exe_bull_choch and not eng1_exe_bull_choch[1]))
                 f_eng2_emitSignalEvent(eng2EventTime, eng2EventLow, (eng1_exe_bull_mss or eng1_exe_bull_choch) ? "iMSS Cont" : "iBOS Cont", color.new(bullColor, 0), false, 1.94)
-            if eng2ShortContReady and eng2BearInternalContinuationEvent
+            if eng2ShortContReady and ((eng1_exe_bear_bos and not eng1_exe_bear_bos[1]) or (eng1_exe_bear_mss and not eng1_exe_bear_mss[1]) or (eng1_exe_bear_choch and not eng1_exe_bear_choch[1]))
                 f_eng2_emitSignalEvent(eng2EventTime, eng2EventHigh, (eng1_exe_bear_mss or eng1_exe_bear_choch) ? "iMSS Cont" : "iBOS Cont", color.new(bearColor, 0), true, 1.94)
-            if eng2LongContReady and eng2BullSwingContinuationEvent
+            if eng2LongContReady and ((eng1_ctx_bull_breakout and not eng1_ctx_bull_breakout[1]) or (eng1_ctx_bull_choch and not eng1_ctx_bull_choch[1]))
                 f_eng2_emitSignalEvent(eng2EventTime, eng2EventLow, eng1_ctx_bull_choch ? "sMSS Cont" : "sBOS Cont", color.new(bullColor, 0), false, 2.18)
-            if eng2ShortContReady and eng2BearSwingContinuationEvent
+            if eng2ShortContReady and ((eng1_ctx_bear_breakout and not eng1_ctx_bear_breakout[1]) or (eng1_ctx_bear_choch and not eng1_ctx_bear_choch[1]))
                 f_eng2_emitSignalEvent(eng2EventTime, eng2EventHigh, eng1_ctx_bear_choch ? "sMSS Cont" : "sBOS Cont", color.new(bearColor, 0), true, 2.18)
         if showOb and eng2SetupExtraLabelsAllowed and (eng2LongSetupEventStateReady or eng2ShortSetupEventStateReady)
             int eng2BullBreakerLabelTime = nz(eng1_ctx_bull_ob_breaker_time, eng1_ctx_bull_ob_bar)
             int eng2BearBreakerLabelTime = nz(eng1_ctx_bear_ob_breaker_time, eng1_ctx_bear_ob_bar)
             int eng2BullBreakerPrevLabelTime = nz(eng1_ctx_bull_ob_breaker_time[1], eng1_ctx_bull_ob_bar[1])
             int eng2BearBreakerPrevLabelTime = nz(eng1_ctx_bear_ob_breaker_time[1], eng1_ctx_bear_ob_bar[1])
-            bool eng2BullBreakerEvent = eng1_ctx_bull_ob_breaker and not na(eng2BullBreakerLabelTime) and eng2BullBreakerLabelTime != nz(eng2BullBreakerPrevLabelTime, -1)
-            bool eng2BearBreakerEvent = eng1_ctx_bear_ob_breaker and not na(eng2BearBreakerLabelTime) and eng2BearBreakerLabelTime != nz(eng2BearBreakerPrevLabelTime, -1)
-            if eng2LongSetupEventStateReady and eng2BullBreakerEvent
+            if eng2LongSetupEventStateReady and eng1_ctx_bull_ob_breaker and not na(eng2BullBreakerLabelTime) and eng2BullBreakerLabelTime != nz(eng2BullBreakerPrevLabelTime, -1)
                 float eng2BullBreakerLevel = not na(eng1_ctx_bull_ob_top) and not na(eng1_ctx_bull_ob_bottom) ? f_zoneMid(eng1_ctx_bull_ob_top, eng1_ctx_bull_ob_bottom) : eng2EventLow
                 f_eng2_emitSignalEvent(nz(eng2BullBreakerLabelTime, time), eng2BullBreakerLevel, "BRK+", color.new(bullColor, 0), false, 2.42)
-            if eng2ShortSetupEventStateReady and eng2BearBreakerEvent
+            if eng2ShortSetupEventStateReady and eng1_ctx_bear_ob_breaker and not na(eng2BearBreakerLabelTime) and eng2BearBreakerLabelTime != nz(eng2BearBreakerPrevLabelTime, -1)
                 float eng2BearBreakerLevel = not na(eng1_ctx_bear_ob_top) and not na(eng1_ctx_bear_ob_bottom) ? f_zoneMid(eng1_ctx_bear_ob_top, eng1_ctx_bear_ob_bottom) : eng2EventHigh
                 f_eng2_emitSignalEvent(nz(eng2BearBreakerLabelTime, time), eng2BearBreakerLevel, "BRK-", color.new(bearColor, 0), true, 2.42)
     f_eng2_trim_label_history(eng2SignalEventLabelHistory, eng2EventKeepCap)
