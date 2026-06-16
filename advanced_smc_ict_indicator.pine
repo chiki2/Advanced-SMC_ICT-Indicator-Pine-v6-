@@ -805,18 +805,9 @@ f_trimSessionVisuals(int keepCount) =>
                 line.delete(oldHighLine)
             if not na(oldLowLine)
                 line.delete(oldLowLine)
-        while array.size(sessionRangeLabels) > cap
-            label extraLabel = array.shift(sessionRangeLabels)
-            if not na(extraLabel)
-                label.delete(extraLabel)
-        while array.size(sessionRangeHighLines) > cap
-            line extraHighLine = array.shift(sessionRangeHighLines)
-            if not na(extraHighLine)
-                line.delete(extraHighLine)
-        while array.size(sessionRangeLowLines) > cap
-            line extraLowLine = array.shift(sessionRangeLowLines)
-            if not na(extraLowLine)
-                line.delete(extraLowLine)
+        f_eng2_trim_label_history(sessionRangeLabels, cap)
+        f_eng2_trim_line_history(sessionRangeHighLines, cap)
+        f_eng2_trim_line_history(sessionRangeLowLines, cap)
         while array.size(sessionRangeNames) > cap
             array.shift(sessionRangeNames)
     true
