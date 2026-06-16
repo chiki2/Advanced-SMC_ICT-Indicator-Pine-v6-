@@ -740,13 +740,14 @@ f_eng2_syncLineFill(linefill currentFill, line lineA, line lineB, color fillColo
 f_levelsClose(float levelA, float levelB, float tolerance) =>
     not na(levelA) and not na(levelB) and not na(tolerance) and math.abs(levelA - levelB) <= tolerance
 
+f_eng2_same_zone_levels(float topA, float bottomA, float topB, float bottomB) =>
+    f_levelsClose(math.max(topA, bottomA), math.max(topB, bottomB), atrTolerance) and f_levelsClose(math.min(topA, bottomA), math.min(topB, bottomB), atrTolerance)
+
 f_eng2_same_zone_visual(float topA, float bottomA, int barA, float topB, float bottomB, int barB) =>
-    bool sameLevels = f_levelsClose(math.max(topA, bottomA), math.max(topB, bottomB), atrTolerance) and f_levelsClose(math.min(topA, bottomA), math.min(topB, bottomB), atrTolerance)
-    sameLevels and ((na(barA) and na(barB)) or (not na(barA) and not na(barB) and math.abs(barA - barB) <= 1))
+    f_eng2_same_zone_levels(topA, bottomA, topB, bottomB) and ((na(barA) and na(barB)) or (not na(barA) and not na(barB) and math.abs(barA - barB) <= 1))
 
 f_eng2_matches_history_zone(bool historyVisible, bool historyTypeMatches, float zoneTop, float zoneBottom, int zoneBar, float historyTop, float historyBottom, int historyLeftBar) =>
-    bool sameLevels = f_levelsClose(math.max(zoneTop, zoneBottom), math.max(historyTop, historyBottom), atrTolerance) and f_levelsClose(math.min(zoneTop, zoneBottom), math.min(historyTop, historyBottom), atrTolerance)
-    historyVisible and historyTypeMatches and ((not na(zoneBar) and not na(historyLeftBar) and math.abs(zoneBar - historyLeftBar) <= 1) or sameLevels)
+    historyVisible and historyTypeMatches and ((not na(zoneBar) and not na(historyLeftBar) and math.abs(zoneBar - historyLeftBar) <= 1) or f_eng2_same_zone_levels(zoneTop, zoneBottom, historyTop, historyBottom))
 
 f_setCell(table targetTable, int col, int row, string cellText, color textClr, color bgClr) =>
     table.cell(targetTable, col, row, cellText, text_color=textClr, bgcolor=bgClr, text_size=compactDashboardMode ? size.tiny : size.small)
@@ -1026,8 +1027,6 @@ f_e2_risk_if(line h, float lvl, color col, int w, bool on) =>
 
 f_eng2_emitSignalEvent(int eventTime, float level, string eventText, color eventColor, bool labelAbove, float lanePrefix) =>
     if not na(level) and eventText != ""
-        // Signal events are secondary to market structure in Full audit mode.
-        // Keep their history tighter so structure labels keep priority.
         int labelTime = na(eventTime) ? time : eventTime
         float labelY = f_eng2_resolve_label_y(labelTime, level, labelAbove, lanePrefix, true)
         string labelStyle = labelAbove ? label.style_label_down : label.style_label_up
