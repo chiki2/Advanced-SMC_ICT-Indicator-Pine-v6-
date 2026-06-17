@@ -959,17 +959,22 @@ f_eng2_syncCtxZone(box b, label lab, bool en, int cb, float top, float bot, stri
         int leftBar = math.min(f_safeBarIndexX(f_createdBarFallback(cb)), bar_index)
         int rightBar = bar_index
         if na(nextBox)
-            nextBox := box.new(left=leftBar, top=safeTop, right=rightBar, bottom=safeBottom, xloc=xloc.bar_index, extend=extend.none, bgcolor=fc, border_color=bc, border_width=1)
+            nextBox := box.new(left=leftBar, top=safeTop, right=rightBar, bottom=safeBottom, xloc=xloc.bar_index, extend=extend.none, border_width=1)
         else
             box.set_lefttop(nextBox, leftBar, safeTop)
             box.set_rightbottom(nextBox, rightBar, safeBottom)
+        box.set_bgcolor(nextBox, fc)
+        box.set_border_color(nextBox, bc)
         int labelX = rightBar + 1
         float labelY = f_zoneMid(safeTop, safeBottom)
+        color labelColor = color.new(bc, 0)
         if na(nextLabel)
-            nextLabel := label.new(x=labelX, y=labelY, xloc=xloc.bar_index, text=txt, style=label.style_label_left, color=color.new(bc, 0), textcolor=color.white, size=size.tiny)
+            nextLabel := label.new(x=labelX, y=labelY, xloc=xloc.bar_index, text=txt, style=label.style_label_left, color=labelColor, textcolor=color.white, size=size.tiny)
         else
             label.set_xy(nextLabel, labelX, labelY)
             label.set_text(nextLabel, txt)
+            label.set_color(nextLabel, labelColor)
+            label.set_textcolor(nextLabel, color.white)
     else
         if not na(nextBox)
             box.delete(nextBox)
