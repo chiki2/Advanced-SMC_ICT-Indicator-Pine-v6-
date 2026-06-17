@@ -816,6 +816,9 @@ f_trimSessionVisuals(int keepCount) =>
 f_sessLaneHasHandles(box b, label lab, line hi, line lo, int st) =>
     not na(b) or not na(lab) or not na(hi) or not na(lo) or not na(st)
 
+f_liveZoneHasHandles(box b, line ln, label lab) =>
+    not na(b) or not na(ln) or not na(lab)
+
 f_eng2_syncSessLane(bool en, bool inSess, bool newSess, bool ended, box b, label lab, line hiLn, line loLn, int stBar, string name, float hi, float lo) =>
     if en
         box nextBox = b
@@ -3547,12 +3550,12 @@ if lastBar and (showCtxBO or showCtxBF or showCtxSO or showCtxSF or not na(eng2C
     eng2CtxBearFvgLabel := csfL
 
 // Empty live setup paths skip sync work; existing objects still clear here.
-if lastBar and (showLongLiveZone or not na(eng2LongZoneBox) or not na(eng2LongZoneLine) or not na(eng2LongZoneLabel))
+if lastBar and (showLongLiveZone or f_liveZoneHasHandles(eng2LongZoneBox, eng2LongZoneLine, eng2LongZoneLabel))
     [lzb, lzl, lzlab] = f_eng2_syncLiveZone(eng2LongZoneBox, eng2LongZoneLine, eng2LongZoneLabel, showLongLiveZone, tradeLongCreatedBar, longZoneTop, longZoneBot, tradeLongEntry, lzText, lOb ? label.style_label_right : label.style_label_left, lzBrd, lzFill, lzBw, lOb or lFvg, longExecutionState)
     eng2LongZoneBox := lzb
     eng2LongZoneLine := lzl
     eng2LongZoneLabel := lzlab
-if lastBar and (showShortLiveZone or not na(eng2ShortZoneBox) or not na(eng2ShortZoneLine) or not na(eng2ShortZoneLabel))
+if lastBar and (showShortLiveZone or f_liveZoneHasHandles(eng2ShortZoneBox, eng2ShortZoneLine, eng2ShortZoneLabel))
     [szb, szl, szlab] = f_eng2_syncLiveZone(eng2ShortZoneBox, eng2ShortZoneLine, eng2ShortZoneLabel, showShortLiveZone, tradeShortCreatedBar, shortZoneTop, shortZoneBot, tradeShortEntry, szText, sOb ? label.style_label_right : label.style_label_left, szBrd, szFill, szBw, sOb or sFvg, shortExecutionState)
     eng2ShortZoneBox := szb
     eng2ShortZoneLine := szl
