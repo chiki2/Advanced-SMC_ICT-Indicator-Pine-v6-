@@ -2939,8 +2939,8 @@ else
                 int eng2ExecEventCap = draw_full ? (freeSafeMode ? (eng1_exec_tf == "1" ? 2 : eng1_exec_tf == "5" ? 3 : 4) : (eng1_exec_tf == "1" ? 6 : eng1_exec_tf == "5" ? 8 : 10)) : (eng1_exec_tf == "1" ? 6 : eng1_exec_tf == "5" ? 8 : 12)
                 int eng2SwingNodeCap = freeSafeMode ? 4 : 12
                 int eng2SwingEventCap = freeSafeMode ? 2 : 5
-                int eng2ExecScanCap = draw_full ? (freeSafeMode ? 70 : 180) : (freeSafeMode ? 90 : 150)
-                int eng2CtxScanCap = draw_full ? (freeSafeMode ? 45 : 140) : (freeSafeMode ? 70 : 120)
+                int eng2ExecScanCap = draw_full ? (freeSafeMode ? 60 : 180) : (freeSafeMode ? 90 : 150)
+                int eng2CtxScanCap = draw_full ? (freeSafeMode ? 35 : 140) : (freeSafeMode ? 70 : 120)
                 if eng1_exec_tf == ENG1_TF_M1
                     f_eng2_backfill_structure_from_buffer(true, eng1_buf_m1_time, eng1_buf_m1_high, eng1_buf_m1_low, eng1_buf_m1_close, ENG1_SWING_LEN, eng2ExecScanCap, eng2ExecNodeCap, eng2ExecEventCap)
                 else if eng1_exec_tf == ENG1_TF_M5
